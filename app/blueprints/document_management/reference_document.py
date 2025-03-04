@@ -4,7 +4,7 @@ from flask import Blueprint, request, jsonify, send_file
 from app.services import s3_service
 from app.services import pdf_service
 
-bp = Blueprint('reference_document', __name__, url_prefix="/reference-document")
+bp = Blueprint('/reference_document', __name__, url_prefix="/flask/reference-document")
 
 @bp.route('', methods=['POST'])
 def process_pdf_from_s3():
