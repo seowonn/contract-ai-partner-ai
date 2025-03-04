@@ -1,3 +1,5 @@
+import io
+
 from flask import Blueprint, request, jsonify, send_file
 from app.services import s3_service
 from app.services import pdf_service
@@ -14,14 +16,17 @@ def process_pdf_from_s3():
 
   try:
     # 1️⃣ s3에서 문서(pdf) 가져오기 (메모리 내)
-    pdf_bytes_io = s3_service.s3_get_object(s3_path)
+    s3_stream = s3_service.s3_get_object(s3_path)
+
+    if s3_stream is None:
+      raise FileNotFoundError(f"S3에서 파일을 찾을 수 없습니다: {s3_path}")
+
+    pdf_bytes_io = io.BytesIO(s3_stream.read())
+    pdf_bytes_io.seek(0)
 
     # 2️⃣ PDF에서 텍스트 추출
     extracted_text = pdf_service.extract_text_from_pdf(pdf_bytes_io)
-    print(extracted_text)
-
-    # (3️⃣ PDF 잘 받아왔는지 확인용)
-    pdf_bytes_io.seek(0)  # BytesIO를 처음부터 읽도록 설정
+    print(extracted_text) # 확인용
 
     # 3️⃣ 텍스트를 청킹하여 분할 추가해야 함
     # chunk
