@@ -4,7 +4,7 @@ from flask import Blueprint, request, jsonify
 from app.services import s3_service
 from app.services import pdf_service, chunking
 
-bp = Blueprint('/reference_document', __name__, url_prefix="/flask/reference-document")
+bp = Blueprint('reference_document', __name__, url_prefix="/flask/reference-document")
 
 @bp.route('', methods=['POST'])
 def process_pdf_from_s3():
@@ -26,11 +26,6 @@ def process_pdf_from_s3():
 
     # 2️⃣ PDF에서 텍스트 추출
     extracted_text = pdf_service.extract_text_from_pdf(pdf_bytes_io)
-
-    # 테스트를 위한 임시 파일
-    # with open(r"C:\projects\contract-ai-partner-ai\app\blueprints\document_management\example.txt", "r", encoding="utf-8") as file:
-    #   extracted_text = file.read()
-
     print(extracted_text)
 
     # 3️⃣ 텍스트 청킹
