@@ -1,8 +1,8 @@
 import io
 
-from flask import Blueprint, request, jsonify, send_file
+from flask import Blueprint, request, jsonify
 from app.services import s3_service
-from app.services import pdf_service
+from app.services import pdf_service, chunking
 
 bp = Blueprint('/reference_document', __name__, url_prefix="/flask/reference-document")
 
@@ -26,18 +26,18 @@ def process_pdf_from_s3():
 
     # 2️⃣ PDF에서 텍스트 추출
     extracted_text = pdf_service.extract_text_from_pdf(pdf_bytes_io)
-    print(extracted_text) # 확인용
 
-    # 3️⃣ 텍스트를 청킹하여 분할 추가해야 함
-    # chunk
+    # 테스트를 위한 임시 파일
+    # with open(r"C:\projects\contract-ai-partner-ai\app\blueprints\document_management\example.txt", "r", encoding="utf-8") as file:
+    #   extracted_text = file.read()
 
-    # 파일이 제대로 받아와져 있음을 확인할 용도..
-    return send_file(
-        pdf_bytes_io,
-        mimetype='application/pdf',
-        as_attachment=True,
-        download_name="downloaded_document.pdf"  # 원하는 파일명 지정 가능
-    )
+    print(extracted_text)
+
+    # 3️⃣ 텍스트 청킹
+    chunks = chunking.chunk_by_article_and_paragraph(extracted_text)
+    print(chunks)
+
+    return jsonify({"chunks": chunks})
 
   except ValueError as e:
     return jsonify({"error": str(e)}), 400
