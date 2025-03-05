@@ -1,4 +1,7 @@
 import io
+import os.path
+import time
+import uuid
 
 from flask import Blueprint, request, jsonify
 from app.services import s3_service
@@ -25,7 +28,7 @@ def process_pdf_from_s3():
     pdf_bytes_io.seek(0)
 
     # 2️⃣ PDF에서 텍스트 추출
-    extracted_text = pdf_service.extract_text_from_pdf(pdf_bytes_io)
+    extracted_text = pdf_service.extract_text_from_pdf_io(pdf_bytes_io)
     print(extracted_text)
 
     # 3️⃣ 텍스트 청킹
