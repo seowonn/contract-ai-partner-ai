@@ -5,7 +5,7 @@ from openai import OpenAI
 from qdrant_client import QdrantClient
 from qdrant_client.models import Distance, VectorParams, PointStruct
 
-from app.blueprints.document_management.models import ClauseChunk
+from app.models.document_models import ClauseChunk
 from app.services.chunking import ArticleChunk
 
 openai_client = OpenAI()
@@ -23,7 +23,6 @@ def vectorize_text(text: str) -> List[float]:
 def embed_chunks(chunks: List[ArticleChunk], collection_name: str,
     category: str, id: int) -> None:
   points = []
-
   for article in chunks:
     article_number = article.article_number
 
