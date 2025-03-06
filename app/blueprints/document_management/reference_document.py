@@ -37,7 +37,11 @@ def process_pdf_from_s3():
     # 3️⃣ 텍스트 청킹
     chunks = chunking.chunk_by_article_and_clause(extracted_text)
 
-    return jsonify({"chunks": chunks})
+    # 4️⃣ 벡터화 + Qdrant 저장
+    vector_store.embed_chunks(chunks, "reference_document",
+                              pdf_request.category, pdf_request.reference_id)
+
+    return jsonify({"uploadResult": True})
 
   except ValueError as e:
     return jsonify({"error": str(e)}), 400
