@@ -1,18 +1,7 @@
 import re
-from dataclasses import dataclass
 from typing import List
 
-
-@dataclass
-class ClauseChunk:
-  clause_number: str
-  content: str
-
-
-@dataclass
-class ArticleChunk:
-  article_number: str
-  clauses: List[ClauseChunk]
+from app.blueprints.document_management.models import ArticleChunk, ClauseChunk
 
 
 def split_text_by_pattern(text: str, pattern: str) -> List[str]:
@@ -44,7 +33,7 @@ def chunk_by_article_and_clause(extracted_text: str) -> List[ArticleChunk]:
       clause_body = clause_chunks[j + 1].strip() if j + 1 < len(
         clause_chunks) else ""
       clauses.append(
-          ClauseChunk(clause_number=clause_title, content=clause_body))
+          ClauseChunk(clause_number=clause_title, clause_content=clause_body))
 
     result.append(ArticleChunk(article_number=article_title, clauses=clauses))
 

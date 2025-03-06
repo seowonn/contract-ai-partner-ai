@@ -23,11 +23,11 @@ def embed_chunks(chunks: List[ArticleChunk], collection_name: str,
   points = []
 
   for article in chunks:
-    article_number = article.number
+    article_number = article.article_number
 
     for clause in article.clauses:
-      clause_content = clause.content
-      clause_number = clause.number
+      clause_content = clause.clause_content
+      clause_number = clause.clause_number
 
       combined_text = f"Article {article_number}, Clause {clause_number}: {clause_content}"
       clause_vector = vectorize_text(combined_text)
