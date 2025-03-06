@@ -6,7 +6,7 @@ from typing import List
 class PDFRequest:
   s3_path: str
   category: str
-  reference_id: str
+  reference_id: int
 
 @dataclass
 class ClauseChunk:
