@@ -32,7 +32,7 @@ def process_pdf_from_s3():
     print(extracted_text)
 
     # 3️⃣ 텍스트 청킹
-    chunks = chunking.chunk_by_article_and_paragraph(extracted_text)
+    chunks = chunking.chunk_by_article_and_clause(extracted_text)
     print(chunks)
 
     return jsonify({"chunks": chunks})
