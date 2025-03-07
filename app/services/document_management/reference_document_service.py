@@ -15,10 +15,10 @@ def process_pdf(pdf_request):
     pdf_bytes_io.seek(0)
 
     # 2️⃣ PDF에서 텍스트 추출
-    # extracted_text = pdf_service.extract_text_from_pdf_io(pdf_bytes_io)
+    extracted_text = pdf_service.extract_text_from_pdf_io(pdf_bytes_io)
 
     # 3️⃣ 텍스트 청킹
-    chunks = chunking.chunk_by_article_and_clause("extracted_text")
+    chunks = chunking.chunk_by_article_and_clause(extracted_text)
 
     # 4️⃣ 벡터화 + Qdrant 저장
     vector_store.embed_chunks(chunks, "reference_document",
