@@ -5,7 +5,6 @@ from openai import OpenAI
 from qdrant_client import QdrantClient
 from qdrant_client.models import Distance, VectorParams, PointStruct
 
-from app.models.document_models import ClauseChunk
 from app.services.chunking import ArticleChunk
 
 openai_client = OpenAI()
@@ -23,6 +22,8 @@ def vectorize_text(text: str) -> List[float]:
 def embed_chunks(chunks: List[ArticleChunk], collection_name: str,
     category: str, id: int) -> None:
   points = []
+  ensure_qdrant_collection(collection_name)
+
   for article in chunks:
     article_number = article.article_number
 
@@ -46,17 +47,12 @@ def embed_chunks(chunks: List[ArticleChunk], collection_name: str,
           )
       )
 
-      ensure_qdrant_collection(collection_name)
       upload_points_to_qdrant(collection_name, points)
 
 
 def ensure_qdrant_collection(collection_name: str) -> None:
-  collections = qdrant_db_client.get_collections()
-
-  existing_collections = {
-    col["name"] if isinstance(col, dict) else getattr(col, "name", None) for col
-    in collections.collections}
-  if collection_name not in existing_collections:
+  exists = qdrant_db_client.collection_exists(collection_name=collection_name)
+  if not exists:
     create_qdrant_collection(collection_name)
 
 
