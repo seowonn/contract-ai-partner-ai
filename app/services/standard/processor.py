@@ -24,7 +24,7 @@ def process_pdf(pdf_request):
     chunks = chunk_by_article_and_clause(extracted_text)
 
     # 4️⃣ 벡터화 + Qdrant 저장
-    embed_chunks(chunks, "reference_document",
+    embed_chunks(chunks, "standard",
                  pdf_request.category, pdf_request.reference_id)
 
     return {"uploadResult": True}, 200

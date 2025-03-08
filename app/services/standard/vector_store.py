@@ -5,6 +5,7 @@ from openai import OpenAI
 from qdrant_client import QdrantClient
 from qdrant_client.models import Distance, VectorParams, PointStruct
 
+from app.models.vector import VectorPayload
 from app.schemas.chunk_schema import ArticleChunk
 
 openai_client = OpenAI()
@@ -31,19 +32,22 @@ def embed_chunks(chunks: List[ArticleChunk], collection_name: str,
       clause_content = clause.clause_content
       clause_number = clause.clause_number
 
-      combined_text = f"Article {article_number}, Clause {clause_number}: {clause_content}"
+      combined_text = f"조 {article_number}, 항 {clause_number}: {clause_content}"
       clause_vector = vectorize_text(combined_text)
+
+      payload = VectorPayload(
+          standard_id=id,
+          category=category,
+          incorrect_text="",
+          proof_text=clause_content,
+          corrected_text=""
+      )
+
       points.append(
           PointStruct(
               id=str(uuid.uuid4()),
               vector=clause_vector,
-              payload={
-                "reference_id": str(id),
-                "category": category,
-                "article_number": article_number,
-                "clause_number": clause_number,
-                "clause_content": clause_content
-              }
+              payload=payload.to_dict()
           )
       )
 
