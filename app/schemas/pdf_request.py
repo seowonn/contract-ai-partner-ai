@@ -1,8 +1,7 @@
-from dataclasses import dataclass
+from pydantic import BaseModel
 
 
-@dataclass
-class PDFRequest:
-  s3_path: str
+class PDFRequest(BaseModel):
+  s3Path: str
   category: str
-  reference_id: int
+  standardId: int

@@ -1,9 +1,13 @@
 import pdfplumber
 import io
 
+from app.common.exception.custom_exception import BaseCustomException
+from app.common.exception.error_code import ErrorCode
+
+
 def extract_text_from_pdf_io(pdf_bytes_io):
     if not isinstance(pdf_bytes_io, io.BytesIO):
-        raise TypeError("Expected a BytesIO object")
+        raise BaseCustomException(ErrorCode.DATA_TYPE_NOT_MATCH)
 
     extracted_text = []
 
