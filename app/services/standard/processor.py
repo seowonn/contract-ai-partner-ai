@@ -1,9 +1,9 @@
 import io
 
-from app.service.common.chunking import chunk_by_article_and_clause
-from app.service.common.pdf_service import extract_text_from_pdf_io
-from app.service.common.s3_service import s3_get_object
-from app.service.standard.vector_store import embed_chunks
+from app.services.common.chunking_service import chunk_by_article_and_clause
+from app.services.common.pdf_service import extract_text_from_pdf_io
+from app.services.common.s3_service import s3_get_object
+from app.services.standard.vector_store import embed_chunks
 
 
 def process_pdf(pdf_request):

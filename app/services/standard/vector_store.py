@@ -5,7 +5,7 @@ from openai import OpenAI
 from qdrant_client import QdrantClient
 from qdrant_client.models import Distance, VectorParams, PointStruct
 
-from app.services.chunking import ArticleChunk
+from app.schemas.chunk_schema import ArticleChunk
 
 openai_client = OpenAI()
 qdrant_db_client = QdrantClient(url="http://localhost:6333")

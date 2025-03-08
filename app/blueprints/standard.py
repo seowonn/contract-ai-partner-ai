@@ -1,7 +1,7 @@
 from flask import Blueprint, request, jsonify
 
-from app.models.document_models import PDFRequest
-from app.service.standard import processor
+from app.schemas.pdf_request import PDFRequest
+from app.services.standard import processor
 
 document = Blueprint('reference_document', __name__, url_prefix="/flask/reference-document")
 
