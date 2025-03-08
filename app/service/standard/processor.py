@@ -1,12 +1,15 @@
 import io
 
-from app.services import s3_service, chunking, vector_store, pdf_service
+from app.service.common.chunking import chunk_by_article_and_clause
+from app.service.common.pdf_service import extract_text_from_pdf_io
+from app.service.common.s3_service import s3_get_object
+from app.service.standard.vector_store import embed_chunks
 
 
 def process_pdf(pdf_request):
   try:
     # 1️⃣ s3에서 문서(pdf) 가져오기 (메모리 내)
-    s3_stream = s3_service.s3_get_object(pdf_request.s3_path)
+    s3_stream = s3_get_object(pdf_request.s3_path)
 
     if s3_stream is None:
       raise FileNotFoundError(f"S3에서 파일을 찾을 수 없습니다: {pdf_request.s3_path}")
@@ -15,14 +18,14 @@ def process_pdf(pdf_request):
     pdf_bytes_io.seek(0)
 
     # 2️⃣ PDF에서 텍스트 추출
-    extracted_text = pdf_service.extract_text_from_pdf_io(pdf_bytes_io)
+    extracted_text = extract_text_from_pdf_io(pdf_bytes_io)
 
     # 3️⃣ 텍스트 청킹
-    chunks = chunking.chunk_by_article_and_clause(extracted_text)
+    chunks = chunk_by_article_and_clause(extracted_text)
 
     # 4️⃣ 벡터화 + Qdrant 저장
-    vector_store.embed_chunks(chunks, "reference_document",
-                              pdf_request.category, pdf_request.reference_id)
+    embed_chunks(chunks, "reference_document",
+                 pdf_request.category, pdf_request.reference_id)
 
     return {"uploadResult": True}, 200
 

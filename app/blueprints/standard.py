@@ -1,7 +1,7 @@
 from flask import Blueprint, request, jsonify
 
 from app.models.document_models import PDFRequest
-from app.services.document_management import reference_document_service
+from app.service.standard import processor
 
 document = Blueprint('reference_document', __name__, url_prefix="/flask/reference-document")
 
@@ -18,6 +18,6 @@ def process_pdf_from_s3():
   except (KeyError, ValueError) as e:
     return jsonify({"error": f"Invalid request: {str(e)}"}), 400
 
-  response, status_code = reference_document_service.process_pdf(pdf_request)
+  response, status_code = processor.process_pdf(pdf_request)
 
   return jsonify(response), status_code
