@@ -1,9 +1,11 @@
-from flask import Blueprint, request, jsonify
+from flask import Blueprint, request
 
 from app.blueprints.standard.standard_exception import StandardException
 from app.common.exception.custom_exception import BaseCustomException
 from app.common.exception.error_code import ErrorCode
 from app.schemas.pdf_request import PDFRequest
+from app.schemas.success_code import SuccessCode
+from app.schemas.success_response import SuccessResponse
 from app.services.standard import processor
 
 standard = Blueprint('reference_document', __name__, url_prefix="/flask/reference-document")
@@ -23,4 +25,4 @@ def process_pdf_from_s3():
   except Exception:
     raise StandardException(ErrorCode.UPLOAD_FAIL)
 
-  return jsonify(response), status_code
+  return SuccessResponse(SuccessCode.UPLOAD_SUCCESS, response).of(), 200

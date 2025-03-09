@@ -1,9 +1,10 @@
 from app.common.exception.custom_exception import BaseCustomException
-from app.common.exception.error_response import ErrorResponse
+from app.schemas.error_response import ErrorResponse
 
 
 def register_error_handlers(app):
 
   @app.errorhandler(BaseCustomException)
   def handle_custom_exception(e: BaseCustomException):
-    return ErrorResponse.of(e.code, str(e)), e.status
+    error_response = ErrorResponse(e.code, str(e))
+    return error_response.of(), e.status
