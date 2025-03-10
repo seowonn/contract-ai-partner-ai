@@ -1,7 +1,9 @@
+import os
 import uuid
 from typing import List
 
-from openai import OpenAI
+from dotenv import load_dotenv
+from openai import AzureOpenAI
 from qdrant_client import QdrantClient
 from qdrant_client.models import Distance, VectorParams, PointStruct
 
@@ -9,16 +11,30 @@ from app.models.vector import VectorPayload
 from app.schemas.chunk_schema import ArticleChunk
 from app.schemas.pdf_request import PDFRequest
 
-openai_client = OpenAI()
+
+dotenv_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), '.env')
+load_dotenv(dotenv_path)
+
+api_key = os.getenv("AZURE_API_KEY")
+endpoint = os.getenv("AZURE_OPENAI_ENDPOINT")
+deployment_name = os.getenv("AZURE_OPENAI_DEPLOYMENT_NAME")
+
+openai_client = AzureOpenAI(
+    api_key=api_key,
+    api_version="2024-10-21",
+    azure_endpoint=endpoint
+)
+
+# Qdrant 클라이언트 설정
 qdrant_db_client = QdrantClient(url="http://localhost:6333")
 
-
 def vectorize_text(text: str) -> List[float]:
-  response = openai_client.embeddings.create(
-      input=text,
-      model="text-embedding-3-small"
-  )
-  return response.data[0].embedding
+    response = openai_client.embeddings.create(
+        model=deployment_name,  # 배포한 모델 이름
+        input=text,
+        encoding_format="float"  # float 형태로 반환
+    )
+    return response.data[0].embedding  # 임베딩 벡터 반환
 
 
 def embed_chunks(chunks: List[ArticleChunk], collection_name: str,
@@ -37,8 +53,8 @@ def embed_chunks(chunks: List[ArticleChunk], collection_name: str,
       clause_vector = vectorize_text(combined_text)
 
       payload = VectorPayload(
-          standard_id=id,
-          category=category,
+          standard_id=pdf_request.standardId,
+          category=pdf_request.category,
           incorrect_text="",
           proof_text=clause_content,
           corrected_text=""
@@ -52,7 +68,7 @@ def embed_chunks(chunks: List[ArticleChunk], collection_name: str,
           )
       )
 
-      upload_points_to_qdrant(collection_name, points)
+  upload_points_to_qdrant(collection_name, points)
 
 
 def ensure_qdrant_collection(collection_name: str) -> None:
@@ -70,4 +86,3 @@ def create_qdrant_collection(collection_name: str):
 
 def upload_points_to_qdrant(collection_name, points):
   qdrant_db_client.upsert(collection_name=collection_name, points=points)
-
