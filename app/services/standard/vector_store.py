@@ -7,6 +7,7 @@ from qdrant_client.models import Distance, VectorParams, PointStruct
 
 from app.models.vector import VectorPayload
 from app.schemas.chunk_schema import ArticleChunk
+from app.schemas.pdf_request import PDFRequest
 
 openai_client = OpenAI()
 qdrant_db_client = QdrantClient(url="http://localhost:6333")
@@ -21,7 +22,7 @@ def vectorize_text(text: str) -> List[float]:
 
 
 def embed_chunks(chunks: List[ArticleChunk], collection_name: str,
-    category: str, id: int) -> None:
+    pdf_request: PDFRequest) -> None:
   points = []
   ensure_qdrant_collection(collection_name)
 
