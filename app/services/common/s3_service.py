@@ -32,6 +32,8 @@ def s3_get_object(s3_path):
   # get_object는 내부적으로 ClientError를 발생시킴
   try:
     response = s3.get_object(Bucket=bucket_name, Key=object_key)
+    if not response:
+      raise BaseCustomException(ErrorCode.FILE_LOAD_FAILED)
     return response['Body']
   except ClientError:
     raise BaseCustomException(ErrorCode.S3_CLIENT_ERROR)
