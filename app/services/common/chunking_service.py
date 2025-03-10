@@ -1,7 +1,7 @@
 import re
 from typing import List
 
-from app.models.document_models import ArticleChunk, ClauseChunk
+from app.schemas.chunk_schema import ArticleChunk, ClauseChunk
 
 
 def split_text_by_pattern(text: str, pattern: str) -> List[str]:
