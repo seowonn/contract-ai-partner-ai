@@ -8,7 +8,7 @@ from app.schemas.success_code import SuccessCode
 from app.schemas.success_response import SuccessResponse
 from app.services.standard import processor
 
-standard = Blueprint('reference_document', __name__, url_prefix="/flask/reference-document")
+standard = Blueprint('standard', __name__, url_prefix="/flask/standard")
 
 @standard.route('', methods=['POST'])
 def process_pdf_from_s3():
@@ -25,4 +25,4 @@ def process_pdf_from_s3():
   except Exception:
     raise StandardException(ErrorCode.UPLOAD_FAIL)
 
-  return SuccessResponse(SuccessCode.UPLOAD_SUCCESS, response).of(), 200
+  return SuccessResponse(SuccessCode.UPLOAD_SUCCESS, response).of(), status_code
