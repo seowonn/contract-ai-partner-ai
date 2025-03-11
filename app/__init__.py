@@ -16,7 +16,9 @@ def create_app():
   app.config["API_KEY"] = os.getenv("API_KEY")
 
   # 로깅 설정
-  logging.basicConfig(level=logging.INFO)
+  werkzeug_logger = logging.getLogger('werkzeug')
+  werkzeug_logger.disabled = True
+  logging.basicConfig(level=logging.DEBUG)
 
   # 예외 핸들러 등록
   register_error_handlers(app)
