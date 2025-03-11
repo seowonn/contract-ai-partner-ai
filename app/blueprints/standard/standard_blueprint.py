@@ -22,7 +22,7 @@ def process_pdf_from_s3():
     response, status_code = processor.process_pdf(pdf_request)
   except (StandardException, BaseCustomException) as e:
     raise e
-  except Exception:
-    raise StandardException(ErrorCode.UPLOAD_FAIL)
+  except Exception as e:
+    raise e
 
   return SuccessResponse(SuccessCode.UPLOAD_SUCCESS, response).of(), status_code
