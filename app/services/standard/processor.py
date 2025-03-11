@@ -3,7 +3,7 @@ from app.services.common.chunking_service import chunk_by_article_and_clause
 from app.services.common.pdf_service import extract_text_from_pdf_io, \
   convert_to_bytes_io
 from app.services.common.s3_service import s3_get_object
-from app.services.standard.vector_store import embed_chunks
+from app.services.standard.vector_store import vectorize_and_save
 
 
 def process_pdf(pdf_request: PDFRequest):
@@ -20,7 +20,7 @@ def process_pdf(pdf_request: PDFRequest):
   chunks = chunk_by_article_and_clause(extracted_text)
 
   # 5️⃣ 벡터화 + Qdrant 저장
-  embed_chunks(chunks, "standard", pdf_request)
+  vectorize_and_save(chunks, "standard", pdf_request)
 
   return True, 200
 

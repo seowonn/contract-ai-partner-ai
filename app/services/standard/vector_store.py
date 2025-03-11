@@ -1,9 +1,6 @@
-import os
 import uuid
 from typing import List
 
-from dotenv import load_dotenv
-from openai import AzureOpenAI
 from qdrant_client import QdrantClient
 from qdrant_client.models import Distance, VectorParams, PointStruct
 
@@ -25,11 +22,17 @@ def vectorize_and_save(chunks: List[ArticleChunk], collection_name: str,
     article_number = article.article_number
 
     for clause in article.clauses:
-      clause_content = clause.clause_content
-      clause_number = clause.clause_number
+      if len(clause.clause_content) < 1:
+        continue
 
-      combined_text = f"조 {article_number}, 항 {clause_number}: {clause_content}"
-      clause_vector = vectorize_text(combined_text)
+      clause_content = clause.clause_content
+      combined_text = f"조 {article_number}, 항 {clause.clause_number}: {clause_content}"
+
+      # 1️⃣ Openai 벡터화
+      clause_vector = embedding_service.embed_text(combined_text)
+
+      # 2️⃣ Openai LLM 기반 교정 문구 생성
+      result = prompt_service.make_correction_data(clause_content)
 
       payload = VectorPayload(
           standard_id=pdf_request.standardId,

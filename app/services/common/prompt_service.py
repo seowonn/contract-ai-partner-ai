@@ -27,7 +27,7 @@ class PromptService:
               [생성할 JSON 형식]
               {{
                 "incorrect_text": "법률을 위반할 수 있는 예시 문장",
-                "corrected_text": "위의 문장을 교정한 올바른 문장"
+                "corrected_text": "위의 문장을 교정한 문장"
               }}
   
               조건:
