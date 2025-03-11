@@ -1,4 +1,4 @@
-from pydantic import json
+import json
 
 
 class PromptService:
@@ -14,10 +14,10 @@ class PromptService:
           {
             "role": "user",
             "content": f"""
-              다음 문장은 특정 법률 조항에 따른 항 내용입니다. 이 조항을 기준으로 위반될 수 있는 문장을
-              상상해서 하나 작성하고, 그 문장을 법률에 맞도록 수정한 교정 문장도 작성해주세요.
+              다음 문장은 특정 법률 조항에 따른 항 내용이다. 이 조항을 기준으로 위반될 수 있는 문장을
+              상상해서 하나 작성하고, 그 문장을 법률에 맞도록 수정한 교정 문장도 작성해줘.
   
-              반드시 아래와 같은 JSON 형태로만 응답하세요.
+              반드시 아래와 같은 JSON 형태로만 응답해야되.
   
               문서 원문:
               \"\"\"
@@ -38,7 +38,7 @@ class PromptService:
             """
           }
         ],
-        temperature=0.3,  # 정확성을 위해 낮게 (창의성을 낮춤)
+        temperature=0.5,
         max_tokens=512,
         top_p=1
     )

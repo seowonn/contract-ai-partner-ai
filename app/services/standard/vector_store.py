@@ -12,13 +12,11 @@ from app.schemas.chunk_schema import ArticleChunk
 from app.schemas.pdf_request import PDFRequest
 from app.containers.service_container import embedding_service, prompt_service
 
-import time
 # Qdrant 클라이언트 설정
 qdrant_db_client = QdrantClient(url="http://localhost:6333")
 
 
-
-def embed_chunks(chunks: List[ArticleChunk], collection_name: str,
+def vectorize_and_save(chunks: List[ArticleChunk], collection_name: str,
     pdf_request: PDFRequest) -> None:
   points = []
   ensure_qdrant_collection(collection_name)
@@ -36,9 +34,9 @@ def embed_chunks(chunks: List[ArticleChunk], collection_name: str,
       payload = VectorPayload(
           standard_id=pdf_request.standardId,
           category=pdf_request.category,
-          incorrect_text="",
+          incorrect_text=result["incorrect_text"],
           proof_text=clause_content,
-          corrected_text=""
+          corrected_text=result["corrected_text"]
       )
 
       points.append(
