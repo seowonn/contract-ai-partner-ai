@@ -22,7 +22,7 @@ def vectorize_and_save(chunks: List[ArticleChunk], collection_name: str,
     article_number = article.article_number
 
     for clause in article.clauses:
-      if len(clause.clause_content) < 1:
+      if len(clause.clause_content) <= 1:
         continue
 
       clause_content = clause.clause_content
