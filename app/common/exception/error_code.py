@@ -3,9 +3,11 @@ from http import HTTPStatus
 
 
 class ErrorCode(Enum):
+  # global 에러
+  REQUEST_UNMATCH = (HTTPStatus.BAD_REQUEST, "G001", "요청 json 매핑 불일치")
+
   # standard 관련 에러
-  REQUEST_NOT_MATCH = (HTTPStatus.BAD_REQUEST, "S001", "전달받은 인자를 매핑할 수 없음")
-  UPLOAD_FAIL = (HTTPStatus.INTERNAL_SERVER_ERROR, "S002", "기준 문서 저장 과정 중 에러 발생")
+  UPLOAD_FAIL = (HTTPStatus.INTERNAL_SERVER_ERROR, "S001", "기준 문서 저장 과정 중 에러 발생")
 
   # common 에러
   DATA_TYPE_NOT_MATCH = (HTTPStatus.BAD_REQUEST, "C001", "데이터의 형식이 맞지 않음")
