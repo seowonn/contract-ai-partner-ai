@@ -10,8 +10,7 @@ from app.schemas.pdf_request import PDFRequest
 from app.containers.service_container import embedding_service, prompt_service
 
 # Qdrant 클라이언트 설정
-qdrant_db_client = QdrantClient(url="http://localhost:6333")
-
+qdrant_db_client = QdrantClient(host="qdrant/qdrant", port=6333)
 
 def vectorize_and_save(chunks: List[ArticleChunk], collection_name: str,
     pdf_request: PDFRequest) -> None:

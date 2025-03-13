@@ -1,0 +1,23 @@
+version: '3.8'
+
+services:
+  flask-app:
+    build: .
+    ports:
+      - "5000:5000" # Flask (Gunicorn) 외부 연셜
+    environment:
+      - FLASK_ENV=production # 운영 모드
+    depends_on:
+      - qdrant # Qdrant 먼저 시작
+    restart: always # 서버 재시작 시 자동 복구
+
+  qdrant:
+    image: qdrant/qdrant
+    ports:
+      - "6333:6333" # Qdrant 기본 포트
+    volumes:
+      - qdrant_storage:/qdrant/storage # 데이터 영속화
+    restart: always # 자동 재시작
+
+volumes:
+  qdrant_storage: # Qdrant 데이터 보존

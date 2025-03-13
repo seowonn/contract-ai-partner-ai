@@ -3,8 +3,8 @@ from botocore.exceptions import ClientError
 
 from app.common.exception.custom_exception import BaseCustomException
 from app.common.exception.error_code import ErrorCode
-from config.s3_config import (AWS_S3_BUCKET_REGION, AWS_ACCESS_KEY,
-                              AWS_SECRET_ACCESS_KEY)
+from app.config.s3_config import (AWS_S3_BUCKET_REGION, AWS_ACCESS_KEY,
+                                  AWS_SECRET_ACCESS_KEY)
 
 
 def s3_connection():

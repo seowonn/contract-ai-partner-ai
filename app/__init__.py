@@ -5,6 +5,7 @@ from flask import Flask
 from dotenv import load_dotenv
 from app.common.exception.error_handler import register_error_handlers
 from app.blueprints.standard import standard_blueprint
+from flask import jsonify
 
 load_dotenv()
 
@@ -19,6 +20,10 @@ def create_app():
   werkzeug_logger = logging.getLogger('werkzeug')
   werkzeug_logger.disabled = True
   logging.basicConfig(level=logging.DEBUG)
+
+  @app.route('/healthz', methods=['GET'])
+  def health_check():
+    return jsonify({"status": "healthy"}), 200
 
   # 예외 핸들러 등록
   register_error_handlers(app)
