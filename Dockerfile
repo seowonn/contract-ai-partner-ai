@@ -1,5 +1,5 @@
 # Flask용 Dockerfile
-FROM python:3.13-slim
+FROM python:3.10-slim
 
 # 작업 디렉터리 생성
 WORKDIR /app
