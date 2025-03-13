@@ -18,7 +18,7 @@ def vectorize_and_save(chunks: List[ArticleChunk], collection_name: str,
   ensure_qdrant_collection(collection_name)
 
   for article in chunks:
-    article_number = article.article_number
+    article_number = article.article_title
 
     for clause in article.clauses:
       if len(clause.clause_content) <= 1:

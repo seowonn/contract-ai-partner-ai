@@ -14,8 +14,8 @@ def chunk_by_article_and_clause(extracted_text: str) -> List[ArticleChunk]:
   2. '제N조'가 반드시 줄 바꿈 후 등장하고, 뒤에는 공백과 특정 기호만 허용 (문자X).
   3. 각 조 내부에서 '①, ②, ③' 또는 '1., 2.' 등의 패턴을 찾아 항을 분리.
   """
-  article_pattern = r'\n(제\s*\d+조[\s\(\.\[\]<>]*)'  # 조(Article) 기준 정규식
-  clause_pattern = r'(\n\s*\d+항|\n\s*[①-⑨]|\n\s*\d+\.)'  # 항(Paragraph) 기준 정규식
+  article_pattern = r'\n(제\s*\d+조(?:\([^)]+\))?)'  # 조(Article) 기준 정규식
+  clause_pattern = r'(\n\s*\d+항|[\n\s]*[①-⑨]|\n\s*\d+\.)'
 
   chunks = split_text_by_pattern(extracted_text, article_pattern)
   result: List[ArticleChunk] = []
@@ -35,6 +35,6 @@ def chunk_by_article_and_clause(extracted_text: str) -> List[ArticleChunk]:
       clauses.append(
           ClauseChunk(clause_number=clause_title, clause_content=clause_body))
 
-    result.append(ArticleChunk(article_number=article_title, clauses=clauses))
+    result.append(ArticleChunk(article_title=article_title, clauses=clauses))
 
   return result  # ✅ 조 + 항 구조 유지한 채 반환
