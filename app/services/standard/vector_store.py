@@ -1,3 +1,4 @@
+import json
 import uuid
 from typing import List
 
@@ -20,6 +21,9 @@ def vectorize_and_save(chunks: List[ArticleChunk], collection_name: str,
   for article in chunks:
     article_number = article.article_title
 
+    if len(article.clauses) == 0:
+      continue
+
     for clause in article.clauses:
       if len(clause.clause_content) <= 1:
         continue
@@ -32,13 +36,19 @@ def vectorize_and_save(chunks: List[ArticleChunk], collection_name: str,
 
       # 2️⃣ Openai LLM 기반 교정 문구 생성
       result = prompt_service.make_correction_data(clause_content)
+      result = result.strip()
+
+      if result.startswith("{") and result.endswith("}"):
+        json_result = json.loads(result)  # 파싱 성공 시
+      else:
+        continue
 
       payload = VectorPayload(
           standard_id=pdf_request.standardId,
           category=pdf_request.category,
-          incorrect_text=result["incorrect_text"],
+          incorrect_text=json_result["incorrect_text"],
           proof_text=clause_content,
-          corrected_text=result["corrected_text"]
+          corrected_text=json_result["corrected_text"]
       )
 
       points.append(
