@@ -19,10 +19,10 @@ def process_pdf_from_s3():
     raise e
 
   try:
-    response, status_code = processor.process_pdf(pdf_request)
+    status_code = processor.process_pdf(pdf_request)
   except (StandardException, BaseCustomException) as e:
     raise e
   except Exception as e:
     raise e
 
-  return SuccessResponse(SuccessCode.UPLOAD_SUCCESS, response).of(), status_code
+  return SuccessResponse(SuccessCode.UPLOAD_SUCCESS, "success").of(), status_code

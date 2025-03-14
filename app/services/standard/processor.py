@@ -22,5 +22,5 @@ def process_pdf(pdf_request: PDFRequest):
   # 5️⃣ 벡터화 + Qdrant 저장
   vectorize_and_save(chunks, "standard", pdf_request)
 
-  return True, 200
+  return 200
 
