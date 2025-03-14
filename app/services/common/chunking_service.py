@@ -24,12 +24,14 @@ def chunk_by_article_and_clause(extracted_text: str) -> List[ArticleChunk]:
     # ⭐ 항이 ① 또는 1. 로만 시작한다는 전제 (따라서 기준문서도 이에 맞는 문서만 필요)
     first_clause_match = re.search(r'(①|1\.)', article_body)
     if first_clause_match is None:
+      result.append(ArticleChunk(article_title=article_title + article_body, clauses=[]))
       continue
 
     match_idx = first_clause_match.start()
+    article_title += ' ' +article_body[:match_idx]
     if first_clause_match:
       clause_pattern = r'([\n\s]*[①-⑨])' if first_clause_match.group(1) == '①' else r'(\n\s*\d+\.)'
-      clause_chunks = split_text_by_pattern(article_body[match_idx:], clause_pattern)
+      clause_chunks = split_text_by_pattern("\n" + article_body[match_idx:], clause_pattern)
 
       for j in range(1, len(clause_chunks), 2):
         clause_title = clause_chunks[j].strip()
