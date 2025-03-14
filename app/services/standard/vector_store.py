@@ -10,8 +10,15 @@ from app.schemas.chunk_schema import ArticleChunk
 from app.schemas.pdf_request import PDFRequest
 from app.containers.service_container import embedding_service, prompt_service
 
+from config.app_config import AppConfig
+print(AppConfig.QDRANT_HOST, type(AppConfig.QDRANT_HOST))
+print(AppConfig.QDRANT_PORT, type(AppConfig.QDRANT_PORT))
+
 # Qdrant 클라이언트 설정
-qdrant_db_client = QdrantClient(host="qdrant", port=6333)
+qdrant_db_client = QdrantClient(
+    host=AppConfig.QDRANT_HOST,
+    port=AppConfig.QDRANT_PORT
+)
 
 def vectorize_and_save(chunks: List[ArticleChunk], collection_name: str,
     pdf_request: PDFRequest) -> None:
