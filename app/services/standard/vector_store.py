@@ -1,3 +1,4 @@
+import json
 import uuid
 from typing import List
 
@@ -9,8 +10,13 @@ from app.schemas.chunk_schema import ArticleChunk
 from app.schemas.pdf_request import PDFRequest
 from app.containers.service_container import embedding_service, prompt_service
 
+from config.app_config import AppConfig
+
 # Qdrant 클라이언트 설정
-qdrant_db_client = QdrantClient(host="qdrant", port=6333)
+qdrant_db_client = QdrantClient(
+    host=AppConfig.QDRANT_HOST,
+    port=AppConfig.QDRANT_PORT
+)
 
 def vectorize_and_save(chunks: List[ArticleChunk], collection_name: str,
     pdf_request: PDFRequest) -> None:
@@ -18,7 +24,10 @@ def vectorize_and_save(chunks: List[ArticleChunk], collection_name: str,
   ensure_qdrant_collection(collection_name)
 
   for article in chunks:
-    article_number = article.article_number
+    article_number = article.article_title
+
+    if len(article.clauses) == 0:
+      continue
 
     for clause in article.clauses:
       if len(clause.clause_content) <= 1:
@@ -32,13 +41,19 @@ def vectorize_and_save(chunks: List[ArticleChunk], collection_name: str,
 
       # 2️⃣ Openai LLM 기반 교정 문구 생성
       result = prompt_service.make_correction_data(clause_content)
+      result = result.strip()
+
+      if result.startswith("{") and result.endswith("}"):
+        json_result = json.loads(result)  # 파싱 성공 시
+      else:
+        continue
 
       payload = VectorPayload(
           standard_id=pdf_request.standardId,
           category=pdf_request.category,
-          incorrect_text=result["incorrect_text"],
+          incorrect_text=json_result["incorrect_text"],
           proof_text=clause_content,
-          corrected_text=result["corrected_text"]
+          corrected_text=json_result["corrected_text"]
       )
 
       points.append(
