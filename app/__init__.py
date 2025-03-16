@@ -1,8 +1,10 @@
 import logging
 import os
 
-from flask import Flask
 from dotenv import load_dotenv
+from flask import Flask
+from app.clients.qdrant_client import qdrant_db_client
+from app.clients.openai_clients import embedding_client, prompt_client
 from app.common.exception.error_handler import register_error_handlers
 from app.blueprints.standard import standard_blueprint
 from flask import jsonify
