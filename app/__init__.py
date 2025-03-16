@@ -16,10 +16,6 @@ def create_app():
   app_env = os.getenv("APP_ENV", "dev")
   app.config["APP_ENV"] = app_env
 
-  # 환경 변수 설정 로드
-  app.config.from_prefixed_env()
-  app.config["API_KEY"] = os.getenv("API_KEY")
-
   # 로깅 설정
   werkzeug_logger = logging.getLogger('werkzeug')
   werkzeug_logger.disabled = True
