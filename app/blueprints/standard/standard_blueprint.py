@@ -8,8 +8,7 @@ from app.schemas.success_response import SuccessResponse
 from app.services.standard import processor
 from pydantic import ValidationError
 
-from app.services.standard.vector_delete import delete_by_standard_id, \
-  check_points_by_standard_id
+from app.services.standard.vector_delete import delete_by_standard_id
 
 standard = Blueprint('standard', __name__, url_prefix="/flask/standard")
 
