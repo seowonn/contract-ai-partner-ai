@@ -2,7 +2,7 @@ import json
 import uuid
 from typing import List
 
-from qdrant_client import QdrantClient
+from app.clients.qdrant_client import qdrant_db_client
 from qdrant_client.models import Distance, VectorParams, PointStruct
 
 from app.models.vector import VectorPayload
@@ -10,13 +10,6 @@ from app.schemas.chunk_schema import ArticleChunk
 from app.schemas.pdf_request import PDFRequest
 from app.containers.service_container import embedding_service, prompt_service
 
-from config.app_config import AppConfig
-
-# Qdrant 클라이언트 설정
-qdrant_db_client = QdrantClient(
-    host=AppConfig.QDRANT_HOST,
-    port=AppConfig.QDRANT_PORT
-)
 
 def vectorize_and_save(chunks: List[ArticleChunk], collection_name: str,
     pdf_request: PDFRequest) -> None:
