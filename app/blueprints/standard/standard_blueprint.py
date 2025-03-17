@@ -1,7 +1,10 @@
+from http import HTTPStatus
+
 from flask import Blueprint, request
 
 from app.blueprints.standard.standard_exception import StandardException
 from app.common.exception.custom_exception import BaseCustomException
+from app.common.file_type import FileType
 from app.schemas.pdf_request import PDFRequest
 from app.schemas.success_code import SuccessCode
 from app.schemas.success_response import SuccessResponse
@@ -20,8 +23,10 @@ def process_pdf_from_s3():
   except ValidationError as e:
     raise e
 
+  status_code = HTTPStatus.OK
   try:
-    status_code = processor.process_pdf(pdf_request)
+    if(pdf_request.fileType == FileType.PDF):
+      status_code = processor.process_pdf(pdf_request)
   except (StandardException, BaseCustomException) as e:
     raise e
   except Exception as e:
