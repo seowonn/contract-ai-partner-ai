@@ -19,3 +19,11 @@ prompt_client = openai.AzureOpenAI(
     azure_endpoint=os.getenv("AZURE_PROMPT_OPENAI_ENDPOINT")
 )
 prompt_deployment_name = os.getenv("AZURE_PROMPT_OPENAI_DEPLOYMENT_NAME")
+
+
+vision_client = openai.AzureOpenAI(
+    api_key=os.getenv("AZURE_VISION_API_KEY"),
+    api_version=os.getenv("AZURE_VISION_OPENAI_API_VERSION"),
+    azure_endpoint=os.getenv("AZURE_VISION_OPENAI_ENDPOINT")
+)
+vision_deployment_name = os.getenv("AZURE_VISION_OPENAI_DEPLOYMENT_NAME")
