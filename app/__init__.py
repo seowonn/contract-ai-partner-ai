@@ -7,6 +7,7 @@ from app.clients.qdrant_client import qdrant_db_client
 from app.clients.openai_clients import embedding_client, prompt_client
 from app.common.exception.error_handler import register_error_handlers
 from app.blueprints.standard import standard_blueprint
+from app.blueprints.agreement import agreement_blueprint
 from flask import jsonify
 
 load_dotenv()
@@ -32,5 +33,6 @@ def create_app():
 
   # 블루 프린트 등록
   app.register_blueprint(standard_blueprint.standard)
+  app.register_blueprint(agreement_blueprint.agreement)
 
   return app
