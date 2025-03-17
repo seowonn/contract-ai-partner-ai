@@ -13,9 +13,9 @@ from pydantic import ValidationError
 
 from app.services.standard.vector_delete import delete_by_standard_id
 
-standard = Blueprint('standard', __name__, url_prefix="/flask/standard")
+standards = Blueprint('standards', __name__, url_prefix="/flask/standards")
 
-@standard.route('', methods=['POST'])
+@standards.route('', methods=['POST'])
 def process_pdf_from_s3():
 
   try:

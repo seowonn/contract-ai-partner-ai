@@ -32,7 +32,7 @@ def create_app():
   register_error_handlers(app)
 
   # 블루 프린트 등록
-  app.register_blueprint(standard_blueprint.standard)
-  app.register_blueprint(agreement_blueprint.agreement)
+  app.register_blueprint(standard_blueprint.standards)
+  app.register_blueprint(agreement_blueprint.agreements)
 
   return app

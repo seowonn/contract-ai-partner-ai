@@ -3,17 +3,15 @@ from http import HTTPStatus
 from flask import Blueprint, request
 from pydantic import ValidationError
 
-from app.blueprints.standard.standard_exception import StandardException
-from app.common.exception.custom_exception import BaseCustomException
 from app.common.file_type import FileType
 from app.schemas.document_request import DocumentRequest
 from app.schemas.success_code import SuccessCode
 from app.schemas.success_response import SuccessResponse
 from app.services.standard import processor
 
-agreement = Blueprint('agreement', __name__, url_prefix="/flask/agreement")
+agreements = Blueprint('agreements', __name__, url_prefix="/flask/agreements")
 
-@agreement.route('', methods=['POST'])
+@agreements.route('', methods=['POST'])
 def process_img_from_s3():
 
   try:
