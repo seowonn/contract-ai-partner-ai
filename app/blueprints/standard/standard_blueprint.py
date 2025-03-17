@@ -19,14 +19,14 @@ standard = Blueprint('standard', __name__, url_prefix="/flask/standard")
 def process_pdf_from_s3():
 
   try:
-    pdf_request = DocumentRequest(**request.get_json())
+    document_request = DocumentRequest(**request.get_json())
   except ValidationError as e:
     raise e
 
   status_code = HTTPStatus.OK
   try:
-    if(pdf_request.type == FileType.PDF):
-      status_code = processor.process_pdf(pdf_request)
+    if(document_request.type == FileType.PDF):
+      status_code = processor.process_pdf(document_request)
   except (StandardException, BaseCustomException) as e:
     raise e
   except Exception as e:
