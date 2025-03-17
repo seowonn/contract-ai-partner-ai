@@ -17,6 +17,7 @@ class ErrorCode(Enum):
   CONVERT_TO_IO_FAILED = (HTTPStatus.INTERNAL_SERVER_ERROR, "C004", "스트림을 io 바이트로 변환하는데 에러 발생")
   INNER_DATA_ERROR = (HTTPStatus.INTERNAL_SERVER_ERROR, "C005", "페이지가 없거나 내부 구조가 깨져 있음")
   FILE_FORMAT_INVALID = (HTTPStatus.INTERNAL_SERVER_ERROR, "C006", "파일이 깨졌 거나 지원 불가입니다.")
+  S3_STREAM_READ_FAILED = (HTTPStatus.INTERNAL_SERVER_ERROR, "C007", "S3 스트림을 읽는 중 에러 발생")
 
   def __init__(self, status: HTTPStatus, code: str, message: str):
     self.status = status

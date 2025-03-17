@@ -1,5 +1,6 @@
 import boto3
 from botocore.exceptions import ClientError
+from botocore.response import StreamingBody
 
 from app.common.exception.custom_exception import BaseCustomException
 from app.common.exception.error_code import ErrorCode
@@ -41,3 +42,9 @@ def s3_get_object(s3_path):
   except ClientError:
     raise BaseCustomException(ErrorCode.S3_CLIENT_ERROR)
 
+
+def read_s3_stream(s3_stream: StreamingBody):
+  try:
+    return s3_stream.read()
+  except (OSError, IOError):
+    raise BaseCustomException(ErrorCode.S3_STREAM_READ_FAILED)
