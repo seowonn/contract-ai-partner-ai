@@ -21,7 +21,7 @@ def create_app():
   # 로깅 설정
   werkzeug_logger = logging.getLogger('werkzeug')
   werkzeug_logger.disabled = True
-  logging.basicConfig(level=logging.WARN)
+  logging.basicConfig(level=logging.DEBUG)
 
   @app.route('/healthz', methods=['GET'])
   def health_check():
