@@ -10,6 +10,9 @@ class ErrorCode(Enum):
   UPLOAD_FAIL = (HTTPStatus.INTERNAL_SERVER_ERROR, "S001", "기준 문서 저장 과정 중 에러 발생")
   UNEXPECTED_RESPONSE = (HTTPStatus.BAD_REQUEST, "S002", "맞지 않은 형식의 요청으로 다른 결과가 나옴")
 
+  # agreement 관련 에러
+  FILE_ENCODING_FAILED = (HTTPStatus.INTERNAL_SERVER_ERROR, "A001", "파일을 Base64로 인코딩하거나 문자열로 변환하는 중 에러 발생")
+
   # common 에러
   DATA_TYPE_NOT_MATCH = (HTTPStatus.BAD_REQUEST, "C001", "데이터의 형식이 맞지 않음")
   FILE_LOAD_FAILED = (HTTPStatus.BAD_REQUEST, "C002", "S3에서 파일을 가져 오지 못함")
