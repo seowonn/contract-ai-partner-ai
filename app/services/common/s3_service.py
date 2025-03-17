@@ -3,17 +3,20 @@ from botocore.exceptions import ClientError
 
 from app.common.exception.custom_exception import BaseCustomException
 from app.common.exception.error_code import ErrorCode
-from app.config.s3_config import (AWS_S3_BUCKET_REGION, AWS_ACCESS_KEY,
-                                  AWS_SECRET_ACCESS_KEY)
+from config.s3_config import AWS_S3_BUCKET_REGION
 
+import os
+from dotenv import load_dotenv
+
+load_dotenv()
 
 def s3_connection():
   try:
     return boto3.client(
         service_name="s3",
         region_name=AWS_S3_BUCKET_REGION,
-        aws_access_key_id=AWS_ACCESS_KEY,
-        aws_secret_access_key=AWS_SECRET_ACCESS_KEY
+        aws_access_key_id=os.getenv("AWS_ACCESS_KEY"),
+        aws_secret_access_key=os.getenv("AWS_SECRET_ACCESS_KEY")
     )
   except Exception:
     raise BaseCustomException(ErrorCode.S3_CLIENT_ERROR)

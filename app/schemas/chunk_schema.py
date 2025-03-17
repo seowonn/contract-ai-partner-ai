@@ -10,5 +10,5 @@ class ClauseChunk:
 
 @dataclass
 class ArticleChunk:
-  article_number: str
+  article_title: str
   clauses: List[ClauseChunk]
