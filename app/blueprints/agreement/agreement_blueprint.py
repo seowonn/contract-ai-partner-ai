@@ -21,7 +21,8 @@ def process_img_from_s3():
 
   status_code = HTTPStatus.OK
   try:
-    if document_request.type == FileType.PNG:
+    if (document_request.type == FileType.PNG or document_request.type == FileType.JPG or
+        document_request.type == FileType.JPEG):
       status_code = processor.process_img(document_request)
     elif document_request.type == FileType.PDF:
       status_code = processor.process_pdf(document_request)
