@@ -8,3 +8,9 @@ class PDFRequest(BaseModel):
   category: str
   standardId: int
   fileType: FileType
+
+class AgreementPDFRequest(BaseModel):
+  url: str
+  categoryName: str
+  id: int
+  type: FileType
