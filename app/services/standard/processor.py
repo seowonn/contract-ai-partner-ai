@@ -1,4 +1,4 @@
-from app.schemas.pdf_request import PDFRequest
+from app.schemas.document_request import DocumentRequest
 from app.services.common.chunking_service import chunk_by_article_and_clause
 from app.services.common.pdf_service import extract_text_from_pdf_io, \
   convert_to_bytes_io
@@ -6,9 +6,9 @@ from app.services.common.s3_service import s3_get_object
 from app.services.standard.vector_store import vectorize_and_save
 
 
-def process_pdf(pdf_request: PDFRequest):
+def process_pdf(pdf_request: DocumentRequest):
   # 1️⃣ s3에서 문서(pdf) 가져오기 (메모리 내)
-  s3_stream = s3_get_object(pdf_request.s3Path)
+  s3_stream = s3_get_object(pdf_request.url)
 
   # 2️⃣ PDF 스트림으로 변환
   pdf_bytes_io = convert_to_bytes_io(s3_stream)

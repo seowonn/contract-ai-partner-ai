@@ -7,12 +7,12 @@ from qdrant_client.models import Distance, VectorParams, PointStruct
 
 from app.models.vector import VectorPayload
 from app.schemas.chunk_schema import ArticleChunk
-from app.schemas.pdf_request import PDFRequest
+from app.schemas.document_request import DocumentRequest
 from app.containers.service_container import embedding_service, prompt_service
 
 
 def vectorize_and_save(chunks: List[ArticleChunk], collection_name: str,
-    pdf_request: PDFRequest) -> None:
+    pdf_request: DocumentRequest) -> None:
   points = []
   ensure_qdrant_collection(collection_name)
 
@@ -42,8 +42,8 @@ def vectorize_and_save(chunks: List[ArticleChunk], collection_name: str,
         continue
 
       payload = VectorPayload(
-          standard_id=pdf_request.standardId,
-          category=pdf_request.category,
+          standard_id=pdf_request.id,
+          category=pdf_request.categoryName,
           incorrect_text=json_result["incorrect_text"],
           proof_text=clause_content,
           corrected_text=json_result["corrected_text"]
