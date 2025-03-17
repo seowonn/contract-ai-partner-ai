@@ -25,10 +25,8 @@ def process_pdf_from_s3():
 
   status_code = HTTPStatus.OK
   try:
-    if(document_request.type == FileType.PDF):
+    if document_request.type == FileType.PDF:
       status_code = processor.process_pdf(document_request)
-  except (StandardException, BaseCustomException) as e:
-    raise e
   except Exception as e:
     raise e
 

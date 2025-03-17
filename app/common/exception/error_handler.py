@@ -2,6 +2,9 @@ from http import HTTPStatus
 import logging
 
 from pydantic import ValidationError
+
+from app.blueprints.agreement.agreement_exception import AgreementException
+from app.blueprints.standard.standard_exception import StandardException
 from app.common.exception.custom_exception import BaseCustomException
 from app.common.exception.error_code import ErrorCode
 from app.schemas.error_response import ErrorResponse
@@ -17,6 +20,17 @@ def register_error_handlers(app):
     error_response = ErrorResponse(error_code.code, error_code.message)
     return error_response.of(), HTTPStatus.BAD_REQUEST
 
+  @app.errorhandler(StandardException)
+  def handle_custom_exception(e: StandardException):
+    logger.debug(f"[StandardException]: {str(e)}")
+    error_response = ErrorResponse(e.code, str(e))
+    return error_response.of(), e.status
+
+  @app.errorhandler(AgreementException)
+  def handle_custom_exception(e: AgreementException):
+    logger.debug(f"[AgreementException]: {str(e)}")
+    error_response = ErrorResponse(e.code, str(e))
+    return error_response.of(), e.status
 
   @app.errorhandler(BaseCustomException)
   def handle_custom_exception(e: BaseCustomException):
