@@ -12,7 +12,7 @@ from app.services.standard import processor
 agreements = Blueprint('agreements', __name__, url_prefix="/flask/agreements")
 
 @agreements.route('', methods=['POST'])
-def process_img_from_s3():
+def process_agreement_pdf_from_s3():
 
   try:
     document_request = DocumentRequest(**request.get_json())
@@ -31,4 +31,4 @@ def process_img_from_s3():
   except Exception as e:
     raise e
 
-  return SuccessResponse(SuccessCode.UPLOAD_SUCCESS, "success").of(), status_code
+  return SuccessResponse(SuccessCode.REVIEW_SUCCESS, "success").of(), status_code
