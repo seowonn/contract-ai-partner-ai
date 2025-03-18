@@ -7,7 +7,9 @@ from app.common.file_type import FileType
 from app.schemas.document_request import DocumentRequest
 from app.schemas.success_code import SuccessCode
 from app.schemas.success_response import SuccessResponse
-from app.services.standard import processor
+from app.services.agreement.img_service import process_img
+from app.services.agreement.vectorize_similarity import vectorize_and_similarity
+from app.services.common.processor import preprocess_data
 
 agreements = Blueprint('agreements', __name__, url_prefix="/flask/agreements")
 
@@ -21,11 +23,15 @@ def process_agreement_pdf_from_s3():
 
   status_code = HTTPStatus.OK
   try:
-    if (document_request.type == FileType.PNG or document_request.type == FileType.JPG or
-        document_request.type == FileType.JPEG):
-      status_code = processor.process_img(document_request)
+    if document_request.type in (FileType.PNG, FileType.JPG, FileType.JPEG):
+      status_code = process_img(document_request)
     elif document_request.type == FileType.PDF:
-      status_code = processor.process_pdf(document_request)
+      chunks = preprocess_data(document_request)
+
+      # 5️⃣ 벡터화 + 유사도 비교 (리턴값 추가)
+      similarity_threshold = 0.8
+      result, status_code = vectorize_and_similarity(chunks, document_request,
+                                        similarity_threshold)
     else:
       pass
   except Exception as e:

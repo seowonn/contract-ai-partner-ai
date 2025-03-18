@@ -1,17 +1,16 @@
 import logging
 from typing import List
+
 from qdrant_client import models
+
 from app.clients.qdrant_client import qdrant_db_client
-from app.schemas.chunk_schema import ArticleChunk
-from app.schemas.pdf_request import AgreementPDFRequest
 from app.containers.service_container import embedding_service, prompt_service
+from app.schemas.chunk_schema import ArticleChunk
+from app.schemas.document_request import DocumentRequest
 
 
-def vectorize_and_similarity(
-    chunks: List[ArticleChunk],
-    pdf_request: AgreementPDFRequest,
-    similarity_threshold
-) -> List[dict]:
+def vectorize_and_similarity(chunks: List[ArticleChunk],
+    pdf_request: DocumentRequest, similarity_threshold) -> List[dict]:
   results = []  # 최종 반환할 결과 저장
 
   for article in chunks:
@@ -59,8 +58,10 @@ def vectorize_and_similarity(
       corrected_result = prompt_service.correct_contract(
           clause_content=clause_content,  # 현재 계약서 문장
           proof_text=[item["proof_text"] for item in clause_results],  # 기준 문서들
-          incorrect_texts=[item["incorrect_text"] for item in clause_results],  # 잘못된 문장들
-          corrected_texts=[item["corrected_text"] for item in clause_results],  # 교정된 문장들
+          incorrect_texts=[item["incorrect_text"] for item in clause_results],
+          # 잘못된 문장들
+          corrected_texts=[item["corrected_text"] for item in clause_results],
+          # 교정된 문장들
           similarity_threshold=similarity_threshold
       )
 
@@ -69,7 +70,7 @@ def vectorize_and_similarity(
         "incorrect_text": corrected_result["clause_content"],  # 원본 문장
         "corrected_text": corrected_result["corrected_text"],  # LLM이 교정한 문장
         "proof_text": corrected_result["proof_text"],  # 참고한 기준 문서
-        "accuracy": corrected_result["accuracy"], # 신뢰도
+        "accuracy": corrected_result["accuracy"],  # 신뢰도
       })
 
   logging.debug(f'타입 확인{type(results)}')
