@@ -18,6 +18,9 @@ class ErrorCode(Enum):
   INNER_DATA_ERROR = (HTTPStatus.INTERNAL_SERVER_ERROR, "C005", "페이지가 없거나 내부 구조가 깨져 있음")
   FILE_FORMAT_INVALID = (HTTPStatus.INTERNAL_SERVER_ERROR, "C006", "파일이 깨졌 거나 지원 불가입니다.")
 
+  # agreement 관련 에러
+  REVIEW_FAIL = (HTTPStatus.BAD_REQUEST, "A001", "AI 검토 보고서 생성 작업 중 에러 발생")
+
   def __init__(self, status: HTTPStatus, code: str, message: str):
     self.status = status
     self.code = code
