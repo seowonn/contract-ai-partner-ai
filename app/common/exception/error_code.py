@@ -8,7 +8,7 @@ class ErrorCode(Enum):
 
   # standard 관련 에러
   UPLOAD_FAIL = (HTTPStatus.INTERNAL_SERVER_ERROR, "S001", "기준 문서 저장 과정 중 에러 발생")
-  UNEXPECTED_RESPONSE = (HTTPStatus.BAD_REQUEST, "S002", "맞지 않은 형식의 요청으로 다른 결과가 나옴")
+  DELETE_FAIL = (HTTPStatus.INTERNAL_SERVER_ERROR, "S002", "삭제 과정 중 에러 발생")
 
   # agreement 관련 에러
   FILE_ENCODING_FAILED = (HTTPStatus.INTERNAL_SERVER_ERROR, "A001", "파일을 Base64로 인코딩하거나 문자열로 변환하는 중 에러 발생")

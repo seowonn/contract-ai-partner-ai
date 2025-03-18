@@ -13,7 +13,7 @@ from app.services.standard.vector_store import vectorize_and_save
 
 standards = Blueprint('standards', __name__, url_prefix="/flask/standards")
 
-@standards.route('', methods=['POST'])
+@standards.route('/analysis', methods=['POST'])
 def process_pdf_from_s3():
 
   try:
@@ -31,7 +31,7 @@ def process_pdf_from_s3():
   except Exception as e:
     raise e
 
-  return SuccessResponse(SuccessCode.UPLOAD_SUCCESS, "success").of(), status_code
+  return SuccessResponse(SuccessCode.ANALYSIS_COMPLETE, "success").of(), status_code
 
 
 @standards.route('/<standardId>', methods=["DELETE"])
