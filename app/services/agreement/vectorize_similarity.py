@@ -7,25 +7,23 @@ from app.schemas.pdf_request import AgreementPDFRequest
 from app.containers.service_container import embedding_service, prompt_service
 
 
-def vectorize_and_similarity(
+def vectorize_and_calculate_similiarity(
     chunks: List[ArticleChunk],
-    pdf_request: AgreementPDFRequest,
-    similarity_threshold
+    pdf_request: AgreementPDFRequest
 ) -> List[dict]:
   results = []  # 최종 반환할 결과 저장
 
   for article in chunks:
-    article_number = article.article_title
 
     for clause in article.clauses:
+
       if len(clause.clause_content) <= 1:
         continue
 
       clause_content = clause.clause_content
-      combined_text = f"조 {article_number}, 항 {clause.clause_number}: {clause_content}"
 
       # 1️⃣ OpenAI 벡터화
-      clause_vector = embedding_service.embed_text(combined_text)
+      clause_vector = embedding_service.embed_text(clause_content)
 
       # 2️⃣ Qdrant에서 유사한 벡터 검색 (query_points 사용)
       search_results = qdrant_db_client.query_points(
@@ -61,7 +59,6 @@ def vectorize_and_similarity(
           proof_text=[item["proof_text"] for item in clause_results],  # 기준 문서들
           incorrect_texts=[item["incorrect_text"] for item in clause_results],  # 잘못된 문장들
           corrected_texts=[item["corrected_text"] for item in clause_results],  # 교정된 문장들
-          similarity_threshold=similarity_threshold
       )
 
       # 최종 결과 저장

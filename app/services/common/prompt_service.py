@@ -40,7 +40,7 @@ class PromptService:
     return response.choices[0].message.content
 
 
-  def correct_contract(self, clause_content: str, proof_text, incorrect_texts, corrected_texts, similarity_threshold):
+  def correct_contract(self, clause_content: str, proof_text, incorrect_texts, corrected_texts):
     # ✅ JSON 형식으로 변환할 데이터
     input_data = {
       "clause_content": clause_content,
@@ -57,7 +57,7 @@ class PromptService:
             "content": f"""
                     예시 위배 문장과 예시 위배 교정 문장을 참고해서 
                     입력받은 계약서 문장을 기준 문서(법률 조항)과 비교하여 교정해줘.
-                    그리고 참고한 자료를 기반으로 신뢰도 {similarity_threshold} 넘은 것만 알려줘
+                    그리고 참고한 자료를 기반으로 위배된 비율, 신뢰도(accuracy) 0.5 넘은 것만 알려줘
 
 
                     [입력 데이터 설명]
@@ -72,19 +72,18 @@ class PromptService:
                     [출력 형식]
                     {{
                         "clause_content": "{clause_content}",
-                        "corrected_text": "계약서의 문장을 올바르게 교정한 문장"
-                        "proof_text": "proof_text, incorrect_text, corrected_text 를 참조해 잘못된 포인트와 이유 문장"
+                        "corrected_text": "계약서의 문장을 올바르게 교정한 문장",
+                        "proof_text": "proof_text, incorrect_text, corrected_text 를 참조해 잘못된 포인트와 이유 문장",
                         "accuracy": "위배된 비율, 신뢰도"
                     }}
 
                     [조건]
-                    - 위반 문장과 교정 문장은 서로 논리적으로 연결되어야 함.
+                    - 위반 문장과 교정 문장은 서로 논리적으로 연결되어야 함,
                     - 결과는 반드시 JSON 형식으로 반환해
                 """
           }
         ],
         temperature=0.5,
-        max_tokens=512,
         top_p=1
     )
 
