@@ -28,7 +28,7 @@ def vectorize_and_calculate_similarity(chunks: List[ArticleChunk],
           query_filter=models.Filter(
               must=[
                 models.FieldCondition(
-                    key="categoryName",
+                    key="category",
                     match=models.MatchValue(value=pdf_request.categoryName)
                 )
               ]
