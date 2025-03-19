@@ -2,7 +2,6 @@ import os
 
 from dotenv import load_dotenv
 import openai
-from openai import OpenAI
 
 load_dotenv() # 루트로 고정
 
