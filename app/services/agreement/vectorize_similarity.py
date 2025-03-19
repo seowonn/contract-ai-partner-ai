@@ -3,20 +3,17 @@ from typing import List
 from qdrant_client import models
 from app.clients.qdrant_client import qdrant_db_client
 from app.schemas.chunk_schema import ArticleChunk
-from app.schemas.pdf_request import AgreementPDFRequest
+from app.schemas.document_request import DocumentRequest
 from app.containers.service_container import embedding_service, prompt_service
 
 
-def vectorize_and_calculate_similiarity(
-    chunks: List[ArticleChunk],
-    pdf_request: AgreementPDFRequest
-) -> List[dict]:
+def vectorize_and_calculate_similarity(chunks: List[ArticleChunk],
+    pdf_request: DocumentRequest) -> List[dict]:
   results = []  # 최종 반환할 결과 저장
 
   for article in chunks:
 
     for clause in article.clauses:
-
       if len(clause.clause_content) <= 1:
         continue
 
