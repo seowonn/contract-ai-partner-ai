@@ -1,14 +1,13 @@
 import logging
-from typing import List
+from typing import List, Tuple
 from qdrant_client import models
 from app.clients.qdrant_client import qdrant_db_client
 from app.schemas.chunk_schema import ArticleChunk
 from app.schemas.document_request import DocumentRequest
 from app.containers.service_container import embedding_service, prompt_service
 
-
 def vectorize_and_calculate_similarity(chunks: List[ArticleChunk],
-    pdf_request: DocumentRequest) -> List[dict]:
+    pdf_request: DocumentRequest) -> Tuple[List[dict], int]:
   results = []  # 최종 반환할 결과 저장
 
   for article in chunks:
@@ -53,7 +52,7 @@ def vectorize_and_calculate_similarity(chunks: List[ArticleChunk],
       # 3️⃣ 계약서 문장을 수정 (해당 조항의 TOP 5개 유사 문장을 기반으로)
       corrected_result = prompt_service.correct_contract(
           clause_content=clause_content,  # 현재 계약서 문장
-          proof_text=[item["proof_text"] for item in clause_results],  # 기준 문서들
+          proof_texts=[item["proof_text"] for item in clause_results],  # 기준 문서들
           incorrect_texts=[item["incorrect_text"] for item in clause_results],  # 잘못된 문장들
           corrected_texts=[item["corrected_text"] for item in clause_results],  # 교정된 문장들
       )
@@ -69,4 +68,4 @@ def vectorize_and_calculate_similarity(chunks: List[ArticleChunk],
   logging.debug(f'타입 확인{type(results)}')
   logging.debug(f'값 확인{results}')
 
-  return results  # ✅ 최종 JSON 형태로 반환
+  return results, 200  # ✅ 최종 JSON 형태로 반환
