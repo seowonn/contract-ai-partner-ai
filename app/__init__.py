@@ -22,7 +22,12 @@ def create_app():
   # 로깅 설정
   werkzeug_logger = logging.getLogger('werkzeug')
   werkzeug_logger.disabled = True
-  logging.basicConfig(level=logging.WARN)
+
+  logging.basicConfig(
+      level=logging.ERROR,  # ERROR 로그만 출력
+      format="%(asctime)s - %(levelname)s - %(message)s",  # ✅ 시간 포함
+      datefmt="%Y-%m-%d %H:%M:%S"
+  )
 
   # 예외 핸들러 등록
   register_error_handlers(app)
