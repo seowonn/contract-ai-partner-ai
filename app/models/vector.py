@@ -8,6 +8,7 @@ class VectorPayload:
   incorrect_text: str
   proof_text: str
   corrected_text: str
+  created_at: str
 
   def to_dict(self):
     return asdict(self)

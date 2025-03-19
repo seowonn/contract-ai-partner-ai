@@ -1,5 +1,6 @@
 import json
 import uuid
+from datetime import datetime
 from typing import List
 
 from app.clients.qdrant_client import qdrant_db_client
@@ -34,19 +35,19 @@ def vectorize_and_save(chunks: List[ArticleChunk], collection_name: str,
 
       # 2️⃣ Openai LLM 기반 교정 문구 생성
       result = prompt_service.make_correction_data(clause_content)
-      result = result.strip()
 
-      if result.startswith("{") and result.endswith("}"):
-        json_result = json.loads(result)  # 파싱 성공 시
-      else:
-        continue
+      # if result.startswith("{") and result.endswith("}"):
+      #   json_result = json.loads(result)  # 파싱 성공 시
+      # else:
+      #   continue
 
       payload = VectorPayload(
           standard_id=pdf_request.id,
           category=pdf_request.categoryName,
-          incorrect_text=json_result["incorrect_text"],
+          incorrect_text=result["incorrect_text"],
           proof_text=clause_content,
-          corrected_text=json_result["corrected_text"]
+          corrected_text=result["corrected_text"],
+          created_at=datetime.now().strftime("%Y-%m-%d %H:%M:%S")
       )
 
       points.append(

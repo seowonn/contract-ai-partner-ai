@@ -1,14 +1,18 @@
-import logging
 from typing import List, Tuple
 from qdrant_client import models
 from app.clients.qdrant_client import qdrant_db_client
+from app.schemas.analysis_response import RagResult, AnalysisResponse
 from app.schemas.chunk_schema import ArticleChunk
 from app.schemas.document_request import DocumentRequest
 from app.containers.service_container import embedding_service, prompt_service
 
 def vectorize_and_calculate_similarity(chunks: List[ArticleChunk],
-    pdf_request: DocumentRequest) -> Tuple[List[dict], int]:
-  results = []  # 최종 반환할 결과 저장
+    pdf_request: DocumentRequest) -> Tuple[AnalysisResponse, int]:
+  analysis_response = AnalysisResponse(
+      summary="",
+      total_page=0,
+      chunks=[]
+  )
 
   for article in chunks:
 
@@ -28,7 +32,7 @@ def vectorize_and_calculate_similarity(chunks: List[ArticleChunk],
           query_filter=models.Filter(
               must=[
                 models.FieldCondition(
-                    key="categoryName",
+                    key="category",
                     match=models.MatchValue(value=pdf_request.categoryName)
                 )
               ]
@@ -38,34 +42,14 @@ def vectorize_and_calculate_similarity(chunks: List[ArticleChunk],
       )
 
       # 5개의 문장별 검색 결과 저장 (현재 조항에 대한 유사한 문장들만 저장)
-      clause_results = []
+      rag_result = RagResult(clause_content=clause_content)
+
       for match in search_results.points:
         payload_data = match.payload or {}
+        rag_result.proof_texts.append(payload_data.get("proof_text"))
+        rag_result.incorrect_texts.append(payload_data.get("incorrect_text"))
+        rag_result.corrected_texts.append(payload_data.get("corrected_text"))
 
-        clause_results.append({
-          "id": match.id,  # ✅ 벡터 ID
-          "proof_text": payload_data.get("proof_text", ""),  # ✅ 원본 문장
-          "incorrect_text": payload_data.get("incorrect_text", ""),  # ✅ 잘못된 문장
-          "corrected_text": payload_data.get("corrected_text", "")  # ✅ 교정된 문장
-        })
+      analysis_response.chunks.append(rag_result)
 
-      # 3️⃣ 계약서 문장을 수정 (해당 조항의 TOP 5개 유사 문장을 기반으로)
-      corrected_result = prompt_service.correct_contract(
-          clause_content=clause_content,  # 현재 계약서 문장
-          proof_texts=[item["proof_text"] for item in clause_results],  # 기준 문서들
-          incorrect_texts=[item["incorrect_text"] for item in clause_results],  # 잘못된 문장들
-          corrected_texts=[item["corrected_text"] for item in clause_results],  # 교정된 문장들
-      )
-
-      # 최종 결과 저장
-      results.append({
-        "incorrect_text": corrected_result["clause_content"],  # 원본 문장
-        "corrected_text": corrected_result["corrected_text"],  # LLM이 교정한 문장
-        "proof_text": corrected_result["proof_text"],  # 참고한 기준 문서
-        "accuracy": corrected_result["accuracy"], # 신뢰도
-      })
-
-  logging.debug(f'타입 확인{type(results)}')
-  logging.debug(f'값 확인{results}')
-
-  return results, 200  # ✅ 최종 JSON 형태로 반환
+  return analysis_response, 200  # ✅ 최종 JSON 형태로 반환
