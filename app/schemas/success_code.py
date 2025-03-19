@@ -3,8 +3,10 @@ from http import HTTPStatus
 
 
 class SuccessCode(Enum):
-  UPLOAD_SUCCESS = (HTTPStatus.OK, "S001", "문서 업로드 완료")
+  ANALYSIS_COMPLETE = (HTTPStatus.OK, "S001", "기준 문서 AI 분석 완료")
   DELETE_SUCCESS = (HTTPStatus.OK, "S002", "문서 삭제 완료")
+
+  REVIEW_SUCCESS = (HTTPStatus.OK, "A001", "계약서 검토 완료")
 
 
   def __init__(self, status: HTTPStatus, code: str, message: str):

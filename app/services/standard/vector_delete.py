@@ -22,9 +22,7 @@ def delete_by_standard_id(standard_id: int):
         collection_name="standard",
         points_selector=filter_condition
     )
-  except UnexpectedResponse as e:
-    raise StandardException(ErrorCode.UNEXPECTED_RESPONSE)
-  except Exception as e:
-    raise e
+  except UnexpectedResponse:
+    raise StandardException(ErrorCode.DELETE_FAIL)
 
   return 200
