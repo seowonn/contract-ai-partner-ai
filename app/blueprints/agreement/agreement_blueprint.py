@@ -8,7 +8,7 @@ from app.schemas.document_request import DocumentRequest
 from app.schemas.success_code import SuccessCode
 from app.schemas.success_response import SuccessResponse
 from app.services.agreement.img_service import process_img
-from app.services.agreement.vectorize_similarity import vectorize_and_similarity
+from app.services.agreement.vectorize_similarity import vectorize_and_calculate_similarity
 from app.services.common.processor import preprocess_data
 
 agreements = Blueprint('agreements', __name__, url_prefix="/flask/agreements")
@@ -29,9 +29,7 @@ def process_agreement_pdf_from_s3():
       chunks = preprocess_data(document_request)
 
       # 5️⃣ 벡터화 + 유사도 비교 (리턴값 추가)
-      similarity_threshold = 0.8
-      result, status_code = vectorize_and_similarity(chunks, document_request,
-                                        similarity_threshold)
+      result, status_code = vectorize_and_calculate_similarity(chunks, document_request)
     else:
       pass
   except Exception as e:

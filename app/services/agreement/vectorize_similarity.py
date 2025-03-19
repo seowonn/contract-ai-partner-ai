@@ -1,30 +1,26 @@
 import logging
 from typing import List
-
 from qdrant_client import models
-
 from app.clients.qdrant_client import qdrant_db_client
-from app.containers.service_container import embedding_service, prompt_service
 from app.schemas.chunk_schema import ArticleChunk
 from app.schemas.document_request import DocumentRequest
+from app.containers.service_container import embedding_service, prompt_service
 
 
-def vectorize_and_similarity(chunks: List[ArticleChunk],
-    pdf_request: DocumentRequest, similarity_threshold) -> List[dict]:
+def vectorize_and_calculate_similarity(chunks: List[ArticleChunk],
+    pdf_request: DocumentRequest) -> List[dict]:
   results = []  # 최종 반환할 결과 저장
 
   for article in chunks:
-    article_number = article.article_title
 
     for clause in article.clauses:
       if len(clause.clause_content) <= 1:
         continue
 
       clause_content = clause.clause_content
-      combined_text = f"조 {article_number}, 항 {clause.clause_number}: {clause_content}"
 
       # 1️⃣ OpenAI 벡터화
-      clause_vector = embedding_service.embed_text(combined_text)
+      clause_vector = embedding_service.embed_text(clause_content)
 
       # 2️⃣ Qdrant에서 유사한 벡터 검색 (query_points 사용)
       search_results = qdrant_db_client.query_points(
@@ -58,11 +54,8 @@ def vectorize_and_similarity(chunks: List[ArticleChunk],
       corrected_result = prompt_service.correct_contract(
           clause_content=clause_content,  # 현재 계약서 문장
           proof_text=[item["proof_text"] for item in clause_results],  # 기준 문서들
-          incorrect_texts=[item["incorrect_text"] for item in clause_results],
-          # 잘못된 문장들
-          corrected_texts=[item["corrected_text"] for item in clause_results],
-          # 교정된 문장들
-          similarity_threshold=similarity_threshold
+          incorrect_texts=[item["incorrect_text"] for item in clause_results],  # 잘못된 문장들
+          corrected_texts=[item["corrected_text"] for item in clause_results],  # 교정된 문장들
       )
 
       # 최종 결과 저장
@@ -70,7 +63,7 @@ def vectorize_and_similarity(chunks: List[ArticleChunk],
         "incorrect_text": corrected_result["clause_content"],  # 원본 문장
         "corrected_text": corrected_result["corrected_text"],  # LLM이 교정한 문장
         "proof_text": corrected_result["proof_text"],  # 참고한 기준 문서
-        "accuracy": corrected_result["accuracy"],  # 신뢰도
+        "accuracy": corrected_result["accuracy"], # 신뢰도
       })
 
   logging.debug(f'타입 확인{type(results)}')
