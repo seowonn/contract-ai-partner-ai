@@ -13,7 +13,7 @@ from app.services.common.processor import preprocess_data
 
 agreements = Blueprint('agreements', __name__, url_prefix="/flask/agreements")
 
-@agreements.route('', methods=['POST'])
+@agreements.route('/analysis', methods=['POST'])
 def process_agreement_pdf_from_s3():
   result=[]
   try:
