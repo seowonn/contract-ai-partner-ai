@@ -24,7 +24,7 @@ def process_agreement_pdf_from_s3():
   status_code = HTTPStatus.OK
   try:
     if document_request.type in (FileType.PNG, FileType.JPG, FileType.JPEG):
-      status_code = process_img(document_request)
+      extracted_text = process_img(document_request)
     elif document_request.type == FileType.PDF:
       chunks = preprocess_data(document_request)
 

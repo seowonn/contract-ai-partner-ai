@@ -10,9 +10,6 @@ class ErrorCode(Enum):
   UPLOAD_FAIL = (HTTPStatus.INTERNAL_SERVER_ERROR, "S001", "기준 문서 저장 과정 중 에러 발생")
   DELETE_FAIL = (HTTPStatus.INTERNAL_SERVER_ERROR, "S002", "삭제 과정 중 에러 발생")
 
-  # agreement 관련 에러
-  FILE_ENCODING_FAILED = (HTTPStatus.INTERNAL_SERVER_ERROR, "A001", "파일을 Base64로 인코딩하거나 문자열로 변환하는 중 에러 발생")
-
   # common 에러
   DATA_TYPE_NOT_MATCH = (HTTPStatus.BAD_REQUEST, "C001", "데이터의 형식이 맞지 않음")
   FILE_LOAD_FAILED = (HTTPStatus.BAD_REQUEST, "C002", "S3에서 파일을 가져 오지 못함")
@@ -24,6 +21,7 @@ class ErrorCode(Enum):
 
   # agreement 관련 에러
   REVIEW_FAIL = (HTTPStatus.INTERNAL_SERVER_ERROR, "A001", "AI 검토 보고서 생성 작업 중 에러 발생")
+  INVALID_S3_PATH = (HTTPStatus.BAD_REQUEST, "A002", "openai 파싱에 적합하지 않은 s3 경로")
 
   def __init__(self, status: HTTPStatus, code: str, message: str):
     self.status = status
