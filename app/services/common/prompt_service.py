@@ -1,6 +1,6 @@
 import json
 import logging
-from typing import List
+from typing import List, Any
 
 
 class PromptService:
@@ -8,7 +8,7 @@ class PromptService:
     self.client = client
     self.deployment_name = deployment_name
 
-  def make_correction_data(self, clause_content: str) -> str:
+  def make_correction_data(self, clause_content: str) -> Any | None:
     response = self.client.chat.completions.create(
         model=self.deployment_name,
         messages=[
@@ -16,6 +16,7 @@ class PromptService:
             "role": "user",
             "content": f"""
               다음 지시문에 맞게 반환 해줘
+              반드시 JSON 코드 블록 (```json ...) 을 사용하지 말고, 그냥 JSON 객체만 반환해.
 
               문서 원문:
               \"\"\"
@@ -38,7 +39,16 @@ class PromptService:
         max_tokens=512,
         top_p=1
     )
-    return response.choices[0].message.content
+
+    response_text = response.choices[0].message.content
+
+    try:
+      parsed_response = json.loads(response_text)
+    except json.JSONDecodeError:
+      logging.error(f"❌ OpenAI 응답이 JSON 형식이 아님: {response_text}")
+      return None  # JSON 변환 실패 시 None 반환
+
+    return parsed_response
 
   def correct_contract(self, clause_content: str, proof_texts: List[str],
       incorrect_texts: List[str], corrected_texts: List[str]):
@@ -73,7 +83,6 @@ class PromptService:
 
                     [출력 형식]
                     {{
-                        "clause_content": "{clause_content}",
                         "corrected_text": "계약서의 문장을 올바르게 교정한 문장",
                         "proof_text": "proof_texts, incorrect_texts, corrected_texts 를 참조해 잘못된 포인트와 이유 문장",
                         "accuracy": "위배된 비율, 신뢰도"
