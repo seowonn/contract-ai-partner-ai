@@ -2,6 +2,7 @@ import os
 
 from dotenv import load_dotenv
 import openai
+from openai import OpenAI
 
 load_dotenv() # 루트로 고정
 
@@ -27,3 +28,6 @@ vision_client = openai.AzureOpenAI(
     azure_endpoint=os.getenv("AZURE_VISION_OPENAI_ENDPOINT")
 )
 vision_deployment_name = os.getenv("AZURE_VISION_OPENAI_DEPLOYMENT_NAME")
+
+openai.api_key = os.getenv("OPENAI_API_KEY")
+openai_client = openai.Client()
