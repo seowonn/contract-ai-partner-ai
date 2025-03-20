@@ -1,5 +1,5 @@
-import pdfplumber
-import io, fitz
+import io
+import fitz
 
 from botocore.response import StreamingBody
 from pdfminer.pdfparser import PDFSyntaxError

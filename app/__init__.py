@@ -22,7 +22,13 @@ def create_app():
   # 로깅 설정
   werkzeug_logger = logging.getLogger('werkzeug')
   werkzeug_logger.disabled = True
-  logging.basicConfig(level=logging.WARN)
+
+  # ✅ 상세 로그 포맷 적용 (파일명, 라인번호 포함)
+  logging.basicConfig(
+      level=logging.ERROR,  # ERROR 로그만 출력
+      format="%(asctime)s - %(levelname)s - %(filename)s:%(lineno)d - %(message)s",
+      datefmt="%Y-%m-%d %H:%M:%S"
+  )
 
   # 예외 핸들러 등록
   register_error_handlers(app)

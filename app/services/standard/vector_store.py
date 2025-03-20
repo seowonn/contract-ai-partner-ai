@@ -1,11 +1,12 @@
-import json
 import uuid
 from datetime import datetime
 from typing import List
 
+from app.blueprints.standard.standard_exception import StandardException
 from app.clients.qdrant_client import qdrant_db_client
 from qdrant_client.models import Distance, VectorParams, PointStruct
 
+from app.common.exception.error_code import ErrorCode
 from app.models.vector import VectorPayload
 from app.schemas.chunk_schema import ArticleChunk
 from app.schemas.document_request import DocumentRequest
@@ -75,4 +76,6 @@ def create_qdrant_collection(collection_name: str):
 
 
 def upload_points_to_qdrant(collection_name, points):
+  if len(points) == 0:
+    raise StandardException(ErrorCode.CHUNKING_FAIL)
   qdrant_db_client.upsert(collection_name=collection_name, points=points)
