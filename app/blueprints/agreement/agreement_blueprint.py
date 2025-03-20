@@ -1,3 +1,4 @@
+import asyncio, time
 from http import HTTPStatus
 
 from flask import Blueprint, request
@@ -34,7 +35,7 @@ def process_agreements_pdf_from_s3():
       chunks = preprocess_data(document_request)
 
       # 5️⃣ 벡터화 + 유사도 비교 (리턴값 추가)
-      result, status_code = vectorize_and_calculate_similarity(chunks, document_request)
+      result, status_code = asyncio.run(vectorize_and_calculate_similarity(chunks, document_request))
     else:
       pass
   except Exception as e:
