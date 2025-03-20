@@ -7,10 +7,11 @@ from app.schemas.chunk_schema import ArticleChunk
 from app.schemas.document_request import DocumentRequest
 from app.containers.service_container import embedding_service, prompt_service
 
-async def vectorize_and_calculate_similarity(chunks: List[ArticleChunk],
-    pdf_request: DocumentRequest) -> Tuple[AnalysisResponse, int]:
+
+async def vectorize_and_calculate_similarity(extracted_text: str,
+    chunks: List[ArticleChunk], pdf_request: DocumentRequest) -> AnalysisResponse:
   analysis_response = AnalysisResponse(
-      summary="",
+      original_text=extracted_text,
       total_page=0,
       chunks=[]
   )
@@ -58,4 +59,4 @@ async def vectorize_and_calculate_similarity(chunks: List[ArticleChunk],
   results = await asyncio.gather(*tasks)
   analysis_response.chunks.extend(results)
 
-  return analysis_response, 200  # ✅ 최종 JSON 형태로 반환
+  return analysis_response

@@ -6,7 +6,7 @@ from app.services.common.s3_service import read_s3_stream, \
   generate_pre_signed_url
 
 
-def process_img(img_reqeust: DocumentRequest):
+def process_img(img_reqeust: DocumentRequest) -> str:
   pre_signed_url = generate_pre_signed_url(img_reqeust.url)
   extracted_text = call_vision_api(pre_signed_url)
   return extracted_text
