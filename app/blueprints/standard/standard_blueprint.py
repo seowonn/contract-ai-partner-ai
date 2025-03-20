@@ -14,8 +14,7 @@ from app.services.standard.vector_store import vectorize_and_save
 standards = Blueprint('standards', __name__, url_prefix="/flask/standards")
 
 @standards.route('/analysis', methods=['POST'])
-def process_pdf_from_s3():
-
+def process_standards_pdf_from_s3():
   try:
     document_request = DocumentRequest(**request.get_json())
   except ValidationError as e:

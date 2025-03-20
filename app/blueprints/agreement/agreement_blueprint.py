@@ -14,8 +14,7 @@ from app.services.common.processor import preprocess_data
 agreements = Blueprint('agreements', __name__, url_prefix="/flask/agreements")
 
 @agreements.route('/analysis', methods=['POST'])
-def process_agreement_pdf_from_s3():
-  result=[]
+def process_agreements_pdf_from_s3():
   try:
     document_request = DocumentRequest(**request.get_json())
   except ValidationError as e:
