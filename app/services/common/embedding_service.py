@@ -1,5 +1,8 @@
 from typing import List
 
+from app.common.exception.custom_exception import BaseCustomException
+from app.common.exception.error_code import ErrorCode
+
 
 class EmbeddingService:
   def __init__(self, client, deployment_name):
@@ -12,4 +15,8 @@ class EmbeddingService:
         input=text,
         encoding_format="float"
     )
+
+    if not response or not response.data or not response.data[0].embedding:
+      raise BaseCustomException(ErrorCode.EMBEDDING_FAILED)
+
     return response.data[0].embedding
