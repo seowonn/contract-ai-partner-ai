@@ -2,7 +2,7 @@ from qdrant_client.http.exceptions import UnexpectedResponse
 
 from app.blueprints.standard.standard_exception import StandardException
 from app.clients.qdrant_client import qdrant_db_client
-from qdrant_client.http import models
+from qdrant_client import models
 
 from app.common.exception.error_code import ErrorCode
 
