@@ -36,5 +36,5 @@ def process_pdf_from_s3():
 
 @standards.route('/<standardId>', methods=["DELETE"])
 def delete_standard(standardId: str):
-  status_code = delete_by_standard_id(int(standardId))
-  return SuccessResponse(SuccessCode.DELETE_SUCCESS, "success").of(), status_code
+  success_code = delete_by_standard_id(int(standardId))
+  return SuccessResponse(success_code, "success").of(), HTTPStatus.OK
