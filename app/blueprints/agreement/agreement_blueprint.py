@@ -3,6 +3,8 @@ from http import HTTPStatus
 from flask import Blueprint, request
 from pydantic import ValidationError
 
+from app.common.exception.custom_exception import BaseCustomException
+from app.common.exception.error_code import ErrorCode
 from app.common.file_type import FileType
 from app.schemas.document_request import DocumentRequest
 from app.schemas.success_code import SuccessCode
@@ -16,9 +18,13 @@ agreements = Blueprint('agreements', __name__, url_prefix="/flask/agreements")
 @agreements.route('/analysis', methods=['POST'])
 def process_agreements_pdf_from_s3():
   try:
-    document_request = DocumentRequest(**request.get_json())
-  except ValidationError as e:
-    raise e
+    json_data = request.get_json()
+    if json_data is None:
+      raise BaseCustomException(ErrorCode.INVALID_JSON_FORMAT)
+
+    document_request = DocumentRequest(**json_data)
+  except ValidationError:
+    raise BaseCustomException(ErrorCode.FIELD_MISSING)
 
   status_code = HTTPStatus.OK
   try:
