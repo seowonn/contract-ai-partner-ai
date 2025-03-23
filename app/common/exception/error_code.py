@@ -10,6 +10,7 @@ class ErrorCode(Enum):
   UPLOAD_FAIL = (HTTPStatus.INTERNAL_SERVER_ERROR, "S001", "기준 문서 저장 과정 중 에러 발생")
   DELETE_FAIL = (HTTPStatus.INTERNAL_SERVER_ERROR, "S002", "삭제 과정 중 에러 발생")
   CHUNKING_FAIL = (HTTPStatus.INTERNAL_SERVER_ERROR, "S003", "청킹된 데이터 없음")
+  PROMPT_MAX_TRIAL_FAILED = (HTTPStatus.INTERNAL_SERVER_ERROR, "S004", "프롬프트 응답 재요청 3회 시도 진행 결과 json 불일치")
 
   # common 에러
   DATA_TYPE_NOT_MATCH = (HTTPStatus.BAD_REQUEST, "C001", "데이터의 형식이 맞지 않음")

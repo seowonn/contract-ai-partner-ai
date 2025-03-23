@@ -12,7 +12,7 @@ from app.schemas.chunk_schema import ArticleChunk
 from app.schemas.document_request import DocumentRequest
 from app.containers.service_container import embedding_service, prompt_service
 
-
+MAX_RETRIES = 3
 def vectorize_and_save(chunks: List[ArticleChunk], collection_name: str,
     pdf_request: DocumentRequest) -> None:
   points = []
@@ -34,13 +34,16 @@ def vectorize_and_save(chunks: List[ArticleChunk], collection_name: str,
       # 1️⃣ Openai 벡터화
       clause_vector = embedding_service.embed_text(combined_text)
 
-      # 2️⃣ Openai LLM 기반 교정 문구 생성
-      result = prompt_service.make_correction_data(clause_content)
+      result = None
+      for attempt in range(1, MAX_RETRIES + 1):
+        # 2️⃣ Openai LLM 기반 교정 문구 생성
+        result = prompt_service.make_correction_data(clause_content)
+        if result is not None:
+          break
+        logging.warning(f"교정 응답 실패. 재시도 {attempt}/{MAX_RETRIES}")
 
-      # if result.startswith("{") and result.endswith("}"):
-      #   json_result = json.loads(result)  # 파싱 성공 시
-      # else:
-      #   continue
+      if result is None:
+        raise StandardException(ErrorCode.PROMPT_MAX_TRIAL_FAILED)
 
       payload = VectorPayload(
           standard_id=pdf_request.id,
