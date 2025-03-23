@@ -29,6 +29,4 @@ vision_client = openai.AzureOpenAI(
 )
 vision_deployment_name = os.getenv("AZURE_VISION_OPENAI_DEPLOYMENT_NAME")
 
-openai.api_key = os.getenv("OPENAI_API_KEY")
-openai_client = openai.Client()
 openai_client = AsyncOpenAI(api_key=os.getenv("OPENAI_API_KEY"))
