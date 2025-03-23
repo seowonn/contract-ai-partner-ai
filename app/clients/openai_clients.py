@@ -1,6 +1,7 @@
 import os
 
 from dotenv import load_dotenv
+from openai import AsyncOpenAI
 import openai
 
 load_dotenv() # 루트로 고정
@@ -30,3 +31,4 @@ vision_deployment_name = os.getenv("AZURE_VISION_OPENAI_DEPLOYMENT_NAME")
 
 openai.api_key = os.getenv("OPENAI_API_KEY")
 openai_client = openai.Client()
+openai_client = AsyncOpenAI(api_key=os.getenv("OPENAI_API_KEY"))
