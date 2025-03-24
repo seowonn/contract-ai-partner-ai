@@ -1,5 +1,6 @@
 import json
 import logging
+import re
 from typing import List, Any
 
 
@@ -16,7 +17,8 @@ class PromptService:
             "role": "user",
             "content": f"""
               다음 지시문에 맞게 반환 해줘
-              반드시 JSON 코드 블록 (```json ...) 을 사용하지 말고, 그냥 JSON 객체만 반환해.
+              반드시 JSON 코드 블록 (```json ...) 을 사용하지 말고, 그냥 JSON 객체만 반환해
+              JSON 문자열 내 줄바꿈(\n)이 포함되지 않도록 한 줄로 작성해줘
 
               문서 원문:
               \"\"\"
@@ -41,12 +43,12 @@ class PromptService:
     )
 
     response_text = response.choices[0].message.content
-
+    response_text_cleaned = re.sub(r'(?<!\\)\n', ' ', response_text).strip()
     try:
-      parsed_response = json.loads(response_text)
+      parsed_response = json.loads(response_text_cleaned)
     except json.JSONDecodeError:
-      logging.error(f"❌ OpenAI 응답이 JSON 형식이 아님: {response_text}")
-      return None  # JSON 변환 실패 시 None 반환
+      logging.error(f"[PromptService]: jsonDecodeError response_text {response_text_cleaned}")
+      return None
 
     return parsed_response
 
