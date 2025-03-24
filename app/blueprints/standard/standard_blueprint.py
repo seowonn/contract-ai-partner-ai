@@ -1,5 +1,6 @@
 from http import HTTPStatus
-
+import time
+import asyncio
 from flask import Blueprint, request
 from pydantic import ValidationError
 
@@ -34,7 +35,10 @@ def process_standards_pdf_from_s3():
       chunks = chunk_texts(extracted_text)
 
       # 5️⃣ 벡터화 + Qdrant 저장
-      vectorize_and_save(chunks, "standard", document_request)
+      start_time = time.time()
+      asyncio.run(vectorize_and_save(chunks, "standard", document_request))
+      end_time = time.time()
+      print(f"Time taken vector_and_save: {end_time - start_time:.4f} seconds")
   except Exception as e:
     raise e
 

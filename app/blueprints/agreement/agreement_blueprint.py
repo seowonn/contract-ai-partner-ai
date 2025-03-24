@@ -15,6 +15,7 @@ from app.services.agreement.img_service import process_img
 from app.services.agreement.vectorize_similarity import \
   vectorize_and_calculate_similarity
 from app.services.common.processor import preprocess_data, chunk_texts
+import time
 
 agreements = Blueprint('agreements', __name__, url_prefix="/flask/agreements")
 
@@ -43,8 +44,9 @@ def process_agreements_pdf_from_s3():
   chunks = chunk_texts(extracted_text)
 
   # 5️⃣ 벡터화 + 유사도 비교 (리턴값 추가)
-  result = asyncio.run(
-    vectorize_and_calculate_similarity(extracted_text, chunks,
-                                       document_request))
+  start_time = time.time()
+  result = asyncio.run(vectorize_and_calculate_similarity(chunks, document_request))
+  end_time = time.time()
+  print(f"Time vectorize and prompt texts: {end_time - start_time:.4f} seconds")
 
   return SuccessResponse(SuccessCode.REVIEW_SUCCESS, result).of(), HTTPStatus.OK

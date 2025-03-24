@@ -13,10 +13,10 @@ from app.schemas.document_request import DocumentRequest
 from app.containers.service_container import embedding_service, prompt_service
 
 
-def vectorize_and_save(chunks: List[ArticleChunk], collection_name: str,
+async def vectorize_and_save(chunks: List[ArticleChunk], collection_name: str,
     pdf_request: DocumentRequest) -> None:
   points = []
-  ensure_qdrant_collection(collection_name)
+  await ensure_qdrant_collection(collection_name)
 
   for article in chunks:
     article_number = article.article_title
@@ -32,10 +32,10 @@ def vectorize_and_save(chunks: List[ArticleChunk], collection_name: str,
       combined_text = f"조 {article_number}, 항 {clause.clause_number}: {clause_content}"
 
       # 1️⃣ Openai 벡터화
-      clause_vector = embedding_service.embed_text(combined_text)
+      clause_vector = await embedding_service.embed_text(combined_text)
 
       # 2️⃣ Openai LLM 기반 교정 문구 생성
-      result = prompt_service.make_correction_data(clause_content)
+      result = await prompt_service.make_correction_data(clause_content)
 
       # if result.startswith("{") and result.endswith("}"):
       #   json_result = json.loads(result)  # 파싱 성공 시
@@ -59,23 +59,23 @@ def vectorize_and_save(chunks: List[ArticleChunk], collection_name: str,
           )
       )
 
-  upload_points_to_qdrant(collection_name, points)
+  await upload_points_to_qdrant(collection_name, points)
 
 
-def ensure_qdrant_collection(collection_name: str) -> None:
-  exists = qdrant_db_client.collection_exists(collection_name=collection_name)
+async def ensure_qdrant_collection(collection_name: str) -> None:
+  exists = await qdrant_db_client.collection_exists(collection_name=collection_name)
   if not exists:
-    create_qdrant_collection(collection_name)
+    await create_qdrant_collection(collection_name)
 
 
-def create_qdrant_collection(collection_name: str):
-  return qdrant_db_client.create_collection(
+async def create_qdrant_collection(collection_name: str):
+  result = await qdrant_db_client.create_collection(
       collection_name=collection_name,
       vectors_config=VectorParams(size=1536, distance=Distance.COSINE)
   )
 
 
-def upload_points_to_qdrant(collection_name, points):
+async def upload_points_to_qdrant(collection_name, points):
   if len(points) == 0:
     raise StandardException(ErrorCode.CHUNKING_FAIL)
-  qdrant_db_client.upsert(collection_name=collection_name, points=points)
+  await qdrant_db_client.upsert(collection_name=collection_name, points=points)
