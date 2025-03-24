@@ -14,10 +14,8 @@ from app.schemas.success_code import SuccessCode
 from app.schemas.success_response import SuccessResponse
 from app.services.common.processor import preprocess_data, chunk_texts
 from app.services.standard.vector_delete import delete_by_standard_id
-from app.services.standard.vector_store import vectorize_and_save, \
-  vectorize_and_save_async_with_to_thread, vectorize_and_save_by_async_gpt
+from app.services.standard.vector_store import vectorize_and_save
 
-import time
 
 standards = Blueprint('standards', __name__, url_prefix="/flask/standards")
 
@@ -39,22 +37,8 @@ def process_standards_pdf_from_s3():
       chunks = chunk_texts(extracted_text)
 
       # 5️⃣ 벡터화 + Qdrant 저장
-      start_time = time.time()
-      vectorize_and_save(chunks, "standard1", document_request)
-      end_time = time.time()
-      print(f"vectorize_and_save 소요 시간: {end_time - start_time}초")
-
-      start_time = time.time()
-      asyncio.run(vectorize_and_save_async_with_to_thread(chunks, "standard2",
-                                                          document_request))
-      end_time = time.time()
-      print(f"vectorize_and_save_async_with_to_thread 소요 시간: {end_time - start_time}초")
-
-      start_time = time.time()
-      asyncio.run(
-        vectorize_and_save_by_async_gpt(chunks, "standard3", document_request))
-      end_time = time.time()
-      print(f"vectorize_and_save_by_async_gpt 소요 시간: {end_time - start_time}초")
+      asyncio.run(vectorize_and_save(
+          chunks, Constants.QDRANT_COLLECTION.value, document_request))
 
   except Exception as e:
     raise e
