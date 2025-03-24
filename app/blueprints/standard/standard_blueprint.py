@@ -1,4 +1,6 @@
 import asyncio
+import logging
+import time
 from http import HTTPStatus
 
 from flask import Blueprint, request
@@ -37,8 +39,11 @@ def process_standards_pdf_from_s3():
       chunks = chunk_texts(extracted_text)
 
       # 5️⃣ 벡터화 + Qdrant 저장
+      start_time = time.time()
       asyncio.run(vectorize_and_save(
           chunks, Constants.QDRANT_COLLECTION.value, document_request))
+      end_time = time.time()
+      logging.info(f"vectorize_and_save 소요 시간: {end_time - start_time}")
 
   except Exception as e:
     raise e
