@@ -1,5 +1,7 @@
 from typing import List
 
+from app.common.exception.custom_exception import BaseCustomException
+from app.common.exception.error_code import ErrorCode
 from app.schemas.chunk_schema import ArticleChunk
 from app.schemas.document_request import DocumentRequest
 from app.services.common.chunking_service import chunk_by_article_and_clause
@@ -24,4 +26,7 @@ def preprocess_data(document_request: DocumentRequest) -> str:
 def chunk_texts(extracted_text: str) -> List[ArticleChunk]:
   # 4️⃣ 텍스트 청킹
   chunks = chunk_by_article_and_clause(extracted_text)
+
+  if len(chunks) == 0:
+    raise BaseCustomException(ErrorCode.CHUNKING_FAIL)
   return chunks

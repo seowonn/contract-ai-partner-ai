@@ -205,5 +205,5 @@ def create_qdrant_collection(collection_name: str):
 
 def upload_points_to_qdrant(collection_name, points):
   if len(points) == 0:
-    raise StandardException(ErrorCode.CHUNKING_FAIL)
+    raise StandardException(ErrorCode.NO_POINTS_FOUND)
   qdrant_db_client.upsert(collection_name=collection_name, points=points)
