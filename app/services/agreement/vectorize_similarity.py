@@ -10,7 +10,7 @@ from app.common.exception.error_code import ErrorCode
 from app.schemas.analysis_response import RagResult, AnalysisResponse
 from app.schemas.chunk_schema import ArticleChunk
 from app.schemas.document_request import DocumentRequest
-from app.containers.service_container import embedding_service
+from app.containers.service_container import text_service
 
 
 async def vectorize_and_calculate_similarity(extracted_text: str,
@@ -37,9 +37,7 @@ async def vectorize_and_calculate_similarity(extracted_text: str,
 
 
 async def process_clause(clause_content: str, pdf_request: DocumentRequest) -> RagResult:
-  # 텍스트 임베딩을 별도 스레드에서 실행 (blocking call을 비동기로 전환)
-  embedding = await asyncio.to_thread(embedding_service.embed_text,
-                                      clause_content)
+  embedding = await text_service.embed_text_async_ver(clause_content)
 
   # Qdrant에서 유사한 벡터 검색 (해당 호출이 동기라면 그대로 사용)
   search_results = qdrant_db_client.query_points(
