@@ -8,8 +8,8 @@ class PromptService:
     self.client = client
     self.deployment_name = deployment_name
 
-  def make_correction_data(self, clause_content: str) -> Any | None:
-    response = self.client.chat.completions.create(
+  async def make_correction_data(self, clause_content: str) -> Any | None:
+    response = await self.client.chat.completions.create(
         model=self.deployment_name,
         messages=[
           {
@@ -50,7 +50,7 @@ class PromptService:
 
     return parsed_response
 
-  def correct_contract(self, clause_content: str, proof_texts: List[str],
+  async def correct_contract(self, clause_content: str, proof_texts: List[str],
       incorrect_texts: List[str], corrected_texts: List[str]):
     # ✅ JSON 형식으로 변환할 데이터
     input_data = {
@@ -60,7 +60,7 @@ class PromptService:
       "corrected_texts": corrected_texts
     }
 
-    response = self.client.chat.completions.create(
+    response = await self.client.chat.completions.create(
         model=self.deployment_name,
         messages=[
           {
@@ -68,9 +68,9 @@ class PromptService:
             "content": f"""
                     예시 위배 문장과 예시 위배 교정 문장을 참고해서 
                     입력받은 계약서 문장을 기준 문서(법률 조항)과 비교하여 교정해줘.
-                    그리고 참고한 자료를 기반으로 위배된 비율, 신뢰도(accuracy) 0.5 넘은 것만 알려줘
+                    그리고 참고한 자료를 기반으로 위배된 비율을 네가 계산해줘
+                    비율을 신뢰도라고 저장하고 신뢰도가 0.5 넘은 것만 저장해줘
                     반드시 JSON 코드 블록 (```json ...) 을 사용하지 말고, 그냥 JSON 객체만 반환해.
-                    특히 'proof_texts', 'incorrect_texts', 'corrected_texts'는 리스트가 아닌 단일 문자열로 반환해야 해.
 
                     [입력 데이터 설명]
                     - **clause_content**: 사용자가 입력한 계약서의 문장 (수정해야 하는 문장)
@@ -83,8 +83,9 @@ class PromptService:
 
                     [출력 형식]
                     {{
+                        "clause_content": 계약서 원문
                         "corrected_text": "계약서의 문장을 올바르게 교정한 문장",
-                        "proof_text": "proof_texts, incorrect_texts, corrected_texts 를 참조해 잘못된 포인트와 이유 문장",
+                        "proof_text": 입력데이터를 참조해 잘못된 포인트와 이유"
                         "accuracy": "위배된 비율, 신뢰도"
                     }}
 
