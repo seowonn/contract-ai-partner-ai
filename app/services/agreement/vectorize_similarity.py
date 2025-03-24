@@ -5,6 +5,7 @@ from qdrant_client import models
 
 from app.blueprints.agreement.agreement_exception import AgreementException
 from app.clients.qdrant_client import qdrant_db_client
+from app.common.constants import Constants
 from app.common.exception.error_code import ErrorCode
 from app.schemas.analysis_response import RagResult, AnalysisResponse
 from app.schemas.chunk_schema import ArticleChunk
@@ -42,7 +43,7 @@ async def process_clause(clause_content: str, pdf_request: DocumentRequest) -> R
 
   # Qdrant에서 유사한 벡터 검색 (해당 호출이 동기라면 그대로 사용)
   search_results = qdrant_db_client.query_points(
-      collection_name="standard",
+      collection_name=Constants.QDRANT_COLLECTION.value,
       query=embedding,
       query_filter=models.Filter(
           must=[

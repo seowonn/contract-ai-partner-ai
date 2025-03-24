@@ -3,6 +3,7 @@ from qdrant_client.models import Filter, FieldCondition, MatchValue
 
 from app.blueprints.standard.standard_exception import StandardException
 from app.clients.qdrant_client import qdrant_db_client
+from app.common.constants import Constants
 from app.common.exception.error_code import ErrorCode
 from app.schemas.success_code import SuccessCode
 
@@ -14,7 +15,7 @@ def delete_by_standard_id(standard_id: int) -> SuccessCode:
   )
 
   points, _ = qdrant_db_client.scroll(
-      collection_name="standard",
+      collection_name=Constants.QDRANT_COLLECTION.value,
       scroll_filter=filter_condition,
       limit=1
   )
@@ -24,7 +25,7 @@ def delete_by_standard_id(standard_id: int) -> SuccessCode:
 
   try:
     qdrant_db_client.delete(
-        collection_name="standard",
+        collection_name=Constants.QDRANT_COLLECTION.value,
         points_selector=filter_condition
     )
   except UnexpectedResponse:

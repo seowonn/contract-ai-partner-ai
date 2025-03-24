@@ -10,6 +10,7 @@ class ErrorCode(Enum):
   UPLOAD_FAIL = (HTTPStatus.INTERNAL_SERVER_ERROR, "S001", "기준 문서 저장 과정 중 에러 발생")
   DELETE_FAIL = (HTTPStatus.INTERNAL_SERVER_ERROR, "S002", "삭제 과정 중 에러 발생")
   CHUNKING_FAIL = (HTTPStatus.INTERNAL_SERVER_ERROR, "S003", "청킹된 데이터 없음")
+  PROMPT_MAX_TRIAL_FAILED = (HTTPStatus.INTERNAL_SERVER_ERROR, "S004", "프롬프트 응답 재요청 3회 시도 진행 결과 json 불일치")
 
   # common 에러
   DATA_TYPE_NOT_MATCH = (HTTPStatus.BAD_REQUEST, "C001", "데이터의 형식이 맞지 않음")
@@ -24,6 +25,7 @@ class ErrorCode(Enum):
   INVALID_URL_PARAMETER = (HTTPStatus.BAD_REQUEST, "C010", "url 경로에 필수 항목이 누락됨")
   CANNOT_CONVERT_TO_NUM = (HTTPStatus.BAD_REQUEST, "C011", "URL 매개변수를 숫자로 변환할 수 없음")
   EMBEDDING_FAILED = (HTTPStatus.INTERNAL_SERVER_ERROR, "C012", "임베딩 실패")
+  NO_POINTS_FOUND = (HTTPStatus.INTERNAL_SERVER_ERROR, "C013", "생성된 포인트 없음")
 
   # agreement 관련 에러
   REVIEW_FAIL = (HTTPStatus.INTERNAL_SERVER_ERROR, "A001", "AI 검토 보고서 생성 작업 중 에러 발생")
