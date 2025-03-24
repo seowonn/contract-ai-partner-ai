@@ -5,6 +5,7 @@ from flask import Blueprint, request
 from pydantic import ValidationError
 
 from app.blueprints.agreement.agreement_exception import AgreementException
+from app.common.constants import Constants
 from app.common.exception.custom_exception import BaseCustomException
 from app.common.exception.error_code import ErrorCode
 from app.common.file_type import FileType
@@ -58,7 +59,8 @@ def process_standards_pdf_from_s3():
   except Exception as e:
     raise e
 
-  return SuccessResponse(SuccessCode.ANALYSIS_COMPLETE, "success").of(), status_code
+  return SuccessResponse(SuccessCode.ANALYSIS_COMPLETE,
+                         Constants.SUCCESS.value).of(), status_code
 
 
 @standards.route('/<standardId>', methods=["DELETE"])
@@ -70,4 +72,5 @@ def delete_standard(standardId: str):
     raise AgreementException(ErrorCode.CANNOT_CONVERT_TO_NUM)
 
   success_code = delete_by_standard_id(int(standardId))
-  return SuccessResponse(success_code, "success").of(), HTTPStatus.OK
+  return SuccessResponse(success_code,
+                         Constants.SUCCESS.value).of(), HTTPStatus.OK
