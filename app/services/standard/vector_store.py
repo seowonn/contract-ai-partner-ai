@@ -17,7 +17,7 @@ from app.schemas.document_request import DocumentRequest
 MAX_RETRIES = 3
 async def vectorize_and_save(chunks: List[ArticleChunk],
     collection_name: str, pdf_request: DocumentRequest) -> None:
-  ensure_qdrant_collection(collection_name)
+  await ensure_qdrant_collection(collection_name)
   tasks = []
 
   for article in chunks:
@@ -32,7 +32,7 @@ async def vectorize_and_save(chunks: List[ArticleChunk],
 
   # None 제거 후 업로드
   points = [point for point in results if point]
-  upload_points_to_qdrant(collection_name, points)
+  await upload_points_to_qdrant(collection_name, points)
 
 
 async def process_clause(article_title: str, clause: ClauseChunk,
@@ -76,20 +76,20 @@ async def retry_make_correction(clause_content: str) -> dict:
   raise StandardException(ErrorCode.PROMPT_MAX_TRIAL_FAILED)
 
 
-def ensure_qdrant_collection(collection_name: str) -> None:
-  exists = qdrant_db_client.collection_exists(collection_name=collection_name)
+async def ensure_qdrant_collection(collection_name: str) -> None:
+  exists = await qdrant_db_client.collection_exists(collection_name=collection_name)
   if not exists:
-    create_qdrant_collection(collection_name)
+    await create_qdrant_collection(collection_name)
 
 
-def create_qdrant_collection(collection_name: str):
-  return qdrant_db_client.create_collection(
+async def create_qdrant_collection(collection_name: str):
+  return await qdrant_db_client.create_collection(
       collection_name=collection_name,
       vectors_config=VectorParams(size=1536, distance=Distance.COSINE)
   )
 
 
-def upload_points_to_qdrant(collection_name, points):
+async def upload_points_to_qdrant(collection_name, points):
   if len(points) == 0:
     raise StandardException(ErrorCode.NO_POINTS_FOUND)
-  qdrant_db_client.upsert(collection_name=collection_name, points=points)
+  await qdrant_db_client.upsert(collection_name=collection_name, points=points)
