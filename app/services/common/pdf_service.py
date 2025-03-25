@@ -9,14 +9,14 @@ from app.common.exception.error_code import ErrorCode
 from app.services.common.s3_service import read_s3_stream
 
 
-def convert_to_bytes_io(s3_stream: StreamingBody):
+def convert_to_bytes_io(response):
   try:
-    data = read_s3_stream(s3_stream)
-    pdf_bytes_io = io.BytesIO(data)
+    pdf_bytes_io = io.BytesIO(response)
     pdf_bytes_io.seek(0)
     return pdf_bytes_io
   except Exception:
     raise BaseCustomException(ErrorCode.CONVERT_TO_IO_FAILED)
+
 
 def extract_text_from_pdf_io(pdf_bytes_io):
   if not isinstance(pdf_bytes_io, io.BytesIO):
