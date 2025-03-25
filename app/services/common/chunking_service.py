@@ -14,6 +14,7 @@ def chunk_by_article_and_clause_with_page(extracted_text: list) -> List[
   result: List[ArticleChunk] = []
 
   for page, page_text in extracted_text:
+    sentence_index = 1
     # 1. 페이지 텍스트를 조항별로 분리
     chunks = split_text_by_pattern(page_text, r'\n(제\s*\d+조(?:\([^)]+\))?)')
 
@@ -34,7 +35,8 @@ def chunk_by_article_and_clause_with_page(extracted_text: list) -> List[
         # 항이 없으면 조항 내용만 저장하고, 해당 페이지를 기록
         result.append(
           ArticleChunk(article_title=article_title + article_body, clauses=[],
-                       page=page))
+                       page=page, sentence_index=sentence_index))
+        sentence_index += 1
         continue
 
       # 4. 항의 시작 위치 계산
@@ -59,8 +61,10 @@ def chunk_by_article_and_clause_with_page(extracted_text: list) -> List[
 
       # 6. 페이지 번호를 포함하여 ArticleChunk 저장
       result.append(ArticleChunk(article_title=article_title, clauses=clauses,
-                                 page=page))
+                                 page=page, sentence_index=sentence_index))
+      sentence_index += 1
 
+  print(result)
   # 7. 최종 결과 반환
   return result
 
