@@ -28,15 +28,18 @@ def extract_text_from_pdf_io(pdf_bytes_io):
     # PyMuPDF (fitz) 사용
     # stream 인자가 없으면 BytesIO 인식 못하므로 필수 (파일이 아닌 메모리로부터 찾기)
     doc = fitz.open(stream=pdf_bytes_io, filetype="pdf")
-    for page in doc:
+    page_count = doc.page_count
+    for page_num in range(page_count):
       try:
+        page = doc.load_page(page_num)
         text = page.get_text()
         if text:
-          extracted_text.append(text.strip())
+          extracted_text.append((page_num + 1, text.strip()))  # 페이지 번호와 텍스트 튜플로 저장
       except (AttributeError, TypeError):
         raise BaseCustomException(ErrorCode.INNER_DATA_ERROR)
 
   except (PDFSyntaxError, ValueError):
     raise BaseCustomException(ErrorCode.FILE_FORMAT_INVALID)
 
-  return "\n".join(extracted_text)
+  return extracted_text
+
