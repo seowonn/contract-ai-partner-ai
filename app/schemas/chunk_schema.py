@@ -12,3 +12,4 @@ class ClauseChunk:
 class ArticleChunk:
   article_title: str
   clauses: List[ClauseChunk]
+  page : int
