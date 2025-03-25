@@ -18,7 +18,7 @@ def convert_to_bytes_io(response):
     raise BaseCustomException(ErrorCode.CONVERT_TO_IO_FAILED)
 
 
-def extract_text_from_pdf_io(pdf_bytes_io):
+def extract_text_and_documents_from_pdf_io(pdf_bytes_io: io.BytesIO):
   if not isinstance(pdf_bytes_io, io.BytesIO):
     raise BaseCustomException(ErrorCode.DATA_TYPE_NOT_MATCH)
 
