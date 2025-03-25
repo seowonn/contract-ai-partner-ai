@@ -45,7 +45,7 @@ def process_agreements_pdf_from_s3():
 
   # 5️⃣ 벡터화 + 유사도 비교 (리턴값 추가)
   start_time = time.time()
-  result = asyncio.run(vectorize_and_calculate_similarity(chunks, document_request))
+  result = asyncio.run(vectorize_and_calculate_similarity(extracted_text, chunks, document_request))
   end_time = time.time()
   print(f"Time vectorize and prompt texts: {end_time - start_time:.4f} seconds")
 
