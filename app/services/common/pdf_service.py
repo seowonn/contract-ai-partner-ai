@@ -1,17 +1,14 @@
 import io
 import fitz
 
-from botocore.response import StreamingBody
 from pdfminer.pdfparser import PDFSyntaxError
-
 from app.common.exception.custom_exception import BaseCustomException
 from app.common.exception.error_code import ErrorCode
-from app.services.common.s3_service import read_s3_stream
 
 
-def convert_to_bytes_io(response):
+def convert_to_bytes_io(s3_stream: bytes) -> io.BytesIO:
   try:
-    pdf_bytes_io = io.BytesIO(response)
+    pdf_bytes_io = io.BytesIO(s3_stream)
     pdf_bytes_io.seek(0)
     return pdf_bytes_io
   except Exception:
