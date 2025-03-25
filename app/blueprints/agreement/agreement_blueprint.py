@@ -48,7 +48,6 @@ def process_agreements_pdf_from_s3():
   start_time = time.time()
   result = asyncio.run(vectorize_and_calculate_similarity(extracted_text, chunks, document_request))
   end_time = time.time()
-  print(f"Time vectorize and prompt texts: {end_time - start_time:.4f} seconds")
   logging.info(f"Time vectorize and prompt texts: {end_time - start_time:.4f} seconds")
 
   return SuccessResponse(SuccessCode.REVIEW_SUCCESS, result).of(), HTTPStatus.OK
