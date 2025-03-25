@@ -17,7 +17,7 @@ async def vectorize_and_calculate_similarity(extracted_text: str,
     chunks: List[ArticleChunk], pdf_request: DocumentRequest) -> AnalysisResponse:
   total_page = max(article.page for article in chunks) + 1
   analysis_response = AnalysisResponse(
-      original_text=extracted_text,
+      summary_content=extracted_text,
       total_page=total_page,
       chunks=[]
   )
