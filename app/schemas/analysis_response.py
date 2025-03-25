@@ -15,7 +15,7 @@ class RagResult:
 
 @dataclass
 class AnalysisResponse:
-  original_text: str
+  summary_content: str
   total_page: int
   chunks: List[RagResult]
 
