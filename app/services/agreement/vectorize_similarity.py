@@ -83,17 +83,9 @@ async def process_clause(clause_content: str, pdf_request: DocumentRequest,
 
 
   # 최종 결과 저장
-  result = {
-      "incorrect_text": corrected_result["clause_content"],  # 원본 문장
-      "corrected_text": corrected_result["corrected_text"],  # LLM이 교정한 문장
-      "proof_text": corrected_result["proof_text"],  # 참고한 기준 문서
-      "accuracy": corrected_result["accuracy"],  # 신뢰도
-      "page": page,  # 페이지 번호
-      "sentence_index": sentence_index  # 문장 인덱스
-  }
+  rag_result.accuracy = corrected_result["accuracy"]
+  rag_result.corrected_text = corrected_result["corrected_text"]
+  rag_result.incorrect_text = corrected_result["clause_content"]
+  rag_result.proof_text = corrected_result["proof_text"]
 
-  # accuracy가 0.5 이하일 경우 결과를 반환하지 않음
-  if float(result["accuracy"]) > 0.5:
-    return result
-  else:
-    return None  # accuracy가 0.5 이하일 경우 빈 객체 반환
+  return rag_result
