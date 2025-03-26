@@ -7,7 +7,7 @@ from flask import Blueprint, request
 from pydantic import ValidationError
 
 from app.blueprints.agreement.agreement_exception import AgreementException
-from app.common.constants import Constants
+from app.blueprints.common.async_loop import run_async
 from app.common.exception.custom_exception import BaseCustomException
 from app.common.exception.error_code import ErrorCode
 from app.common.file_type import FileType
@@ -51,7 +51,7 @@ def process_agreements_pdf_from_s3():
 
   # 5️⃣ 벡터화 + 유사도 비교 (리턴값 추가)
   start_time = time.time()
-  chunks = asyncio.run(
+  chunks = run_async(
       vectorize_and_calculate_similarity(
           document_chunks, Constants.QDRANT_COLLECTION.value, document_request))
   end_time = time.time()
