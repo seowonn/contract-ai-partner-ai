@@ -20,6 +20,7 @@ from app.services.agreement.vectorize_similarity import \
   vectorize_and_calculate_similarity
 from app.services.common.ingestion_pipeline import preprocess_data, chunk_agreement_documents
 import time
+from app.containers.service_container import prompt_service, sync_prompt_service
 
 from config.app_config import AppConfig
 
@@ -47,8 +48,15 @@ def process_agreements_pdf_from_s3():
 
   if len(documents) == 0:
     raise AgreementException(ErrorCode.NO_TEXTS_EXTRACTED)
+  # start = time.time()
+  summary_content = sync_prompt_service.summarize_document(documents)
+  # end = time.time()
+  # logging.info(f"summary texts: {end - start:.4f} seconds")
 
+  # start = time.time()
   document_chunks = chunk_agreement_documents(documents)
+  # end = time.time()
+  # logging.info(f"chunking texts: {end - start:.4f} seconds")
 
   # 5️⃣ 벡터화 + 유사도 비교 (리턴값 추가)
   start_time = time.time()
@@ -60,7 +68,7 @@ def process_agreements_pdf_from_s3():
 
   response = AnalysisResponse(
       total_page = len(documents),
-      summary_content="",
+      summary_content=summary_content,
       chunks=chunks
   )
 

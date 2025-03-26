@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import List
+from typing import List, Optional
 
 
 @dataclass
@@ -19,7 +19,7 @@ class DocumentChunk:
   clause_content: str
   page: int
   order_index: int
-  clause_number: str
+  clause_number: Optional[str] = None
 
 @dataclass
 class DocumentMetadata:

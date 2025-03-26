@@ -56,14 +56,15 @@ class PromptService:
 
       return parsed_response
 
-  async def correct_contract(self, clause_content: str, proof_texts: List[str],
-      incorrect_texts: List[str], corrected_texts: List[str]) -> Optional[dict]:
+
+  async def correct_contract(self, clause_content: str, proof_text: List[str],
+      incorrect_text: List[str], corrected_text: List[str]):
     # ✅ JSON 형식으로 변환할 데이터
     input_data = {
       "clause_content": clause_content,
-      "proof_texts": proof_texts,
-      "incorrect_texts": incorrect_texts,
-      "corrected_texts": corrected_texts
+      "proof_text": proof_text,
+      "incorrect_text": incorrect_text,
+      "corrected_text": corrected_text
     }
 
     async with httpx.AsyncClient() as httpx_client:
@@ -121,3 +122,24 @@ class PromptService:
       return None  # JSON 변환 실패 시 None 반환
 
     return parsed_response
+
+  def summarize_document(self, documents: str) -> str:
+
+    # OpenAI API 호출하여 문서 요약
+    response = self.client.chat.completions.create(
+        model=self.deployment_name,
+        messages=[{
+          "role": "user",
+          "content": f"문서 전체 내용을 string 형식으로 요약해줘."
+                     f"출력할때 강조하는 '**' 과 엔터키 '\n', '\n\n' 모두 제거하고 출력해줘"
+                     f"\n\n 문서 : {documents}"
+        }],
+        temperature=0.5,
+        top_p=1
+    )
+
+    # 요약된 내용만 추출하여 반환
+    summary_content = response.choices[
+      0].message.content if response.choices else ''
+
+    return summary_content
