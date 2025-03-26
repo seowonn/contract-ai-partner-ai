@@ -63,6 +63,6 @@ def delete_standard(standardId: str):
   if not standardId.isdigit():
     raise AgreementException(ErrorCode.CANNOT_CONVERT_TO_NUM)
 
-  success_code = delete_by_standard_id(int(standardId))
+  success_code = asyncio.run(delete_by_standard_id(int(standardId)))
   return SuccessResponse(success_code,
                          Constants.SUCCESS.value).of(), HTTPStatus.OK

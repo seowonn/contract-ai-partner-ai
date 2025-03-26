@@ -8,13 +8,13 @@ from app.common.exception.error_code import ErrorCode
 from app.schemas.success_code import SuccessCode
 
 
-def delete_by_standard_id(standard_id: int) -> SuccessCode:
+async def delete_by_standard_id(standard_id: int) -> SuccessCode:
   filter_condition = Filter(
       must=[
         FieldCondition(key="standard_id", match=MatchValue(value=standard_id))]
   )
 
-  points, _ = qdrant_db_client.scroll(
+  points, _ = await qdrant_db_client.scroll(
       collection_name=Constants.QDRANT_COLLECTION.value,
       scroll_filter=filter_condition,
       limit=1
@@ -24,7 +24,7 @@ def delete_by_standard_id(standard_id: int) -> SuccessCode:
     return SuccessCode.NO_DOCUMENT_FOUND
 
   try:
-    qdrant_db_client.delete(
+    await qdrant_db_client.delete(
         collection_name=Constants.QDRANT_COLLECTION.value,
         points_selector=filter_condition
     )
