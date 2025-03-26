@@ -25,9 +25,10 @@ def create_app():
 
   # ✅ 상세 로그 포맷 적용 (파일명, 라인번호 포함)
   logging.basicConfig(
-      level=logging.ERROR,  # ERROR 로그만 출력
+      level=logging.INFO,  # ERROR 로그만 출력
       format="%(asctime)s - %(levelname)s - %(filename)s:%(lineno)d - %(message)s",
-      datefmt="%Y-%m-%d %H:%M:%S"
+      datefmt="%Y-%m-%d %H:%M:%S",
+      force=True
   )
 
   # 예외 핸들러 등록

@@ -26,7 +26,7 @@ def s3_connection():
 s3 = s3_connection()
 
 
-def s3_get_object(url):
+def s3_get_object(url: str) -> bytes:
   if not url.startswith("https://"):
     raise ValueError("Invalid https path")
 

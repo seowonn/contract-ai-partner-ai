@@ -10,14 +10,15 @@ from app.common.exception.error_code import ErrorCode
 from app.schemas.analysis_response import RagResult, AnalysisResponse
 from app.schemas.chunk_schema import ArticleChunk
 from app.schemas.document_request import DocumentRequest
-from app.containers.service_container import text_service
+from app.containers.service_container import text_service, prompt_service
 
 
 async def vectorize_and_calculate_similarity(extracted_text: str,
     chunks: List[ArticleChunk], pdf_request: DocumentRequest) -> AnalysisResponse:
+  total_page = max(article.page for article in chunks) + 1
   analysis_response = AnalysisResponse(
-      original_text=extracted_text,
-      total_page=0,
+      summary_content=extracted_text,
+      total_page=total_page,
       chunks=[]
   )
 
@@ -27,20 +28,26 @@ async def vectorize_and_calculate_similarity(extracted_text: str,
     for clause in article.clauses:
       if len(clause.clause_content) <= 1:
         continue
-      tasks.append(process_clause(clause.clause_content, pdf_request))
+      tasks.append(process_clause(clause.clause_content, pdf_request,
+                                  article.page, article.sentence_index))
 
   # 모든 임베딩 및 유사도 검색 태스크를 병렬로 실행
   results = await asyncio.gather(*tasks)
-  analysis_response.chunks.extend(results)
+
+  # 반환 값에서 null 제거
+  for result in results:
+    if result is not None:  # accuracy가 0.5 이하인 경우는 null을 반환하고 여기에서 제외
+      analysis_response.chunks.append(result)
 
   return analysis_response
 
 
-async def process_clause(clause_content: str, pdf_request: DocumentRequest) -> RagResult:
-  embedding = await text_service.embed_text_async_ver(clause_content)
+async def process_clause(clause_content: str, pdf_request: DocumentRequest,
+                          page: int, sentence_index: int):
+  embedding = await text_service.embed_text(clause_content)
 
   # Qdrant에서 유사한 벡터 검색 (해당 호출이 동기라면 그대로 사용)
-  search_results = qdrant_db_client.query_points(
+  search_results = await qdrant_db_client.query_points(
       collection_name=Constants.QDRANT_COLLECTION.value,
       query=embedding,
       query_filter=models.Filter(
@@ -55,14 +62,38 @@ async def process_clause(clause_content: str, pdf_request: DocumentRequest) -> R
       limit=5
   )
 
-  if len(search_results.points) == 0:
-    raise AgreementException(ErrorCode.NO_SEARCH_RESULT)
-
-  # 5개의 문장별 검색 결과 저장 (현재 조항에 대한 유사한 문장들만 저장)
-  rag_result = RagResult(clause_content=clause_content)
+  # 3️⃣ 유사한 문장들 처리
+  clause_results = []
   for match in search_results.points:
-    payload_data = match.payload or {}
-    rag_result.proof_texts.append(payload_data.get("proof_text"))
-    rag_result.incorrect_texts.append(payload_data.get("incorrect_text"))
-    rag_result.corrected_texts.append(payload_data.get("corrected_text"))
-  return rag_result
+      payload_data = match.payload or {}
+      clause_results.append({
+          "id": match.id,  # ✅ 벡터 ID
+          "proof_texts": payload_data.get("proof_texts", ""),  # ✅ 원본 문장
+          "incorrect_text": payload_data.get("incorrect_text", ""),  # ✅ 잘못된 문장
+          "corrected_text": payload_data.get("corrected_text", "")  # ✅ 교정된 문장
+      })
+
+  # 4️⃣ 계약서 문장을 수정 (해당 조항의 TOP 5개 유사 문장을 기반으로)
+  corrected_result = await prompt_service.correct_contract(
+      clause_content=clause_content,
+      proof_texts=[item["proof_texts"] for item in clause_results],  # 기준 문서들
+      incorrect_texts=[item["incorrect_text"] for item in clause_results],  # 잘못된 문장들
+      corrected_texts=[item["corrected_text"] for item in clause_results],  # 교정된 문장들
+  )
+
+
+  # 최종 결과 저장
+  result = {
+      "incorrect_text": corrected_result["clause_content"],  # 원본 문장
+      "corrected_text": corrected_result["corrected_text"],  # LLM이 교정한 문장
+      "proof_text": corrected_result["proof_text"],  # 참고한 기준 문서
+      "accuracy": corrected_result["accuracy"],  # 신뢰도
+      "page": page,  # 페이지 번호
+      "sentence_index": sentence_index  # 문장 인덱스
+  }
+
+  # accuracy가 0.5 이하일 경우 결과를 반환하지 않음
+  if float(result["accuracy"]) > 0.5:
+    return result
+  else:
+    return None  # accuracy가 0.5 이하일 경우 빈 객체 반환
