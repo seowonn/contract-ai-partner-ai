@@ -41,7 +41,9 @@ def preprocess_data(document_request: DocumentRequest) -> List[Document]:
 def chunk_texts(extracted_text) -> List[ArticleChunk]:
   chunks: List[ArticleChunk] = []
   if isinstance(extracted_text, str):
+    start_time = time.time()
     chunks = chunk_by_article_and_clause(extracted_text)
+    logging.info(f"기준 문서 chunk_by_article_and_clause 소요 시간: {time.time() - start_time}")
   elif isinstance(extracted_text, list):
     start_time = time.time()  # 시작 시간 기록
     # 4️⃣ 텍스트 청킹

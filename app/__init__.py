@@ -27,7 +27,8 @@ def create_app():
   logging.basicConfig(
       level=logging.INFO,  # ERROR 로그만 출력
       format="%(asctime)s - %(levelname)s - %(filename)s:%(lineno)d - %(message)s",
-      datefmt="%Y-%m-%d %H:%M:%S"
+      datefmt="%Y-%m-%d %H:%M:%S",
+      force=True
   )
 
   # 예외 핸들러 등록
