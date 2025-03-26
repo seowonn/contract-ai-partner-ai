@@ -17,7 +17,7 @@ async def vectorize_and_calculate_similarity(extracted_text: str,
     chunks: List[DocumentChunk], pdf_request: DocumentRequest) -> AnalysisResponse:
   total_page = max(article.page for article in chunks) + 1
   analysis_response = AnalysisResponse(
-      original_text=extracted_text,
+      summary_content=extracted_text,
       total_page=total_page,
       chunks=[]
   )
@@ -42,7 +42,7 @@ async def vectorize_and_calculate_similarity(extracted_text: str,
 
 async def process_clause(clause_content: str, pdf_request: DocumentRequest,
                           page: int, sentence_index: int):
-  embedding = await text_service.embed_text_async_ver(clause_content)
+  embedding = await text_service.embed_text(clause_content)
 
   # Qdrant에서 유사한 벡터 검색 (해당 호출이 동기라면 그대로 사용)
   search_results = await qdrant_db_client.query_points(

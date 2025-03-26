@@ -14,7 +14,7 @@ from app.common.file_type import FileType
 from app.schemas.document_request import DocumentRequest
 from app.schemas.success_code import SuccessCode
 from app.schemas.success_response import SuccessResponse
-from app.services.common.processor import preprocess_data, chunk_texts
+from app.services.common.ingestion_pipeline import preprocess_data, chunk_texts
 from app.services.standard.vector_delete import delete_by_standard_id
 from app.services.standard.vector_store import vectorize_and_save
 
@@ -35,7 +35,10 @@ def process_standards_pdf_from_s3():
   status_code = HTTPStatus.OK
   try:
     if document_request.type == FileType.PDF:
-      extracted_text = preprocess_data(document_request)
+
+      documents = preprocess_data(document_request)
+      extracted_text = "\n".join([doc.page_content for doc in documents])
+
       chunks = chunk_texts(extracted_text)
 
       # 5️⃣ 벡터화 + Qdrant 저장
