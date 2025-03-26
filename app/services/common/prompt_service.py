@@ -74,11 +74,11 @@ class PromptService:
                     입력받은 텍스트에서 '\n' 엔터키는 지우고 작업 수행해.
                     그리고 참고한 자료를 기반으로 위배된 확률을 계산해줘
                     틀린 확률이 높다면 accuracy 를 높여줘
-                    accuracy 0~1 범위의 float 형태로 출력해줘
+                    accuracy 0~1 범위의 float 형태로 반드시 소수점 셋째자리까지 출력해줘
                     반드시 JSON 코드 블록 (```json ...) 을 사용하지 말고, 그냥 JSON 객체만 반환해.
                     맞춤법, 띄어쓰기를 수정하지 말고 계약서 내용에서 틀린걸 수정해줘
                     교정 전 후 값이 일치하거나 의미차이가 없다면 데이터 출력 하지 말아줘
-
+                    
                     [입력 데이터 설명]
                     - clause_content: 사용자가 입력한 계약서의 문장 (수정해야 하는 문장)
                     - proof_text: 기준이 되는 법률 문서의 문장 목록 (계약서와 비교할 법률 조항들)
@@ -116,3 +116,24 @@ class PromptService:
       return None  # JSON 변환 실패 시 None 반환
 
     return parsed_response
+
+  def summarize_document(self, documents: str) -> str:
+
+    # OpenAI API 호출하여 문서 요약
+    response = self.client.chat.completions.create(
+        model=self.deployment_name,
+        messages=[{
+          "role": "user",
+          "content": f"문서 전체 내용을 string 형식으로 요약해줘."
+                     f"출력할때 강조하는 '**' 과 엔터키 '\n', '\n\n' 모두 제거하고 출력해줘"
+                     f"\n\n 문서 : {documents}"
+        }],
+        temperature=0.5,
+        top_p=1
+    )
+
+    # 요약된 내용만 추출하여 반환
+    summary_content = response.choices[
+      0].message.content if response.choices else ''
+
+    return summary_content
