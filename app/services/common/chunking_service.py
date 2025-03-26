@@ -48,7 +48,7 @@ def chunk_by_article_and_clause(extracted_text: str) -> List[ArticleChunk]:
 def chunk_by_article_and_clause_with_page(extracted_text: list) -> List[
   DocumentChunk]:
   result: List[DocumentChunk] = []
-  previous_last_sentence = ""  # 이전 페이지에서 잘린 문장을 저장할 변수
+
 
   for page, page_text in extracted_text:
     sentence_index = 1  # 문장 번호 초기화
