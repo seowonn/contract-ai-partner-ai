@@ -3,7 +3,7 @@ from typing import List
 
 from qdrant_client import models
 
-from app.clients.qdrant_client import qdrant_db_client
+from app.clients.qdrant_client import get_qdrant_client
 from app.schemas.analysis_response import RagResult
 from app.schemas.chunk_schema import DocumentChunk
 from app.schemas.document_request import DocumentRequest
@@ -37,7 +37,8 @@ async def process_clause(rag_result: RagResult, clause_content: str,
     collection_name: str, category_name: str):
   embedding = await embedding_service.embed_text(clause_content)
 
-  search_results = await qdrant_db_client.query_points(
+  client = get_qdrant_client()
+  search_results = await client.query_points(
       collection_name=collection_name,
       query=embedding,
       query_filter=models.Filter(
