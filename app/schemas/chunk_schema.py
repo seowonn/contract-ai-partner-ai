@@ -20,3 +20,12 @@ class DocumentChunk:
   page: int
   order_index: int
   clause_number: str
+
+@dataclass
+class DocumentMetadata:
+  page: int
+
+@dataclass
+class Document:
+  page_content: str
+  metadata: DocumentMetadata

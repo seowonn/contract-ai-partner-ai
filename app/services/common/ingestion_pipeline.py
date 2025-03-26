@@ -3,7 +3,7 @@ from typing import List
 from app.common.exception.custom_exception import BaseCustomException
 from app.common.exception.error_code import ErrorCode
 from app.schemas.chunk_schema import ArticleChunk, DocumentChunk
-from app.schemas.document import Document
+from app.schemas.chunk_schema import Document
 from app.schemas.document_request import DocumentRequest
 from app.services.common.chunking_service import \
   chunk_by_article_and_clause_with_page, chunk_by_article_and_clause, \

@@ -5,7 +5,7 @@ import fitz
 
 from app.common.exception.custom_exception import BaseCustomException
 from app.common.exception.error_code import ErrorCode
-from app.schemas.document import Document, DocumentMetadata
+from app.schemas.chunk_schema import Document, DocumentMetadata
 
 
 def convert_to_bytes_io(s3_stream: bytes) -> io.BytesIO:

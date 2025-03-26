@@ -12,7 +12,7 @@ from app.common.exception.custom_exception import BaseCustomException
 from app.common.exception.error_code import ErrorCode
 from app.common.file_type import FileType
 from app.schemas.analysis_response import AnalysisResponse
-from app.schemas.document import Document
+from app.schemas.chunk_schema import Document
 from app.schemas.document_request import DocumentRequest
 from app.schemas.success_code import SuccessCode
 from app.schemas.success_response import SuccessResponse

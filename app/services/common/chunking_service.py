@@ -2,7 +2,7 @@ import re
 from typing import List
 
 from app.schemas.chunk_schema import ArticleChunk, ClauseChunk, DocumentChunk
-from app.schemas.document import Document
+from app.schemas.chunk_schema import Document
 
 MIN_CLAUSE_BODY_LENGTH = 5
 
