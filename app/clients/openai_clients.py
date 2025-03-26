@@ -1,12 +1,14 @@
 import os
 
 from dotenv import load_dotenv
-from openai import AsyncOpenAI
+from openai import AsyncOpenAI,OpenAI
 import openai
 
 load_dotenv() # 루트로 고정
 
 openai_client = AsyncOpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+sync_openai_client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+
 embedding_deployment_name = os.getenv("EMBEDDING_OPENAI_DEPLOYMENT_NAME")
 prompt_deployment_name = os.getenv("PROMPT_OPENAI_DEPLOYMENT_NAME")
 

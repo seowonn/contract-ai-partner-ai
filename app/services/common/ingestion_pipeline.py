@@ -6,8 +6,7 @@ from app.schemas.chunk_schema import ArticleChunk, DocumentChunk
 from app.schemas.chunk_schema import Document
 from app.schemas.document_request import DocumentRequest
 from app.services.common.chunking_service import \
-  chunk_by_article_and_clause_with_page, chunk_by_article_and_clause, \
-  chunk_by_article_and_clause_with_page2
+  chunk_by_article_and_clause_with_page, chunk_by_article_and_clause
 from app.services.common.pdf_service import convert_to_bytes_io, \
   extract_documents_from_pdf_io
 from app.services.common.s3_service import s3_get_object
@@ -51,7 +50,7 @@ def chunk_standard_texts(extracted_text: str) -> List[ArticleChunk]:
 def chunk_agreement_documents(documents: List[Document]) -> List[DocumentChunk]:
   start_time = time.time()  # 시작 시간 기록
   # 4️⃣ 텍스트 청킹
-  chunks = chunk_by_article_and_clause_with_page2(documents)
+  chunks = chunk_by_article_and_clause_with_page(documents)
   chunk_time = time.time() - start_time  # 경과 시간 계산
   logging.info(f"chunk_agreement_texts took {chunk_time:.4f} seconds")
 
