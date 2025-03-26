@@ -1,7 +1,7 @@
 import json
 import logging
 import re
-from typing import List, Any
+from typing import List, Any, Optional
 
 
 class PromptService:
@@ -53,7 +53,7 @@ class PromptService:
     return parsed_response
 
   async def correct_contract(self, clause_content: str, proof_texts: List[str],
-      incorrect_texts: List[str], corrected_texts: List[str]):
+      incorrect_texts: List[str], corrected_texts: List[str]) -> Optional[dict]:
     # ✅ JSON 형식으로 변환할 데이터
     input_data = {
       "clause_content": clause_content,
