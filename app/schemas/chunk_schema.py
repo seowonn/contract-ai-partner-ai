@@ -14,3 +14,9 @@ class ArticleChunk:
   clauses: List[ClauseChunk]
   page : int
   sentence_index : int
+
+@dataclass
+class DocumentChunk:
+  clauses: str
+  page: int
+  sentence_index: int

@@ -8,13 +8,13 @@ from app.clients.qdrant_client import qdrant_db_client
 from app.common.constants import Constants
 from app.common.exception.error_code import ErrorCode
 from app.schemas.analysis_response import RagResult, AnalysisResponse
-from app.schemas.chunk_schema import ArticleChunk
+from app.schemas.chunk_schema import ArticleChunk, DocumentChunk
 from app.schemas.document_request import DocumentRequest
 from app.containers.service_container import text_service, prompt_service
 
 
 async def vectorize_and_calculate_similarity(extracted_text: str,
-    chunks: List[ArticleChunk], pdf_request: DocumentRequest) -> AnalysisResponse:
+    chunks: List[DocumentChunk], pdf_request: DocumentRequest) -> AnalysisResponse:
   total_page = max(article.page for article in chunks) + 1
   analysis_response = AnalysisResponse(
       original_text=extracted_text,
@@ -26,9 +26,7 @@ async def vectorize_and_calculate_similarity(extracted_text: str,
   tasks = []
   for article in chunks:
     for clause in article.clauses:
-      if len(clause.clause_content) <= 1:
-        continue
-      tasks.append(process_clause(clause.clause_content, pdf_request,
+      tasks.append(process_clause(clause, pdf_request,
                                   article.page, article.sentence_index))
 
   # 모든 임베딩 및 유사도 검색 태스크를 병렬로 실행

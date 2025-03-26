@@ -35,6 +35,7 @@ def extract_text_from_pdf_io(pdf_bytes_io):
         text = page.get_text()
         if text:
           extracted_text.append((page_num + 1, text.strip()))  # 페이지 번호와 텍스트 튜플로 저장
+
       except (AttributeError, TypeError):
         raise BaseCustomException(ErrorCode.INNER_DATA_ERROR)
 
