@@ -8,12 +8,14 @@ from app.schemas.analysis_response import RagResult
 from app.schemas.chunk_schema import DocumentChunk
 from app.schemas.document_request import DocumentRequest
 from app.containers.service_container import embedding_service, prompt_service
+from app.services.standard.vector_store import ensure_qdrant_collection
 
 
 async def vectorize_and_calculate_similarity(document_chunks: List[DocumentChunk],
     collection_name: str, pdf_request: DocumentRequest) -> List[RagResult]:
 
   tasks = []
+  await ensure_qdrant_collection(collection_name)
   for chunk in document_chunks:
     if len(chunk.clause_content) <= 1:
       continue
@@ -22,7 +24,7 @@ async def vectorize_and_calculate_similarity(document_chunks: List[DocumentChunk
         order_index=chunk.order_index
     )
     task = process_clause(
-        rag_result, collection_name, chunk.clause_content,
+        rag_result, chunk.clause_content, collection_name,
         pdf_request.categoryName
     )
     tasks.append(task)
