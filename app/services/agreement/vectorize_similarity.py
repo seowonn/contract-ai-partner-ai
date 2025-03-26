@@ -10,7 +10,7 @@ from app.common.exception.error_code import ErrorCode
 from app.schemas.analysis_response import RagResult, AnalysisResponse
 from app.schemas.chunk_schema import ArticleChunk
 from app.schemas.document_request import DocumentRequest
-from app.containers.service_container import text_service, prompt_service
+from app.containers.service_container import embedding_service, prompt_service
 
 
 async def vectorize_and_calculate_similarity(extracted_text: str,
@@ -41,6 +41,7 @@ async def vectorize_and_calculate_similarity(extracted_text: str,
 
   return analysis_response
 
+  embedding = await embedding_service.embed_text(clause_content)
 
 async def process_clause(clause_content: str, pdf_request: DocumentRequest,
                           page: int, sentence_index: int):
