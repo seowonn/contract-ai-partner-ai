@@ -9,8 +9,8 @@ class EmbeddingService:
     self.client = client
     self.deployment_name = deployment_name
 
-  def embed_text(self, text: str) -> List[float]:
-    response = self.client.embeddings.create(
+  async def embed_text(self, text: str) -> List[float]:
+    response = await self.client.embeddings.create(
         model=self.deployment_name,
         input=text,
         encoding_format="float"

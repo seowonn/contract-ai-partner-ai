@@ -6,7 +6,7 @@ from app.blueprints.agreement.agreement_exception import AgreementException
 from app.common.exception.custom_exception import BaseCustomException
 from app.common.exception.error_code import ErrorCode
 from config.s3_config import AWS_S3_BUCKET_REGION
-
+import requests
 import os
 from dotenv import load_dotenv
 
@@ -26,21 +26,28 @@ def s3_connection():
 s3 = s3_connection()
 
 
-def s3_get_object(s3_path):
-  if not s3_path.startswith("s3://"):
-    raise ValueError("Invalid S3 path")
+def s3_get_object(url: str) -> bytes:
+  if not url.startswith("https://"):
+    raise ValueError("Invalid https path")
 
-  parts = s3_path.replace("s3://", "").split("/", 1)
+  parts = url.replace("https://", "").split("/", 1)
   bucket_name, object_key = parts[0], parts[1]
 
-  # S3에서 파일 가져오기(스트림)
-  # get_object는 내부적으로 ClientError를 발생시킴
   try:
-    response = s3.get_object(Bucket=bucket_name, Key=object_key)
-    if not response:
+    full_url = f"https://{bucket_name}/{object_key}"
+
+    # 공개된 객체는 generate_pre_signed_url 없이 https:// URL을 그대로 사용하여 접근
+    response = requests.get(full_url)
+
+    if response.status_code != 200:
+      print(
+          f"Failed to fetch the file, Status code: {response.status_code}, Response: {response.text}")  # 디버깅용 출력
       raise BaseCustomException(ErrorCode.FILE_LOAD_FAILED)
-    return response['Body']
-  except ClientError:
+
+    return response.content   # 파일 데이터 반환
+
+  except requests.exceptions.RequestException as e:
+    print(f"Error occurred while fetching the file: {e}")
     raise BaseCustomException(ErrorCode.S3_CLIENT_ERROR)
 
 
