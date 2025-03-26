@@ -60,7 +60,7 @@ def chunk_by_article_and_clause_with_page(extracted_text: list) -> List[
     for match in matches:
       article_body = match[1].strip()  # 조 내용
       # 3. 항목 번호가 있는 경우 번호와 내용으로 분리
-      clause_pattern = r'([①-⑨]|\d+\.)\s*([^\①②③④⑤⑥⑦⑧⑨\d\.\n]+(?:\n[^\①②③④⑤⑥⑦⑧⑨\d\.\n]+)*)'
+      clause_pattern = r'([①-⑨])\s*([^\①②③④⑤⑥⑦⑧⑨\.\n]+(?:\n(?![①-⑨]|\d+\.)[^\①②③④⑤⑥⑦⑧⑨\.\n]+)*)'
       clause_matches = re.findall(clause_pattern, article_body)
 
       # 4. 번호가 있는 경우, 항목 번호별로 청킹 추가
@@ -69,8 +69,7 @@ def chunk_by_article_and_clause_with_page(extracted_text: list) -> List[
           clause_number = clause[0]  # 항목 번호 (①, 1., 2., 등)
           clause_content = clause[1].strip()  # 항목 내용
 
-          if len(clause_content) >= 10 and clause_content.endswith(
-              '.'):  # 최소 10자 이상의 내용만 추가
+          if len(clause_content) >= 10:  # 최소 10자 이상의 내용만 추가
             result.append(DocumentChunk(clause_content=clause_content, page=page,
                                         order_index=sentence_index, clause_number=clause_number))
             sentence_index += 1  # 문장 번호 증가
