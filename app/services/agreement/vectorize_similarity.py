@@ -13,37 +13,30 @@ from app.schemas.analysis_response import RagResult, AnalysisResponse
 from app.schemas.chunk_schema import ArticleChunk, DocumentChunk
 from app.schemas.document_request import DocumentRequest
 from app.containers.service_container import embedding_service, prompt_service
+import time
+import logging
 
-
-async def vectorize_and_calculate_similarity(extracted_text,
-    chunks: List[DocumentChunk], pdf_request: DocumentRequest) -> AnalysisResponse:
-  total_page = max(article.page for article in chunks) + 1
-  analysis_response = AnalysisResponse(
-      summary_content=extracted_text,
-      total_page=total_page,
-      chunks=[]
-  )
+async def vectorize_and_calculate_similarity(
+    chunks: List[DocumentChunk], document_request: DocumentRequest) -> list:
 
   # 각 조항에 대해 비동기 태스크 생성
   tasks = []
   for article in chunks:
-    tasks.append(process_clause(article.clauses, pdf_request,
-                                article.page, article.sentence_index))
+    tasks.append(process_clause(article.clause_content, document_request,
+                                article.page, article.order_index))
 
   # 모든 임베딩 및 유사도 검색 태스크를 병렬로 실행
   results = await asyncio.gather(*tasks)
 
   # 반환 값에서 null 제거
-  for result in results:
-    if result is not None:  # accuracy가 0.5 이하인 경우는 null을 반환하고 여기에서 제외
-      analysis_response.chunks.append(result)
+  filtered_results = [result for result in results if result is not None]
 
-  return analysis_response
+  return filtered_results
 
 
-async def process_clause(clause_content: str, pdf_request: DocumentRequest,
+async def process_clause(clause_content: str, document_request: DocumentRequest,
                           page: int, sentence_index: int):
-  embedding = await text_service.embed_text(clause_content)
+  embedding = await embedding_service.embed_text(clause_content)
 
   # Qdrant에서 유사한 벡터 검색 (해당 호출이 동기라면 그대로 사용)
   search_results = await qdrant_db_client.query_points(
@@ -53,7 +46,7 @@ async def process_clause(clause_content: str, pdf_request: DocumentRequest,
           must=[
             models.FieldCondition(
                 key="category",
-                match=models.MatchValue(value=pdf_request.categoryName)
+                match=models.MatchValue(value=document_request.categoryName)
             )
           ]
       ),
@@ -100,7 +93,7 @@ async def process_clause(clause_content: str, pdf_request: DocumentRequest,
 
 async def vectorize_and_calculate_similarity2(
     document_chunks: List[DocumentChunk],
-    collection_name: str, pdf_request: DocumentRequest) -> List[RagResult]:
+    collection_name: str, document_request: DocumentRequest) -> List[RagResult]:
   tasks = []
   for chunk in document_chunks:
     if len(chunk.clause_content) <= 1:
@@ -111,7 +104,7 @@ async def vectorize_and_calculate_similarity2(
     )
     task = process_clause(
         rag_result, collection_name, chunk.clause_content,
-        pdf_request.categoryName
+        document_request.categoryName
     )
     tasks.append(task)
 
