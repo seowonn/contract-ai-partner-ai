@@ -45,7 +45,7 @@ async def process_clause(article_title: str, clause: ClauseChunk,
 
   try:
     clause_vector, result = await asyncio.gather(
-        text_service.embed_text_async_ver(combined_text),
+        text_service.embed_text(combined_text),
         retry_make_correction(clause_content)
     )
   except StandardException:
@@ -69,7 +69,7 @@ async def process_clause(article_title: str, clause: ClauseChunk,
 
 async def retry_make_correction(clause_content: str) -> dict:
   for attempt in range(1, MAX_RETRIES + 1):
-    result = await text_service.make_correction_data_async_ver(clause_content)
+    result = await text_service.make_correction_data(clause_content)
     if result is not None:
       return result
     logging.warning(f"교정 응답 실패. 재시도 {attempt}/{MAX_RETRIES}")

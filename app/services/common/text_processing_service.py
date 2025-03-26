@@ -14,7 +14,7 @@ class TextProcessingService:
   def __init__(self, client: AsyncOpenAI):
     self.client = client
 
-  async def embed_text_async_ver(self, text: str) -> List[float]:
+  async def embed_text(self, text: str) -> List[float]:
     response = await self.client.embeddings.create(
         model=os.getenv("EMBEDDING_OPENAI_DEPLOYMENT_NAME"),
         input=text,
@@ -26,7 +26,7 @@ class TextProcessingService:
 
     return response.data[0].embedding
 
-  async def make_correction_data_async_ver(self, clause_content: str) -> Any | None:
+  async def make_correction_data(self, clause_content: str) -> Any | None:
     response = await self.client.chat.completions.create(
         model=os.getenv("PROMPT_OPENAI_DEPLOYMENT_NAME"),
         messages=[
