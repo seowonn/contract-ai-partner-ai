@@ -41,7 +41,7 @@ def extract_documents_from_pdf_io2(pdf_bytes_io: io.BytesIO) -> List[Document]:
 
   return documents
 
-def extract_text_from_pdf_io(pdf_bytes_io):
+def extract_documents_from_pdf_io(pdf_bytes_io):
   if not isinstance(pdf_bytes_io, io.BytesIO):
     raise BaseCustomException(ErrorCode.DATA_TYPE_NOT_MATCH)
 

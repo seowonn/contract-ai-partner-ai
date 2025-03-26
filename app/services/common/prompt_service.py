@@ -52,14 +52,14 @@ class PromptService:
 
     return parsed_response
 
-  async def correct_contract(self, clause_content: str, proof_texts: List[str],
-      incorrect_texts: List[str], corrected_texts: List[str]):
+  async def correct_contract(self, clause_content: str, proof_text: List[str],
+      incorrect_text: List[str], corrected_text: List[str]):
     # ✅ JSON 형식으로 변환할 데이터
     input_data = {
       "clause_content": clause_content,
-      "proof_texts": proof_texts,
-      "incorrect_texts": incorrect_texts,
-      "corrected_texts": corrected_texts
+      "proof_text": proof_text,
+      "incorrect_text": incorrect_text,
+      "corrected_text": corrected_text
     }
 
     response = await self.client.chat.completions.create(
@@ -80,16 +80,16 @@ class PromptService:
 
                     [입력 데이터 설명]
                     - clause_content: 사용자가 입력한 계약서의 문장 (수정해야 하는 문장)
-                    - proof_texts: 기준이 되는 법률 문서의 문장 목록 (계약서와 비교할 법률 조항들)
-                    - incorrect_texts: 법률을 위반할 가능성이 있는 문장 예시 목록
-                    - corrected_texts: 법률 위반 가능성이 있는 예시 문장을 올바르게 수정한 문장 목록
+                    - proof_text: 기준이 되는 법률 문서의 문장 목록 (계약서와 비교할 법률 조항들)
+                    - incorrect_text: 법률을 위반할 가능성이 있는 문장 예시 목록
+                    - corrected_text: 법률 위반 가능성이 있는 예시 문장을 올바르게 수정한 문장 목록
 
                     [입력 데이터]
                     {json.dumps(input_data, ensure_ascii=False, indent=2)}
 
                     [출력 형식]
                     {{
-                        "clause_content": 계약서 원문
+                        "incorrect_text": 계약서 원문
                         "corrected_text": "계약서의 문장을 올바르게 교정한 문장",
                         "proof_text": 입력데이터를 참조해 잘못된 포인트와 이유"
                         "accuracy": "위배된 비율, 신뢰도"
