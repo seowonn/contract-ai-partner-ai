@@ -51,31 +51,16 @@ def chunk_by_article_and_clause_with_page(extracted_text: list) -> List[
 
   for page, page_text in extracted_text:
     sentence_index = 1  # 문장 번호 초기화
-    # print(f'붙여야하는 문장==========={previous_last_sentence}')
-    # page_text = previous_last_sentence + page_text  # 이전 페이지에서 잘린 문장을 이어 붙임
-    # print(f'붙인 문장==========={page_text}')
     # 1. '제X조'를 기준으로 텍스트를 분리
     pattern = r'(제\d+조\s*【[^】]+】)(.*?)(?=(제\d+조|$))'  # 제X조를 기준으로 분리
     matches = re.findall(pattern, page_text, flags=re.DOTALL)
 
-
-    # if previous_last_sentence:
-    #   if matches:
-    #     # 첫 번째 항목인 제X조 앞부분에 previous_last_sentence를 결합
-    #     matches[0] = previous_last_sentence + matches[0][1]
-    #     previous_last_sentence = ""  # 잘린 문장은 처리되었으므로 초기화
-    #     print(f'matches========={matches}')
-
-    # matches : 페이지
-    # article_body : 조
     # 2. 각 조항을 청킹
     for match in matches:
       article_body = match[1].strip()  # 조 내용
-      print(f'article_body=========={article_body}')
       # 3. 항목 번호가 있는 경우 번호와 내용으로 분리
       clause_pattern = r'([①-⑨]|\d+\.)\s*([^\①②③④⑤⑥⑦⑧⑨\d\.\n]+(?:\n[^\①②③④⑤⑥⑦⑧⑨\d\.\n]+)*)'
       clause_matches = re.findall(clause_pattern, article_body)
-      print(f"clause_matches=============: {clause_matches}")
 
       # 4. 번호가 있는 경우, 항목 번호별로 청킹 추가
       if clause_matches:
@@ -95,16 +80,5 @@ def chunk_by_article_and_clause_with_page(extracted_text: list) -> List[
                                       sentence_index=sentence_index))
           sentence_index += 1  # 문장 번호 증가
 
-    # # 5. 문장이 잘렸다면 이어서 처리
-    # last_line = page_text.split("\n")[-1]  # 마지막 줄 추출
-    #
-    # # 문장이 잘렸는지 확인 (구두점이 없으면 문장이 잘린 것)
-    # if not last_line.endswith(('.', '?', '!', '。', '！', '？')):
-    #   previous_last_sentence = last_line  # 문장이 잘린 경우, 마지막 문장 저장
-    #   # print(f'잘린문장==========={previous_last_sentence}')
-    # else:
-    #   previous_last_sentence = ""  # 문장이 정상적으로 끝났으면 초기화
-
-  # print(result)
   return result
 
