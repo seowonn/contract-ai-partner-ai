@@ -51,14 +51,16 @@ def process_agreements_pdf_from_s3():
 
   # 5️⃣ 벡터화 + 유사도 비교 (리턴값 추가)
   start_time = time.time()
-  result = asyncio.run(vectorize_and_calculate_similarity(extracted_text, chunks, document_request))
+  chunks = asyncio.run(
+      vectorize_and_calculate_similarity(
+          document_chunks, Constants.QDRANT_COLLECTION.value, document_request))
   end_time = time.time()
   logging.info(f"Time vectorize and prompt texts: {end_time - start_time:.4f} seconds")
 
   response = AnalysisResponse(
       total_page = len(documents),
       summary_content="",
-      chunks=[]
+      chunks=chunks
   )
 
   return SuccessResponse(SuccessCode.REVIEW_SUCCESS, response).of(), HTTPStatus.OK
