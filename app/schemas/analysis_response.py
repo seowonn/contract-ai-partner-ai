@@ -1,5 +1,5 @@
 from dataclasses import dataclass, field
-from typing import List
+from typing import List, Optional
 
 
 def to_camel_case(snake_str: str) -> str:
@@ -10,10 +10,10 @@ def to_camel_case(snake_str: str) -> str:
 class RagResult:
   page: int
   order_index: int
-  accuracy: float
-  proof_texts: List[str] = field(default_factory=list)
-  incorrect_texts: List[str] = field(default_factory=list)
-  corrected_texts: List[str] = field(default_factory=list)
+  accuracy: Optional[float] = None
+  corrected_text: Optional[str] = None
+  incorrect_text: Optional[str] = None
+  proof_text: Optional[str] = None
   position: List[int] = field(default_factory=list)
 
 @dataclass

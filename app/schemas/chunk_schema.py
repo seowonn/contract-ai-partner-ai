@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import List
+from typing import List, Optional
 
 
 @dataclass
@@ -16,6 +16,16 @@ class ArticleChunk:
 
 @dataclass
 class DocumentChunk:
-  clauses: str
+  clause_content: str
   page: int
-  sentence_index: int
+  order_index: int
+  clause_number: Optional[str] = None
+
+@dataclass
+class DocumentMetadata:
+  page: int
+
+@dataclass
+class Document:
+  page_content: str
+  metadata: DocumentMetadata

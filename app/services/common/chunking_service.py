@@ -2,6 +2,7 @@ import re
 from typing import List
 
 from app.schemas.chunk_schema import ArticleChunk, ClauseChunk, DocumentChunk
+from app.schemas.chunk_schema import Document
 
 MIN_CLAUSE_BODY_LENGTH = 5
 
@@ -70,15 +71,45 @@ def chunk_by_article_and_clause_with_page(extracted_text: list) -> List[
 
           if len(clause_content) >= 10 and clause_content.endswith(
               '.'):  # 최소 10자 이상의 내용만 추가
-            result.append(DocumentChunk(clauses=clause_content, page=page,
-                                        sentence_index=sentence_index))
+            result.append(DocumentChunk(clause_content=clause_content, page=page,
+                                        order_index=sentence_index, clause_number=clause_number))
             sentence_index += 1  # 문장 번호 증가
       else:
         # 번호가 없으면, 전체 문장을 하나의 항목으로 처리
         if article_body.endswith('.'):
-          result.append(DocumentChunk(clauses=article_body, page=page,
-                                      sentence_index=sentence_index))
+          result.append(DocumentChunk(clause_content=article_body, page=page,
+                                      order_index=sentence_index))
           sentence_index += 1  # 문장 번호 증가
+
+  return result
+
+
+
+def chunk_by_article_and_clause_with_page2(documents: List[Document]) -> List[
+  DocumentChunk]:
+  result: List[DocumentChunk] = []
+
+  for doc in documents:
+    sentence_index = 0
+    chunks = split_text_by_pattern(doc.page_content, r'\n(제\s*\d+조(?:\([^)]+\))?)')
+
+    for i in range(1, len(chunks), 2):
+      article_title = chunks[i].strip()
+      article_body = chunks[i + 1].strip() if i + 1 < len(chunks) else ""
+
+      article_title = article_title.replace('\n', ' ')
+      article_body = article_body.replace('\n', ' ')
+
+      first_clause_match = re.search(r'(①|1\.)', article_body)
+      if first_clause_match is None:
+        result.append(
+          DocumentChunk(
+              clause_content=article_body,
+              page=doc.metadata.page,
+              order_index=sentence_index,
+              clause_number=article_title
+          ))
+        sentence_index += 1
 
   return result
 

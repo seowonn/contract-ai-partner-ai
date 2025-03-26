@@ -3,11 +3,11 @@ from typing import List
 from app.common.exception.custom_exception import BaseCustomException
 from app.common.exception.error_code import ErrorCode
 from app.schemas.chunk_schema import ArticleChunk, DocumentChunk
-from app.schemas.chunk_schema import ArticleChunk
-from app.schemas.document import Document
+from app.schemas.chunk_schema import Document
 from app.schemas.document_request import DocumentRequest
 from app.services.common.chunking_service import \
-  chunk_by_article_and_clause_with_page, chunk_by_article_and_clause
+  chunk_by_article_and_clause_with_page, chunk_by_article_and_clause, \
+  chunk_by_article_and_clause_with_page2
 from app.services.common.pdf_service import convert_to_bytes_io, \
   extract_documents_from_pdf_io
 from app.services.common.s3_service import s3_get_object
@@ -38,20 +38,22 @@ def preprocess_data(document_request: DocumentRequest) -> list:
     return documents
 
 
+def chunk_standard_texts(extracted_text: str) -> List[ArticleChunk]:
+  start_time = time.time()
+  chunks = chunk_by_article_and_clause(extracted_text)
+  logging.info(f"chunk_standard_texts 소요 시간: {time.time() - start_time}")
 
-def chunk_texts(extracted_text) -> list:
-  chunks: list = []
-  if isinstance(extracted_text, str):
-    start_time = time.time()
-    chunks = chunk_by_article_and_clause(extracted_text)
-    logging.info(f"기준 문서 chunk_by_article_and_clause 소요 시간: {time.time() - start_time}")
-  elif isinstance(extracted_text, list):
-    start_time = time.time()  # 시작 시간 기록
-    # 4️⃣ 텍스트 청킹
-    chunks = chunk_by_article_and_clause_with_page(extracted_text)
-    chunk_time = time.time() - start_time  # 경과 시간 계산
-    logging.info(
-      f"chunk_by_article_and_clause_with_page took {chunk_time:.4f} seconds")
+  if len(chunks) == 0:
+    raise BaseCustomException(ErrorCode.CHUNKING_FAIL)
+  return chunks
+
+
+def chunk_agreement_documents(documents: List[Document]) -> List[DocumentChunk]:
+  start_time = time.time()  # 시작 시간 기록
+  # 4️⃣ 텍스트 청킹
+  chunks = chunk_by_article_and_clause_with_page(documents)
+  chunk_time = time.time() - start_time  # 경과 시간 계산
+  logging.info(f"chunk_agreement_texts took {chunk_time:.4f} seconds")
 
   if len(chunks) == 0:
     raise BaseCustomException(ErrorCode.CHUNKING_FAIL)
