@@ -1,4 +1,3 @@
-import asyncio
 import logging
 from http import HTTPStatus
 from typing import List
@@ -21,6 +20,8 @@ from app.services.agreement.vectorize_similarity import \
   vectorize_and_calculate_similarity
 from app.services.common.ingestion_pipeline import preprocess_data, chunk_agreement_documents
 import time
+
+from config.app_config import AppConfig
 
 agreements = Blueprint('agreements', __name__, url_prefix="/flask/agreements")
 
@@ -53,7 +54,7 @@ def process_agreements_pdf_from_s3():
   start_time = time.time()
   chunks = run_async(
       vectorize_and_calculate_similarity(
-          document_chunks, Constants.QDRANT_COLLECTION.value, document_request))
+          document_chunks, AppConfig.COLLECTION_NAME, document_request))
   end_time = time.time()
   logging.info(f"Time vectorize and prompt texts: {end_time - start_time:.4f} seconds")
 

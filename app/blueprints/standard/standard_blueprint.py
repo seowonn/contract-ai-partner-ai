@@ -1,4 +1,3 @@
-import asyncio
 import logging
 import time
 from http import HTTPStatus
@@ -18,7 +17,7 @@ from app.schemas.success_response import SuccessResponse
 from app.services.common.ingestion_pipeline import preprocess_data, chunk_standard_texts
 from app.services.standard.vector_delete import delete_by_standard_id
 from app.services.standard.vector_store import vectorize_and_save
-
+from config.app_config import AppConfig
 
 standards = Blueprint('standards', __name__, url_prefix="/flask/standards")
 
