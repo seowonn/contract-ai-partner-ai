@@ -6,12 +6,16 @@ import openai
 
 load_dotenv() # 루트로 고정
 
+openai_client = AsyncOpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+embedding_deployment_name = os.getenv("EMBEDDING_OPENAI_DEPLOYMENT_NAME")
+prompt_deployment_name = os.getenv("PROMPT_OPENAI_DEPLOYMENT_NAME")
+
+
 embedding_client = openai.AzureOpenAI(
     api_key=os.getenv("AZURE_EMBEDDING_API_KEY"),
     api_version=os.getenv("AZURE_EMBEDDING_OPENAI_API_VERSION"),
     azure_endpoint=os.getenv("AZURE_EMBEDDING_OPENAI_ENDPOINT")
 )
-embedding_deployment_name = os.getenv("AZURE_EMBEDDING_OPENAI_DEPLOYMENT_NAME")
 
 
 prompt_client = openai.AzureOpenAI(
@@ -19,7 +23,6 @@ prompt_client = openai.AzureOpenAI(
     api_version=os.getenv("AZURE_PROMPT_OPENAI_API_VERSION"),
     azure_endpoint=os.getenv("AZURE_PROMPT_OPENAI_ENDPOINT")
 )
-prompt_deployment_name = os.getenv("AZURE_PROMPT_OPENAI_DEPLOYMENT_NAME")
 
 
 vision_client = openai.AzureOpenAI(
@@ -28,5 +31,3 @@ vision_client = openai.AzureOpenAI(
     azure_endpoint=os.getenv("AZURE_VISION_OPENAI_ENDPOINT")
 )
 vision_deployment_name = os.getenv("AZURE_VISION_OPENAI_DEPLOYMENT_NAME")
-
-openai_client = AsyncOpenAI(api_key=os.getenv("OPENAI_API_KEY"))

@@ -7,18 +7,19 @@ from flask import Blueprint, request
 from pydantic import ValidationError
 
 from app.blueprints.agreement.agreement_exception import AgreementException
+from app.common.constants import Constants
 from app.common.exception.custom_exception import BaseCustomException
 from app.common.exception.error_code import ErrorCode
 from app.common.file_type import FileType
 from app.schemas.analysis_response import AnalysisResponse
-from app.schemas.document import Document
+from app.schemas.chunk_schema import Document
 from app.schemas.document_request import DocumentRequest
 from app.schemas.success_code import SuccessCode
 from app.schemas.success_response import SuccessResponse
 from app.services.agreement.img_service import process_img
 from app.services.agreement.vectorize_similarity import \
   vectorize_and_calculate_similarity
-from app.services.common.ingestion_pipeline import preprocess_data, chunk_texts
+from app.services.common.ingestion_pipeline import preprocess_data, chunk_agreement_documents
 import time
 
 agreements = Blueprint('agreements', __name__, url_prefix="/flask/agreements")
@@ -46,18 +47,20 @@ def process_agreements_pdf_from_s3():
   if len(documents) == 0:
     raise AgreementException(ErrorCode.NO_TEXTS_EXTRACTED)
 
-  chunks = chunk_texts(documents)
+  document_chunks = chunk_agreement_documents(documents)
 
   # 5️⃣ 벡터화 + 유사도 비교 (리턴값 추가)
   start_time = time.time()
-  result = asyncio.run(vectorize_and_calculate_similarity(extracted_text, chunks, document_request))
+  chunks = asyncio.run(
+      vectorize_and_calculate_similarity(
+          document_chunks, Constants.QDRANT_COLLECTION.value, document_request))
   end_time = time.time()
   logging.info(f"Time vectorize and prompt texts: {end_time - start_time:.4f} seconds")
 
   response = AnalysisResponse(
       total_page = len(documents),
       summary_content="",
-      chunks=[]
+      chunks=chunks
   )
 
   return SuccessResponse(SuccessCode.REVIEW_SUCCESS, response).of(), HTTPStatus.OK

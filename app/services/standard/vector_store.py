@@ -9,7 +9,7 @@ from qdrant_client.models import Distance, VectorParams, PointStruct
 from app.blueprints.standard.standard_exception import StandardException
 from app.clients.qdrant_client import qdrant_db_client
 from app.common.exception.error_code import ErrorCode
-from app.containers.service_container import text_service
+from app.containers.service_container import embedding_service, prompt_service
 from app.models.vector import VectorPayload
 from app.schemas.chunk_schema import ArticleChunk, ClauseChunk
 from app.schemas.document_request import DocumentRequest
@@ -45,7 +45,7 @@ async def process_clause(article_title: str, clause: ClauseChunk,
 
   try:
     clause_vector, result = await asyncio.gather(
-        text_service.embed_text(combined_text),
+        embedding_service.embed_text(combined_text),
         retry_make_correction(clause_content)
     )
   except StandardException:
@@ -69,7 +69,7 @@ async def process_clause(article_title: str, clause: ClauseChunk,
 
 async def retry_make_correction(clause_content: str) -> dict:
   for attempt in range(1, MAX_RETRIES + 1):
-    result = await text_service.make_correction_data(clause_content)
+    result = await prompt_service.make_correction_data(clause_content)
     if result is not None:
       return result
     logging.warning(f"교정 응답 실패. 재시도 {attempt}/{MAX_RETRIES}")
