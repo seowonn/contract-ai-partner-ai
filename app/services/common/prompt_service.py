@@ -111,19 +111,30 @@ class PromptService:
               }
             ],
             temperature=0.5,
-            top_p=1
         )
 
     response_text = response.choices[0].message.content
+    response_text_cleaned = re.sub(r'(?<!\\)\n', ' ', response_text).strip()
 
-    # ✅ JSON 변환 시도
+    if response_text_cleaned.startswith(
+        "```json") and response_text_cleaned.endswith("```"):
+      pure_json = response_text_cleaned[7:-3].strip()
+    elif response_text_cleaned.startswith(
+        "```") and response_text_cleaned.endswith("```"):
+      pure_json = response_text_cleaned[3:-3].strip()
+    else:
+      pure_json = response_text_cleaned
+
     try:
-      parsed_response = json.loads(response_text)
+      parsed_response = json.loads(pure_json)
     except json.JSONDecodeError:
-      logging.error(f"❌ OpenAI 응답이 JSON 형식이 아님: {response_text}")
-      return None  # JSON 변환 실패 시 None 반환
+      logging.error(
+          f"[PromptService] ❌ OpenAI 응답이 JSON 형식이 아님: {response_text_cleaned}"
+      )
+      return None
 
     return parsed_response
+
 
   def summarize_document(self, documents: str) -> str:
     # OpenAI API 호출하여 문서 요약
