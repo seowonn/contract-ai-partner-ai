@@ -6,6 +6,8 @@ from typing import List, Any, Optional
 import httpx
 from openai import AsyncOpenAI
 
+from app.clients.openai_clients import sync_openai_client
+
 
 class PromptService:
   def __init__(self, deployment_name):
@@ -124,9 +126,8 @@ class PromptService:
     return parsed_response
 
   def summarize_document(self, documents: str) -> str:
-
     # OpenAI API 호출하여 문서 요약
-    response = self.client.chat.completions.create(
+    response = sync_openai_client.chat.completions.create(
         model=self.deployment_name,
         messages=[{
           "role": "user",

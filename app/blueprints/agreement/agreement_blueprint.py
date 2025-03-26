@@ -19,8 +19,8 @@ from app.services.agreement.img_service import process_img
 from app.services.agreement.vectorize_similarity import \
   vectorize_and_calculate_similarity
 from app.services.common.ingestion_pipeline import preprocess_data, chunk_agreement_documents
+from app.containers.service_container import prompt_service
 import time
-from app.containers.service_container import prompt_service, sync_prompt_service
 
 from config.app_config import AppConfig
 
@@ -49,7 +49,7 @@ def process_agreements_pdf_from_s3():
   if len(documents) == 0:
     raise AgreementException(ErrorCode.NO_TEXTS_EXTRACTED)
 
-  summary_content = sync_prompt_service.summarize_document(documents)
+  summary_content = prompt_service.summarize_document(documents)
 
   document_chunks = chunk_agreement_documents(documents)
 
