@@ -131,8 +131,9 @@ class PromptService:
         model=self.deployment_name,
         messages=[{
           "role": "user",
-          "content": f"문서 전체 내용을 string 형식으로 요약해줘."
-                     f"출력할때 강조하는 '**' 과 엔터키 '\n', '\n\n' 모두 제거하고 출력해줘"
+          # 과 엔터키 '\n', '\n\n' 모두 제거하고 출력해줘"
+          "content": f"문서 전체 내용을 요약해줘."
+                     f"출력할때 강조하는 '**'  제거하고 출력해줘"
                      f"\n\n 문서 : {documents}"
         }],
         temperature=0.5,
