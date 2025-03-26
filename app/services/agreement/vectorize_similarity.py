@@ -39,7 +39,8 @@ async def vectorize_and_calculate_similarity(extracted_text: str,
     if result is not None:  # accuracy가 0.5 이하인 경우는 null을 반환하고 여기에서 제외
       analysis_response.chunks.append(result)
 
-  return analysis_response
+async def process_clause(rag_result: RagResult, clause_content: str,
+    collection_name:str, categoryName: str):
 
   embedding = await embedding_service.embed_text(clause_content)
 
@@ -49,7 +50,7 @@ async def process_clause(clause_content: str, pdf_request: DocumentRequest,
 
   # Qdrant에서 유사한 벡터 검색 (해당 호출이 동기라면 그대로 사용)
   search_results = await qdrant_db_client.query_points(
-      collection_name=Constants.QDRANT_COLLECTION.value,
+      collection_name=collection_name,
       query=embedding,
       query_filter=models.Filter(
           must=[

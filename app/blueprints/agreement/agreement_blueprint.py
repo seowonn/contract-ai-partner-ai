@@ -7,6 +7,7 @@ from flask import Blueprint, request
 from pydantic import ValidationError
 
 from app.blueprints.agreement.agreement_exception import AgreementException
+from app.common.constants import Constants
 from app.common.exception.custom_exception import BaseCustomException
 from app.common.exception.error_code import ErrorCode
 from app.common.file_type import FileType
