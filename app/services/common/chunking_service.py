@@ -90,7 +90,7 @@ def chunk_by_article_and_clause_with_page(documents: List[Document]) -> List[
 
           if len(clause_content) >= MIN_CLAUSE_BODY_LENGTH:
             result.append(DocumentChunk(
-                clause_content=f"{article_title}+\n{clause_content}",
+                clause_content=f"{article_title}{Constants.ARTICLE_CLAUSE_SEPARATOR.value}\n{clause_content}",
                 page=page,
                 order_index=order_index,
                 clause_number=f"제{article_number}조 {clause_number}항"
@@ -99,7 +99,7 @@ def chunk_by_article_and_clause_with_page(documents: List[Document]) -> List[
       else:
         if len(article_body) >= MIN_CLAUSE_BODY_LENGTH:
           result.append(DocumentChunk(
-              clause_content=f"{article_title}+\n{article_body}",
+              clause_content=f"{article_title}{Constants.ARTICLE_CLAUSE_SEPARATOR.value}\n{article_body}",
               page=page,
               order_index=order_index,
               clause_number=f"제{article_number}조 1항"
