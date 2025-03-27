@@ -7,6 +7,7 @@ from app.schemas.chunk_schema import Document
 
 MIN_CLAUSE_BODY_LENGTH = 5
 
+
 def split_text_by_pattern(text: str, pattern: str) -> List[str]:
   return re.split(pattern, text)
 
@@ -76,17 +77,20 @@ def chunk_by_article_and_clause_with_page(documents: List[Document]) -> List[
       article_body = body.strip()
 
       first_clause_match = re.search(r'(①|1\.)', article_body)
-      if first_clause_match:
+      if first_clause_match and article_body.startswith(first_clause_match.group(1)):
         clause_pattern = r'([\n\s]*[①-⑨])' if first_clause_match.group(1) == '①' else r'(\n\s*\d+\.)'
         clause_chunks = split_text_by_pattern("\n" + article_body, clause_pattern)
 
         for j in range(1, len(clause_chunks), 2):
           clause_number = clause_chunks[j].strip()
+          if clause_number.endswith("."):
+            clause_number = clause_number[:-1]
+
           clause_content = clause_chunks[j + 1].strip() if j + 1 < len(clause_chunks) else ""
 
           if len(clause_content) >= MIN_CLAUSE_BODY_LENGTH:
             result.append(DocumentChunk(
-                clause_content=f"{article_title}\n{clause_content}",
+                clause_content=f"{article_title}+\n{clause_content}",
                 page=page,
                 order_index=order_index,
                 clause_number=f"제{article_number}조 {clause_number}항"
@@ -95,7 +99,7 @@ def chunk_by_article_and_clause_with_page(documents: List[Document]) -> List[
       else:
         if len(article_body) >= MIN_CLAUSE_BODY_LENGTH:
           result.append(DocumentChunk(
-              clause_content=f"{article_title}\n{article_body}",
+              clause_content=f"{article_title}+\n{article_body}",
               page=page,
               order_index=order_index,
               clause_number=f"제{article_number}조 1항"
@@ -168,5 +172,4 @@ def get_clause_pattern(clause_number: str) -> Optional[str]:
     return r'([\n\s]*[①-⑨])'
   elif re.match(r'\d+\.', pattern):
     return r'(\n\s*\d+\.)'
-  else:
-    return None
+  return None
