@@ -151,6 +151,7 @@ async def find_text_positions(clause_content: str, pdf_document):
 
       # 바운딩 박스를 생성 (최소값과 최대값을 사용)
       positions.append({
+        "page": page_num + 1,
         "bbox": (min_x0, min_y0, max_x1, max_y1)  # 최소 x, 최소 y, 최대 x, 최대 y
       })
 
