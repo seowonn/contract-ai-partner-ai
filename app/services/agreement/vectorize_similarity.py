@@ -3,7 +3,7 @@ from typing import List
 
 from qdrant_client import models
 
-from app.clients.qdrant_client import qdrant_db_client
+from app.clients.qdrant_client import get_qdrant_client
 from app.schemas.analysis_response import RagResult
 from app.schemas.chunk_schema import DocumentChunk
 from app.schemas.document_request import DocumentRequest
@@ -43,7 +43,8 @@ async def process_clause(rag_result: RagResult, clause_content: str,
     collection_name: str, category_name: str):
   embedding = await embedding_service.embed_text(clause_content)
 
-  search_results = await qdrant_db_client.query_points(
+  client = get_qdrant_client()
+  search_results = await client.query_points(
       collection_name=collection_name,
       query=embedding,
       query_filter=models.Filter(
@@ -100,14 +101,14 @@ async def process_clause(rag_result: RagResult, clause_content: str,
     print("Text not found in the document.")
 
   # 최종 결과 저장
-  rag_result.accuracy = corrected_result["accuracy"]
+  rag_result.accuracy = float(corrected_result["accuracy"])
   rag_result.corrected_text = corrected_result["corrected_text"]
   rag_result.incorrect_text = corrected_result["clause_content"]  # 원본 문장
   rag_result.proof_text = corrected_result["proof_text"]
   rag_result.position = position_values  # 위치정보
 
   # accuracy가 0.5 이하일 경우 결과를 반환하지 않음
-  if float(rag_result.accuracy) > 0.5:
+  if rag_result.accuracy > 0.5:
     return rag_result
   else:
     return None  # accuracy가 0.5 이하일 경우 빈 객체 반환

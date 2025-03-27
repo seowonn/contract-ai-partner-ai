@@ -63,6 +63,7 @@ def delete_standard(standardId: str):
   if not standardId.isdigit():
     raise AgreementException(ErrorCode.CANNOT_CONVERT_TO_NUM)
 
-  success_code = run_async(delete_by_standard_id(int(standardId)))
+  success_code = (
+    run_async(delete_by_standard_id(int(standardId), AppConfig.COLLECTION_NAME)))
   return SuccessResponse(success_code,
                          Constants.SUCCESS.value).of(), HTTPStatus.OK

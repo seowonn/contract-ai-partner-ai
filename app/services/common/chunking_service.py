@@ -45,12 +45,14 @@ def chunk_by_article_and_clause(extracted_text: str) -> List[ArticleChunk]:
   return result
 
 
-def chunk_by_article_and_clause_with_page(extracted_text: list) -> List[
+def chunk_by_article_and_clause_with_page(documents: List[Document]) -> List[
   DocumentChunk]:
   result: List[DocumentChunk] = []
 
+  for doc in documents:
+    page = doc.metadata.page
+    page_text = doc.page_content
 
-  for page, page_text in extracted_text:
     sentence_index = 1  # 문장 번호 초기화
     # 1. '제X조'를 기준으로 텍스트를 분리
     pattern = r'(제\d+조\s*【[^】]+】)(.*?)(?=(제\d+조|$))'  # 제X조를 기준으로 분리
