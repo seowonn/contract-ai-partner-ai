@@ -12,9 +12,13 @@ from app.services.standard.vector_store import ensure_qdrant_collection
 import fitz
 import io
 
-# 이걸 pdf_bytes_io 객체를 가져와서 여기서 오픈하는게 맞는건지 모르겠음
-pdf_document = fitz.open('./pdf/test.pdf')
 
+def byte_data(pdf_bytes_io: io.BytesIO):
+    global pdf_document
+    # pdf_bytes_io를 사용하여 데이터를 읽고 pdf_document로 설정
+    pdf_document = fitz.open(stream=pdf_bytes_io, filetype="pdf")
+    print(f"pdf_bytes_io : {pdf_document}")
+    return pdf_document
 
 async def vectorize_and_calculate_similarity(
     document_chunks: List[DocumentChunk],
@@ -80,35 +84,39 @@ async def process_clause(rag_result: RagResult, clause_content: str,
       # 교정된 문장들
   )
 
-  # 원문 텍스트에 대한 위치 정보 찾기
-  positions = await find_text_positions(clause_content, pdf_document)
-
-  position_values = []  # position_values를 저장할 리스트
-
-  if positions:
-    for position in positions:
-      # 소수점 두 자리까지만 반올림
-      page = position['page']
-      bbox = position['bbox']
-
-      # 각 좌표값을 소수점 두 자리까지 반올림
-      rounded_bbox = [round(coord, 2) for coord in bbox]
-
-      position_value = [page, rounded_bbox]
-      position_values.append(position_value)  # position_values 리스트에 추가
-
-  else:
-    print("Text not found in the document.")
-
-  # 최종 결과 저장
-  rag_result.accuracy = float(corrected_result["accuracy"])
-  rag_result.corrected_text = corrected_result["corrected_text"]
-  rag_result.incorrect_text = corrected_result["clause_content"]  # 원본 문장
-  rag_result.proof_text = corrected_result["proof_text"]
-  rag_result.position = position_values  # 위치정보
-
   # accuracy가 0.5 이하일 경우 결과를 반환하지 않음
-  if rag_result.accuracy > 0.5:
+  if float(corrected_result["accuracy"]) > 0.5:
+
+    # 원문 텍스트에 대한 위치 정보 찾기
+    positions = await find_text_positions(clause_content, pdf_document)
+
+    position_values = []  # position_values를 저장할 리스트
+
+    if positions:
+      for position in positions:
+        # 소수점 두 자리까지만 반올림
+        page = position['page']
+        bbox = position['bbox']
+
+        # 각 좌표값을 소수점 두 자리까지 반올림
+        rounded_bbox = [round(coord, 2) for coord in bbox]
+
+        position_value = [page, rounded_bbox]
+        position_values.append(position_value)  # position_values 리스트에 추가
+
+    else:
+      print("Text not found in the document.")
+
+    # 최종 결과 저장
+    rag_result.accuracy = corrected_result["accuracy"]
+    rag_result.corrected_text = corrected_result["corrected_text"]
+    rag_result.incorrect_text = corrected_result["clause_content"]  # 원본 문장
+    rag_result.proof_text = corrected_result["proof_text"]
+    rag_result.position = position_values  # 위치정보
+
+    # rag_result.clause_data.page = [pos[0] for pos in position_values]
+    # rag_result.clause_data.position = [pos[1] for pos in position_values]
+
     return rag_result
   else:
     return None  # accuracy가 0.5 이하일 경우 빈 객체 반환
@@ -150,10 +158,13 @@ async def find_text_positions(clause_content: str, pdf_document):
       min_y0 = min([x[2] for x in group])  # 최소 y0 값
       max_y1 = max([x[3] for x in group])  # 최대 y1 값
 
+      width = max_x1 - min_x0
+      height = max_y1 - min_y0
+
       # 바운딩 박스를 생성 (최소값과 최대값을 사용)
       positions.append({
         "page": page_num + 1,
-        "bbox": (min_x0, min_y0, max_x1, max_y1)  # 최소 x, 최소 y, 최대 x, 최대 y
+        "bbox": (min_x0, min_y0, width, height)  # 최소 x, 최소 y, 너비, 높이
       })
 
   return positions
