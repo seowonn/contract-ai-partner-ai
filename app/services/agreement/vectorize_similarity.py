@@ -4,14 +4,14 @@ from typing import List
 from qdrant_client import models
 
 from app.clients.qdrant_client import get_qdrant_client
-from app.schemas.analysis_response import RagResult
+from app.schemas.analysis_response import RagResult, ClauseData
 from app.schemas.chunk_schema import DocumentChunk
 from app.schemas.document_request import DocumentRequest
 from app.containers.service_container import embedding_service, prompt_service
 from app.services.standard.vector_store import ensure_qdrant_collection
 import fitz
 import io
-
+from collections import defaultdict
 
 def byte_data(pdf_bytes_io: io.BytesIO):
     global pdf_document
@@ -31,12 +31,10 @@ async def vectorize_and_calculate_similarity(
     if len(chunk.clause_content) <= 1:
       continue
 
-    rag_result = RagResult(
-        page=chunk.page,
-        order_index=chunk.order_index
-    )
+    rag_result = RagResult()
     tasks.append(process_clause(rag_result, chunk.clause_content,
-                                collection_name, document_request.categoryName))
+                                collection_name, document_request.categoryName,
+                                chunk.page, chunk.order_index))
 
   # 모든 임베딩 및 유사도 검색 태스크를 병렬로 실행
   results = await asyncio.gather(*tasks)
@@ -44,7 +42,7 @@ async def vectorize_and_calculate_similarity(
 
 
 async def process_clause(rag_result: RagResult, clause_content: str,
-    collection_name: str, category_name: str):
+    collection_name: str, category_name: str, page: int, order_index: int):
   embedding = await embedding_service.embed_text(clause_content)
 
   client = get_qdrant_client()
@@ -107,24 +105,52 @@ async def process_clause(rag_result: RagResult, clause_content: str,
     else:
       print("Text not found in the document.")
 
+    # 페이지 번호가 같은 항목을 하나로 묶기
+    grouped_positions = defaultdict(list)
+
+    # position_values를 페이지 번호별로 그룹화
+    for pos in position_values:
+      page = pos[0]
+      location = pos[1]
+      grouped_positions[page].append(location)
+
+    # 페이지와 그에 해당하는 모든 위치 좌표를 가져오기
+    page = list(grouped_positions.keys())[0]  # 페이지
+    positions = grouped_positions[page]  # 해당 페이지의 모든 위치
+
+    # 출력
+    print(f'Page: {page}')
+    print(f'positions: {positions}')
+
+
+
     # 최종 결과 저장
     rag_result.accuracy = corrected_result["accuracy"]
     rag_result.corrected_text = corrected_result["corrected_text"]
     rag_result.incorrect_text = corrected_result["clause_content"]  # 원본 문장
     rag_result.proof_text = corrected_result["proof_text"]
-    rag_result.position = position_values  # 위치정보
+    page = page
+    order_index = order_index
 
-    # rag_result.clause_data.page = [pos[0] for pos in position_values]
-    # rag_result.clause_data.position = [pos[1] for pos in position_values]
+    # ClauseData 객체 생성
+    clause_data = ClauseData(
+        order_index=order_index,
+        page=page,
+        position=positions
+    )
+
+    rag_result.clauseData = [clause_data]  # 위치정보
 
     return rag_result
+
+  # accuracy가 0.5 이하일 경우 빈 객체 반환
   else:
-    return None  # accuracy가 0.5 이하일 경우 빈 객체 반환
+    return None
 
 
 async def find_text_positions(clause_content: str, pdf_document):
   positions = []  # 위치 정보를 저장할 리스트
-  print(f'기존 문장 : {clause_content}')
+  # print(f'기존 문장 : {clause_content}')
 
   # 모든 페이지를 검색
   for page_num in range(pdf_document.page_count):
