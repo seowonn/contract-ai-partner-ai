@@ -137,18 +137,21 @@ async def find_text_positions(clause_content: str, pdf_document):
       if rounded_y not in grouped_positions:
         grouped_positions[rounded_y] = []
 
-      grouped_positions[rounded_y].append((x0, x1))
+      grouped_positions[rounded_y].append((x0, x1, y0, y1))
 
     # 그룹화된 바운딩 박스를 하나의 큰 박스로 묶기
     for y_key, group in grouped_positions.items():
       # 하나의 그룹에서 x0, x1의 최솟값과 최댓값을 구하기
       min_x0 = min([x[0] for x in group])  # 최소 x0 값
       max_x1 = max([x[1] for x in group])  # 최대 x1 값
-      # 그룹에 해당하는 y 값은 동일하므로, 바운딩 박스를 만들 때 y0, y1은 동일
+
+      # 하나의 그룹에서 y0, y1의 최솟값과 최댓값을 구하기
+      min_y0 = min([x[2] for x in group])  # 최소 y0 값
+      max_y1 = max([x[3] for x in group])  # 최대 y1 값
+
+      # 바운딩 박스를 생성 (최소값과 최대값을 사용)
       positions.append({
-        "page": page_num + 1,
-        "bbox": (min_x0, y_key, max_x1, y_key + 16)
-        # y1 값은 약간의 여유를 두고 설정 (필요시 조정)
+        "bbox": (min_x0, min_y0, max_x1, max_y1)  # 최소 x, 최소 y, 최대 x, 최대 y
       })
 
   return positions
