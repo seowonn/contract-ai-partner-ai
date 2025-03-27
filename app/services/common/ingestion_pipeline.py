@@ -1,7 +1,9 @@
 from typing import List
 
+from app.common.constants import Constants
 from app.common.exception.custom_exception import BaseCustomException
 from app.common.exception.error_code import ErrorCode
+from app.schemas.analysis_response import RagResult, ClauseData
 from app.schemas.chunk_schema import ArticleChunk, DocumentChunk
 from app.schemas.chunk_schema import Document
 from app.schemas.document_request import DocumentRequest
@@ -57,3 +59,31 @@ def chunk_agreement_documents(documents: List[Document]) -> List[DocumentChunk]:
   if len(chunks) == 0:
     raise BaseCustomException(ErrorCode.CHUNKING_FAIL)
   return chunks
+
+
+def sort_chunks_by_clause_number(document_chunks: List[DocumentChunk]) -> List[RagResult]:
+  sorted_chunks: List[RagResult] = []
+  clause_map: dict[str, RagResult] = {}
+
+  for doc in document_chunks:
+    if doc.clause_number in clause_map:
+      rag_result = clause_map[doc.clause_number]
+    else:
+      rag_result = RagResult(
+        clause_data=[]
+      )
+      clause_map[doc.clause_number] = rag_result
+      sorted_chunks.append(rag_result)
+
+    if rag_result.incorrect_text:
+      rag_result.incorrect_text += Constants.CLAUSE_TEXT_SEPARATOR.value + doc.clause_content
+    else:
+      rag_result.incorrect_text = doc.clause_content
+
+    rag_result.clause_data.append(ClauseData(
+        order_index=doc.order_index,
+        page=doc.page,
+        position=[]
+    ))
+
+  return sorted_chunks

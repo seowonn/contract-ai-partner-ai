@@ -5,27 +5,19 @@ from qdrant_client import models
 
 from app.clients.qdrant_client import get_qdrant_client
 from app.schemas.analysis_response import RagResult
-from app.schemas.chunk_schema import DocumentChunk
 from app.schemas.document_request import DocumentRequest
 from app.containers.service_container import embedding_service, prompt_service
 from app.services.standard.vector_store import ensure_qdrant_collection
 
 async def vectorize_and_calculate_similarity(
-    document_chunks: List[DocumentChunk],
+    sorted_chunks: List[RagResult],
     collection_name: str, document_request: DocumentRequest) -> List[RagResult]:
 
   await ensure_qdrant_collection(collection_name)
 
   tasks = []
-  for chunk in document_chunks:
-    if len(chunk.clause_content) <= 1:
-      continue
-
-    rag_result = RagResult(
-        page=chunk.page,
-        order_index=chunk.order_index
-    )
-    tasks.append(process_clause(rag_result, chunk.clause_content,
+  for chunk in sorted_chunks:
+    tasks.append(process_clause(chunk, chunk.incorrect_text,
                                 collection_name, document_request.categoryName))
 
   # 모든 임베딩 및 유사도 검색 태스크를 병렬로 실행
@@ -80,6 +72,7 @@ async def process_clause(rag_result: RagResult, clause_content: str,
 
   # accuracy가 0.5 이하일 경우 결과를 반환하지 않음
   if rag_result.accuracy > 0.5:
+    # rag_result.clause_data.position = 여기를 채우시오
     return rag_result
   else:
     return None  # accuracy가 0.5 이하일 경우 빈 객체 반환

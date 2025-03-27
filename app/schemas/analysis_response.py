@@ -14,7 +14,7 @@ class RagResult:
   corrected_text: Optional[str] = None
   proof_text: Optional[str] = None
   accuracy: Optional[float] = None
-  clause_data: ClauseData = field(default_factory=ClauseData)
+  clause_data: List[ClauseData] = field(default_factory=list)
 
 @dataclass
 class AnalysisResponse:
