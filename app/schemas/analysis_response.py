@@ -8,19 +8,17 @@ def to_camel_case(snake_str: str) -> str:
 
 @dataclass
 class ClauseData:
-  order_index: int = 0
-  page: int = 0
+  order_index: int
+  page: int
   position: List[List[float]] = field(default_factory=list)
 
 @dataclass
 class RagResult:
-  page: int
-  order_index: int
   accuracy: Optional[float] = None
   corrected_text: Optional[str] = None
   incorrect_text: Optional[str] = None
   proof_text: Optional[str] = None
-  position: List[int] = field(default_factory=list)
+  clauseData: List[ClauseData] = field(default_factory=list)
 
 @dataclass
 class AnalysisResponse:
