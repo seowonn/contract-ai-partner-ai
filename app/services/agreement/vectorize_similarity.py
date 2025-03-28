@@ -1,6 +1,6 @@
 import asyncio
 import logging
-from typing import List
+from typing import List, Optional
 
 from httpx import ConnectTimeout
 from qdrant_client import models
@@ -16,7 +16,6 @@ from app.services.standard.vector_store import ensure_qdrant_collection
 import fitz
 import io
 
-SEMAPHORE = asyncio.Semaphore(5)  # 동시 Qdrant 요청 5개로 제한
 
 def byte_data(pdf_bytes_io: io.BytesIO):
     global pdf_document
@@ -30,10 +29,11 @@ async def vectorize_and_calculate_similarity(
 
   await ensure_qdrant_collection(collection_name)
 
+  semaphore = asyncio.Semaphore(5)  # 딱 한 번만 생성
   tasks = []
   for chunk in sorted_chunks:
-    tasks.append(process_clause(chunk, chunk.incorrect_text,
-                                collection_name, document_request.categoryName))
+    tasks.append(process_clause(chunk, chunk.incorrect_text, collection_name,
+                                document_request.categoryName, semaphore))
 
   # 모든 임베딩 및 유사도 검색 태스크를 병렬로 실행
   results = await asyncio.gather(*tasks)
@@ -41,12 +41,12 @@ async def vectorize_and_calculate_similarity(
 
 
 async def process_clause(rag_result: RagResult, clause_content: str,
-    collection_name: str, category_name: str):
+    collection_name: str, category_name: str, semaphore) -> Optional[RagResult]:
   embedding = await embedding_service.embed_text(clause_content)
 
   try:
     client = get_qdrant_client()
-    async with SEMAPHORE:
+    async with semaphore:
       search_results = await client.query_points(
           collection_name=collection_name,
           query=embedding,
