@@ -59,7 +59,7 @@ async def process_clause(rag_result: RagResult, clause_content: str,
         limit=5
     )
   except Exception as e:
-    print("❌ Qdrant 검색 중 예외 발생:", repr(e))
+    logging.error("❌ Qdrant 검색 중 예외 발생:", repr(e))
     raise BaseCustomException(ErrorCode.QDRANT_CONNECTION_TIMEOUT)
 
   # 3️⃣ 유사한 문장들 처리
