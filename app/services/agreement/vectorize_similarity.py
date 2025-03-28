@@ -2,9 +2,7 @@ import asyncio
 import logging
 from typing import List, Optional
 
-from httpx import ConnectTimeout
 from qdrant_client import models
-from qdrant_client.http.exceptions import ResponseHandlingException
 
 from app.clients.qdrant_client import get_qdrant_client
 from app.common.exception.custom_exception import BaseCustomException
@@ -60,9 +58,8 @@ async def process_clause(rag_result: RagResult, clause_content: str,
           limit=5
       )
 
-  except Exception as e:
-    logging.error(f"❌ Qdrant 검색 중 예외 발생: {repr(e)}")
-    raise BaseCustomException(ErrorCode.QDRANT_CONNECTION_TIMEOUT)
+  except Exception:
+    raise BaseCustomException(ErrorCode.QDRANT_SEARCH_FAILED)
 
   # 3️⃣ 유사한 문장들 처리
   clause_results = []
