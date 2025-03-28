@@ -1,6 +1,7 @@
-from typing import List
+import io
+from typing import List, Tuple
 
-from app.common.constants import Constants
+from app.common.constants import CLAUSE_TEXT_SEPARATOR
 from app.common.exception.custom_exception import BaseCustomException
 from app.common.exception.error_code import ErrorCode
 from app.schemas.analysis_response import RagResult, ClauseData
@@ -18,25 +19,50 @@ import time
 
 
 def preprocess_data(document_request: DocumentRequest) -> List[Document]:
-    # 1️⃣ s3에서 문서(pdf) 가져오기 (메모리 내)
-    start_time = time.time()  # 시작 시간 기록
-    s3_stream = s3_get_object(document_request.url)
-    s3_time = time.time() - start_time  # 경과 시간 계산
-    logging.info(f"s3_get_object took {s3_time:.4f} seconds")
+  # 1️⃣ s3에서 문서(pdf) 가져오기 (메모리 내)
+  start_time = time.time()  # 시작 시간 기록
+  s3_stream = s3_get_object(document_request.url)
+  s3_time = time.time() - start_time  # 경과 시간 계산
+  logging.info(f"s3_get_object took {s3_time:.4f} seconds")
 
-    # 2️⃣ PDF 스트림으로 변환
-    start_time = time.time()  # 시작 시간 기록
-    pdf_bytes_io = convert_to_bytes_io(s3_stream)
-    convert_time = time.time() - start_time  # 경과 시간 계산
-    logging.info(f"convert_to_bytes_io took {convert_time:.4f} seconds")
+  # 2️⃣ PDF 스트림으로 변환
+  start_time = time.time()  # 시작 시간 기록
+  pdf_bytes_io = convert_to_bytes_io(s3_stream)
+  convert_time = time.time() - start_time  # 경과 시간 계산
+  logging.info(f"convert_to_bytes_io took {convert_time:.4f} seconds")
 
-    # 3️⃣ PDF에서 텍스트 추출
-    start_time = time.time()  # 시작 시간 기록
-    documents = extract_documents_from_pdf_io(pdf_bytes_io)
-    extract_time = time.time() - start_time  # 경과 시간 계산
-    logging.info(f"extract_text_and_documents_from_pdf_io took {extract_time:.4f} seconds")
+  # 3️⃣ PDF에서 텍스트 추출
+  start_time = time.time()  # 시작 시간 기록
+  documents = extract_documents_from_pdf_io(pdf_bytes_io)
+  extract_time = time.time() - start_time  # 경과 시간 계산
+  logging.info(
+    f"extract_text_and_documents_from_pdf_io took {extract_time:.4f} seconds")
 
-    return documents
+  return documents
+
+
+def preprocess_data2(document_request: DocumentRequest) -> Tuple[
+  List[Document], io.BytesIO]:
+  # 1️⃣ s3에서 문서(pdf) 가져오기 (메모리 내)
+  start_time = time.time()  # 시작 시간 기록
+  s3_stream = s3_get_object(document_request.url)
+  s3_time = time.time() - start_time  # 경과 시간 계산
+  logging.info(f"s3_get_object took {s3_time:.4f} seconds")
+
+  # 2️⃣ PDF 스트림으로 변환
+  start_time = time.time()  # 시작 시간 기록
+  pdf_bytes_io = convert_to_bytes_io(s3_stream)
+  convert_time = time.time() - start_time  # 경과 시간 계산
+  logging.info(f"convert_to_bytes_io took {convert_time:.4f} seconds")
+
+  # 3️⃣ PDF에서 텍스트 추출
+  start_time = time.time()  # 시작 시간 기록
+  documents = extract_documents_from_pdf_io(pdf_bytes_io)
+  extract_time = time.time() - start_time  # 경과 시간 계산
+  logging.info(
+      f"extract_text_and_documents_from_pdf_io took {extract_time:.4f} seconds")
+
+  return documents, pdf_bytes_io
 
 
 def chunk_standard_texts(extracted_text: str) -> List[ArticleChunk]:
@@ -61,7 +87,8 @@ def chunk_agreement_documents(documents: List[Document]) -> List[DocumentChunk]:
   return chunks
 
 
-def gather_chunks_by_clause_number(document_chunks: List[DocumentChunk]) -> List[RagResult]:
+def gather_chunks_by_clause_number(document_chunks: List[DocumentChunk]) -> \
+List[RagResult]:
   sorted_chunks: List[RagResult] = []
   clause_map: dict[str, RagResult] = {}
 
@@ -70,13 +97,13 @@ def gather_chunks_by_clause_number(document_chunks: List[DocumentChunk]) -> List
       rag_result = clause_map[doc.clause_number]
     else:
       rag_result = RagResult(
-        clause_data=[]
+          clause_data=[]
       )
       clause_map[doc.clause_number] = rag_result
       sorted_chunks.append(rag_result)
 
     if rag_result.incorrect_text:
-      rag_result.incorrect_text += Constants.CLAUSE_TEXT_SEPARATOR.value + doc.clause_content
+      rag_result.incorrect_text += CLAUSE_TEXT_SEPARATOR + doc.clause_content
     else:
       rag_result.incorrect_text = doc.clause_content
 
