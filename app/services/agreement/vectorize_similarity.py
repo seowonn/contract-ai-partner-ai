@@ -58,7 +58,8 @@ async def process_clause(rag_result: RagResult, clause_content: str,
         search_params=models.SearchParams(hnsw_ef=128, exact=False),
         limit=5
     )
-  except (ConnectTimeout, ResponseHandlingException):
+  except (ConnectTimeout, ResponseHandlingException) as e:
+    logging.error(f"search_results 검색 에러: {e}")
     raise BaseCustomException(ErrorCode.QDRANT_CONNECTION_TIMEOUT)
 
   # 3️⃣ 유사한 문장들 처리
