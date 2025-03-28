@@ -172,4 +172,4 @@ async def find_text_positions(clause_content: str, pdf_document):
         "bbox": (min_x0, min_y0, width, height)  # 상대적 x, y, 너비, 높이
       })
 
-    return positions
+  return positions
