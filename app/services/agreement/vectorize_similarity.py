@@ -16,6 +16,8 @@ from app.services.standard.vector_store import ensure_qdrant_collection
 import fitz
 import io
 
+SEMAPHORE = asyncio.Semaphore(5)  # 동시 Qdrant 요청 5개로 제한
+
 def byte_data(pdf_bytes_io: io.BytesIO):
     global pdf_document
     # pdf_bytes_io를 사용하여 데이터를 읽고 pdf_document로 설정
@@ -44,22 +46,22 @@ async def process_clause(rag_result: RagResult, clause_content: str,
 
   try:
     client = get_qdrant_client()
-    search_results = await client.query_points(
-        collection_name=collection_name,
-        query=embedding,
-        query_filter=models.Filter(
-            must=[
-              models.FieldCondition(
+    async with SEMAPHORE:
+      search_results = await client.query_points(
+          collection_name=collection_name,
+          query=embedding,
+          query_filter=models.Filter(
+              must=[models.FieldCondition(
                   key="category",
                   match=models.MatchValue(value=category_name)
-              )
-            ]
-        ),
-        search_params=models.SearchParams(hnsw_ef=128, exact=False),
-        limit=5
-    )
+              )]
+          ),
+          search_params=models.SearchParams(hnsw_ef=128, exact=False),
+          limit=5
+      )
+
   except Exception as e:
-    logging.error("❌ Qdrant 검색 중 예외 발생:", repr(e))
+    logging.error(f"❌ Qdrant 검색 중 예외 발생: {repr(e)}")
     raise BaseCustomException(ErrorCode.QDRANT_CONNECTION_TIMEOUT)
 
   # 3️⃣ 유사한 문장들 처리
