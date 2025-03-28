@@ -34,6 +34,7 @@ class ErrorCode(Enum):
   UNSUPPORTED_FILE_TYPE = (HTTPStatus.BAD_REQUEST, "A003", "지원되지 않는 타입의 파일")
   NO_TEXTS_EXTRACTED = (HTTPStatus.INTERNAL_SERVER_ERROR, "A004", "해당 파일에서 추출된 텍스트 없음")
   NO_SEARCH_RESULT = (HTTPStatus.INTERNAL_SERVER_ERROR, "A005", "Qdrant 내 검색된 데이터 없음")
+  QDRANT_SEARCH_FAILED = (HTTPStatus.INTERNAL_SERVER_ERROR, "A006", "Qdrant 검색 결과 반환 실패")
 
   def __init__(self, status: HTTPStatus, code: str, message: str):
     self.status = status

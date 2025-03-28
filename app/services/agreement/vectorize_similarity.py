@@ -1,10 +1,8 @@
 import asyncio
 import logging
-from typing import List
+from typing import List, Optional
 
-from httpx import ConnectTimeout
 from qdrant_client import models
-from qdrant_client.http.exceptions import ResponseHandlingException
 
 from app.clients.qdrant_client import get_qdrant_client
 from app.common.exception.custom_exception import BaseCustomException
@@ -15,6 +13,7 @@ from app.containers.service_container import embedding_service, prompt_service
 from app.services.standard.vector_store import ensure_qdrant_collection
 import fitz
 import io
+
 
 def byte_data(pdf_bytes_io: io.BytesIO):
     global pdf_document
@@ -28,10 +27,11 @@ async def vectorize_and_calculate_similarity(
 
   await ensure_qdrant_collection(collection_name)
 
+  semaphore = asyncio.Semaphore(5)  # 딱 한 번만 생성
   tasks = []
   for chunk in sorted_chunks:
-    tasks.append(process_clause(chunk, chunk.incorrect_text,
-                                collection_name, document_request.categoryName))
+    tasks.append(process_clause(chunk, chunk.incorrect_text, collection_name,
+                                document_request.categoryName, semaphore))
 
   # 모든 임베딩 및 유사도 검색 태스크를 병렬로 실행
   results = await asyncio.gather(*tasks)
@@ -39,28 +39,27 @@ async def vectorize_and_calculate_similarity(
 
 
 async def process_clause(rag_result: RagResult, clause_content: str,
-    collection_name: str, category_name: str):
+    collection_name: str, category_name: str, semaphore) -> Optional[RagResult]:
   embedding = await embedding_service.embed_text(clause_content)
 
   try:
     client = get_qdrant_client()
-    search_results = await client.query_points(
-        collection_name=collection_name,
-        query=embedding,
-        query_filter=models.Filter(
-            must=[
-              models.FieldCondition(
+    async with semaphore:
+      search_results = await client.query_points(
+          collection_name=collection_name,
+          query=embedding,
+          query_filter=models.Filter(
+              must=[models.FieldCondition(
                   key="category",
                   match=models.MatchValue(value=category_name)
-              )
-            ]
-        ),
-        search_params=models.SearchParams(hnsw_ef=128, exact=False),
-        limit=5
-    )
-  except Exception as e:
-    logging.error("❌ Qdrant 검색 중 예외 발생:", repr(e))
-    raise BaseCustomException(ErrorCode.QDRANT_CONNECTION_TIMEOUT)
+              )]
+          ),
+          search_params=models.SearchParams(hnsw_ef=128, exact=False),
+          limit=5
+      )
+
+  except Exception:
+    raise BaseCustomException(ErrorCode.QDRANT_SEARCH_FAILED)
 
   # 3️⃣ 유사한 문장들 처리
   clause_results = []
