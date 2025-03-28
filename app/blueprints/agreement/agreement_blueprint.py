@@ -17,11 +17,10 @@ from app.schemas.success_code import SuccessCode
 from app.schemas.success_response import SuccessResponse
 from app.services.agreement.img_service import process_img
 from app.services.agreement.vectorize_similarity import \
-  vectorize_and_calculate_similarity
-from app.services.common.ingestion_pipeline import chunk_agreement_documents, \
+  vectorize_and_calculate_similarity, byte_data
+from app.services.common.ingestion_pipeline import \
   gather_chunks_by_clause_number, preprocess_data2
-from app.services.common.ingestion_pipeline import preprocess_data, \
-  chunk_agreement_documents, gather_chunks_by_clause_number
+from app.services.common.ingestion_pipeline import chunk_agreement_documents
 from app.containers.service_container import prompt_service
 import time
 
@@ -42,6 +41,7 @@ def process_agreements_pdf_from_s3():
     raise BaseCustomException(ErrorCode.FIELD_MISSING)
 
   documents: List[Document] = []
+  pdf_bytes_io = None
   if document_request.type in (FileType.PNG, FileType.JPG, FileType.JPEG):
     extracted_text = process_img(document_request)
   elif document_request.type == FileType.PDF:
@@ -58,17 +58,19 @@ def process_agreements_pdf_from_s3():
 
   sorted_chunks = gather_chunks_by_clause_number(document_chunks)
 
-
   # 5️⃣ 벡터화 + 유사도 비교 (리턴값 추가)
+  byte_data(pdf_bytes_io)
+
   start_time = time.time()
   chunks = run_async(
       vectorize_and_calculate_similarity(
           sorted_chunks, AppConfig.COLLECTION_NAME, document_request))
   end_time = time.time()
-  logging.info(f"Time vectorize and prompt texts: {end_time - start_time:.4f} seconds")
+  logging.info(
+      f"Time vectorize and prompt texts: {end_time - start_time:.4f} seconds")
 
   response = AnalysisResponse(
-      total_page = len(documents),
+      total_page=len(documents),
       summary_content=summary_content,
       chunks=chunks
   )
