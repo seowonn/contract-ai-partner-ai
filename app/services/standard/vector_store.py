@@ -1,8 +1,11 @@
 import asyncio
 import logging
+import math
 import uuid
 from datetime import datetime
 from typing import List
+
+import numpy as np
 from httpx import ConnectTimeout
 from qdrant_client.http.exceptions import ResponseHandlingException
 
@@ -54,12 +57,20 @@ async def process_clause(article_title: str, clause: ClauseChunk,
   except StandardException:
     return None
 
+  if clause_vector is None or not isinstance(clause_vector, list):
+    return None
+
+  if any(math.isnan(x) for x in clause_vector):
+    return None
+
+  clause_vector = np.array(clause_vector, dtype=np.float32).tolist()
+
   payload = VectorPayload(
       standard_id=pdf_request.id,
       category=pdf_request.categoryName,
-      incorrect_text=result["incorrect_text"],
-      proof_text=clause_content,
-      corrected_text=result["corrected_text"],
+      incorrect_text=result.get("incorrect_text") or "",
+      proof_text=clause_content or "",
+      corrected_text=result.get("corrected_text") or "",
       created_at=datetime.now().strftime("%Y-%m-%d %H:%M:%S")
   )
 

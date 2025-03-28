@@ -1,6 +1,7 @@
 from typing import List
 
 import httpx
+import numpy as np
 from openai import AsyncOpenAI
 
 from app.common.exception.custom_exception import BaseCustomException
@@ -23,4 +24,4 @@ class EmbeddingService:
     if not response or not response.data or not response.data[0].embedding:
       raise BaseCustomException(ErrorCode.EMBEDDING_FAILED)
 
-    return response.data[0].embedding
+    return np.array(response.data[0].embedding, dtype=np.float32).tolist()

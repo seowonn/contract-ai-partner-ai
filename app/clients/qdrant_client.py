@@ -5,5 +5,5 @@ def get_qdrant_client() -> AsyncQdrantClient:
     return AsyncQdrantClient(
         host=AppConfig.QDRANT_HOST,
         port=AppConfig.QDRANT_PORT,
-        timeout=30
+        timeout=60
     )
