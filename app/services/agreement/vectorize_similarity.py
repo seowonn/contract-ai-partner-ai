@@ -84,39 +84,12 @@ async def process_clause(rag_result: RagResult, clause_content: str,
 
     position_values = []  # position_values를 저장할 리스트
 
-    if positions:
-      for position in positions:
-        # 소수점 두 자리까지만 반올림
-        page = position['page']
-        bbox = position['bbox']
+    # 각 문장에 대해 position 정보를 포함한 ClauseData 객체 생성
+    for position in positions:
+      bbox = position['bbox']
 
-        # 각 좌표값을 소수점 두 자리까지 반올림
-        rounded_bbox = [round(coord, 2) for coord in bbox]
-
-        position_value = [page, rounded_bbox]
-        position_values.append(position_value)  # position_values 리스트에 추가
-
-    else:
-      print("Text not found in the document.")
-
-    # 페이지 번호가 같은 항목을 하나로 묶기
-    grouped_positions = defaultdict(list)
-
-    # position_values를 페이지 번호별로 그룹화
-    for pos in position_values:
-      page = pos[0]
-      location = pos[1]
-      grouped_positions[page].append(location)
-
-    # 페이지와 그에 해당하는 모든 위치 좌표를 가져오기
-    page = list(grouped_positions.keys())[0]  # 페이지
-    positions = grouped_positions[page]  # 해당 페이지의 모든 위치
-
-    # 출력
-    print(f'Page: {page}')
-    print(f'positions: {positions}')
-
-
+      # ClauseData 객체를 position_values 리스트에 추가
+      position_values.append(list(bbox))
 
     # 최종 결과 저장
     rag_result.accuracy = corrected_result["accuracy"]
@@ -124,25 +97,31 @@ async def process_clause(rag_result: RagResult, clause_content: str,
     rag_result.incorrect_text = corrected_result["clause_content"]  # 원본 문장
     rag_result.proof_text = corrected_result["proof_text"]
 
+    # position_values 리스트를 rag_result.clauseData에 할당
+    rag_result.clause_data[0].position = position_values  # 위치정보
 
-    # ClauseData 객체 생성
-    clause_data = ClauseData(
-        position=positions
-    )
-    rag_result.clauseData = [clause_data]  # 위치정보
+    return rag_result
 
-
+  else:
   # accuracy가 0.5 이하일 경우 빈 객체 반환
     return None
 
-
 async def find_text_positions(clause_content: str, pdf_document):
   positions = []  # 위치 정보를 저장할 리스트
-  # print(f'기존 문장 : {clause_content}')
+  print(f'기존 문장 : {clause_content}')
+
+  # +를 기준으로 문장을 나누고 뒤에 있는 부분만 사용
+  clause_content_parts = clause_content.split('+', 1)
+  if len(clause_content_parts) > 1:
+    clause_content = clause_content_parts[1].strip()  # `+` 뒤의 내용만 사용
 
   # 모든 페이지를 검색
   for page_num in range(pdf_document.page_count):
     page = pdf_document.load_page(page_num)  # 페이지 로드
+
+    # 페이지 크기 얻기 (페이지의 너비와 높이)
+    page_width = float(page.rect.width)  # 명시적으로 float로 처리
+    page_height = float(page.rect.height)  # 명시적으로 float로 처리
 
     # 문장의 위치를 찾기 위해 search_for 사용
     text_instances = page.search_for(clause_content)
@@ -154,15 +133,19 @@ async def find_text_positions(clause_content: str, pdf_document):
     for text_instance in text_instances:
       x0, y0, x1, y1 = text_instance  # 바운딩 박스 좌표
 
-      # y 값을 기준으로 그룹화 (y0를 반올림하여 묶음)
-      rounded_y = round(y0, 2)
+      # 상대적인 위치로 계산 (픽셀을 페이지 크기로 나누어 상대값 계산)
+      rel_x0 = x0 / page_width
+      rel_y0 = y0 / page_height
+      rel_x1 = x1 / page_width
+      rel_y1 = y1 / page_height
 
-      if rounded_y not in grouped_positions:
-        grouped_positions[rounded_y] = []
+      # y 값을 기준으로 그룹화
+      if rel_y0 not in grouped_positions:
+        grouped_positions[rel_y0] = []
 
-      grouped_positions[rounded_y].append((x0, x1, y0, y1))
+      grouped_positions[rel_y0].append((rel_x0, rel_x1, rel_y0, rel_y1))
 
-    # 그룹화된 바운딩 박스를 하나의 큰 박스로 묶기
+      # 그룹화된 바운딩 박스를 하나의 큰 박스로 묶기
     for y_key, group in grouped_positions.items():
       # 하나의 그룹에서 x0, x1의 최솟값과 최댓값을 구하기
       min_x0 = min([x[0] for x in group])  # 최소 x0 값
@@ -172,13 +155,19 @@ async def find_text_positions(clause_content: str, pdf_document):
       min_y0 = min([x[2] for x in group])  # 최소 y0 값
       max_y1 = max([x[3] for x in group])  # 최대 y1 값
 
+      # 상대적인 값에 100을 곱해줍니다
+      min_x0 *= 100
+      min_y0 *= 100
+      max_x1 *= 100
+      max_y1 *= 100
+
       width = max_x1 - min_x0
       height = max_y1 - min_y0
 
       # 바운딩 박스를 생성 (최소값과 최대값을 사용)
       positions.append({
         "page": page_num + 1,
-        "bbox": (min_x0, min_y0, width, height)  # 최소 x, 최소 y, 너비, 높이
+        "bbox": (min_x0, min_y0, width, height)  # 상대적 x, y, 너비, 높이
       })
 
-  return positions
+    return positions
