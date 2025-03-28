@@ -1,7 +1,8 @@
 import re
 from typing import List, Optional, Tuple
 
-from app.common.constants import Constants
+from app.common.constants import ARTICLE_CHUNK_PATTERN, ARTICLE_HEADER_PATTERN, \
+  ARTICLE_CLAUSE_SEPARATOR, ARTICLE_HEADER_PARSE_PATTERN, CLAUSE_HEADER_PATTERN
 from app.schemas.chunk_schema import ArticleChunk, ClauseChunk, DocumentChunk
 from app.schemas.chunk_schema import Document
 
@@ -49,37 +50,35 @@ def chunk_by_article_and_clause(extracted_text: str) -> List[ArticleChunk]:
 
 def chunk_by_article_and_clause_with_page(documents: List[Document]) -> List[
   DocumentChunk]:
-  result: List[DocumentChunk] = []
+  chunks: List[DocumentChunk] = []
 
   for doc in documents:
     page = doc.metadata.page
     page_text = doc.page_content
     order_index = 1
 
-    if page != 1 and not is_page_text_starting_with_article_heading(Constants.ARTICLE_HEADER_PATTERN.value, page_text):
-      first_article_match = re.search(Constants.ARTICLE_HEADER_PATTERN.value, page_text, flags=re.MULTILINE)
+    preamble_exists = check_if_preamble_exists_except_first_page(page, page_text)
+    if preamble_exists:
+      order_index, chunks = (
+        chunk_preamble_content(page_text, chunks, page, order_index))
 
-      order_index, result = append_preamble(
-          result,
-          page_text[:first_article_match.start()] if first_article_match else page_text,
-          page, order_index
-      )
-
-    article_pattern = r'(제\d+조\s*【[^】]+】)(.*?)(?=(?:제\d+조\s*【[^】]+】|$))'
-    matches = re.findall(article_pattern, page_text, flags=re.DOTALL)
-
+    matches = re.findall(ARTICLE_CHUNK_PATTERN, page_text, flags=re.DOTALL)
     for header, body in matches:
-      header_match = re.match(r'제(\d+)조\s*【([^】]+)】', header)
+      header_match = re.match(ARTICLE_HEADER_PARSE_PATTERN, header)
       if not header_match:
         continue
 
-      article_number, article_title = header_match.groups()
+      article_number = header_match.group(1)
+      article_title = header_match.group(2) or header_match.group(3)
       article_body = body.strip()
 
-      first_clause_match = re.search(r'(①|1\.)', article_body)
-      if first_clause_match and article_body.startswith(first_clause_match.group(1)):
-        clause_pattern = r'([\n\s]*[①-⑨])' if first_clause_match.group(1) == '①' else r'(\n\s*\d+\.)'
-        clause_chunks = split_text_by_pattern("\n" + article_body, clause_pattern)
+      first_clause_match = re.search(CLAUSE_HEADER_PATTERN, article_body)
+      if first_clause_match and article_body.startswith(
+          first_clause_match.group(1)):
+
+        clause_chunks = (
+          split_by_clause_header_pattern(
+              first_clause_match.group(1), "\n" + article_body))
 
         for j in range(1, len(clause_chunks), 2):
           clause_number = clause_chunks[j].strip()
@@ -89,8 +88,8 @@ def chunk_by_article_and_clause_with_page(documents: List[Document]) -> List[
           clause_content = clause_chunks[j + 1].strip() if j + 1 < len(clause_chunks) else ""
 
           if len(clause_content) >= MIN_CLAUSE_BODY_LENGTH:
-            result.append(DocumentChunk(
-                clause_content=f"{article_title}{Constants.ARTICLE_CLAUSE_SEPARATOR.value}\n{clause_content}",
+            chunks.append(DocumentChunk(
+                clause_content=f"{article_title}{ARTICLE_CLAUSE_SEPARATOR}\n{clause_content}",
                 page=page,
                 order_index=order_index,
                 clause_number=f"제{article_number}조 {clause_number}항"
@@ -98,15 +97,21 @@ def chunk_by_article_and_clause_with_page(documents: List[Document]) -> List[
             order_index += 1
       else:
         if len(article_body) >= MIN_CLAUSE_BODY_LENGTH:
-          result.append(DocumentChunk(
-              clause_content=f"{article_title}{Constants.ARTICLE_CLAUSE_SEPARATOR.value}\n{article_body}",
+          chunks.append(DocumentChunk(
+              clause_content=f"{article_title}{ARTICLE_CLAUSE_SEPARATOR}\n{article_body}",
               page=page,
               order_index=order_index,
               clause_number=f"제{article_number}조 1항"
           ))
           order_index += 1
 
-  return result
+  return chunks
+
+
+def check_if_preamble_exists_except_first_page(page: int, page_text: str) -> bool:
+  return page != 1 and not is_page_text_starting_with_article_heading(
+      ARTICLE_HEADER_PATTERN, page_text
+  )
 
 
 def is_page_text_starting_with_article_heading(heading: str,
@@ -114,6 +119,15 @@ def is_page_text_starting_with_article_heading(heading: str,
   lines = page_text.strip().splitlines()
   content_lines = [line for line in lines if not line.strip().startswith("페이지")]
   return bool(re.match(heading, content_lines[0])) if content_lines else False
+
+
+def chunk_preamble_content(page_text: str, chunks: List[DocumentChunk],
+    page: int, order_index: int) -> Tuple[int, List[DocumentChunk]]:
+  first_article_match = (
+    re.search(ARTICLE_HEADER_PATTERN, page_text, flags=re.MULTILINE))
+
+  preamble = page_text[:first_article_match.start()] if first_article_match else page_text
+  return append_preamble(chunks, preamble, page, order_index)
 
 
 def append_preamble(result: List[DocumentChunk], preamble: str, page: int,
@@ -160,6 +174,20 @@ def append_preamble(result: List[DocumentChunk], preamble: str, page: int,
       order_index += 1
 
   return order_index, result
+
+
+def split_by_clause_header_pattern(clause_header: str, article_body: str) \
+    -> List[str]:
+  clause_pattern = ""
+
+  if clause_header == '①':
+    clause_pattern = r'([\n\s]*[①-⑨])'
+  elif clause_header == '1.':
+    clause_pattern = r'(\n\s*\d+\.)'
+  elif clause_header == '(1)':
+    clause_pattern = r'(\n\s*\(\d+\))'
+
+  return split_text_by_pattern("\n" + article_body, clause_pattern)
 
 
 def get_clause_pattern(clause_number: str) -> Optional[str]:
