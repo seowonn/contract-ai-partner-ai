@@ -1,4 +1,5 @@
 import asyncio
+import logging
 from typing import List
 
 from httpx import ConnectTimeout
@@ -63,13 +64,17 @@ async def process_clause(rag_result: RagResult, clause_content: str,
   # 3️⃣ 유사한 문장들 처리
   clause_results = []
   for match in search_results.points:
-    payload_data = match.payload or {}
-    clause_results.append({
-      "id": match.id,  # ✅ 벡터 ID
-      "proof_text": payload_data.get("proof_text", ""),  # ✅ 원본 문장
-      "incorrect_text": payload_data.get("incorrect_text", ""),  # ✅ 잘못된 문장
-      "corrected_text": payload_data.get("corrected_text", "")  # ✅ 교정된 문장
-    })
+    try:
+      payload_data = match.payload or {}
+      clause_results.append({
+        "id": match.id,  # ✅ 벡터 ID
+        "proof_text": payload_data.get("proof_text", ""),  # ✅ 원본 문장
+        "incorrect_text": payload_data.get("incorrect_text", ""),  # ✅ 잘못된 문장
+        "corrected_text": payload_data.get("corrected_text", "")  # ✅ 교정된 문장
+      })
+    except Exception as e:
+      logging.error(f"[process_clause]: {e}")
+      continue
 
   # 4️⃣ 계약서 문장을 수정 (해당 조항의 TOP 5개 유사 문장을 기반으로)
   corrected_result = await prompt_service.correct_contract(
