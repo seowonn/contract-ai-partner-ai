@@ -36,7 +36,7 @@ def preprocess_data(document_request: DocumentRequest) -> List[Document]:
     extract_time = time.time() - start_time  # 경과 시간 계산
     logging.info(f"extract_text_and_documents_from_pdf_io took {extract_time:.4f} seconds")
 
-    return documents
+    return documents, pdf_bytes_io
 
 
 def chunk_standard_texts(extracted_text: str) -> List[ArticleChunk]:

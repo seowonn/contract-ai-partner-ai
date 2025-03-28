@@ -17,9 +17,10 @@ from app.schemas.success_code import SuccessCode
 from app.schemas.success_response import SuccessResponse
 from app.services.agreement.img_service import process_img
 from app.services.agreement.vectorize_similarity import \
-  vectorize_and_calculate_similarity
+  vectorize_and_calculate_similarity, byte_data
 from app.services.common.ingestion_pipeline import preprocess_data, \
   chunk_agreement_documents, gather_chunks_by_clause_number
+from app.services.common.ingestion_pipeline import preprocess_data, chunk_agreement_documents
 from app.containers.service_container import prompt_service
 import time
 
@@ -39,25 +40,35 @@ def process_agreements_pdf_from_s3():
   except ValidationError:
     raise BaseCustomException(ErrorCode.FIELD_MISSING)
 
+  # 1. s3 가져오기, 스트림 변환, PDF 추출
   documents: List[Document] = []
   if document_request.type in (FileType.PNG, FileType.JPG, FileType.JPEG):
     extracted_text = process_img(document_request)
   elif document_request.type == FileType.PDF:
-    documents = preprocess_data(document_request)
+    documents, pdf_bytes_io = preprocess_data(document_request)
   else:
     raise AgreementException(ErrorCode.UNSUPPORTED_FILE_TYPE)
 
   if len(documents) == 0:
     raise AgreementException(ErrorCode.NO_TEXTS_EXTRACTED)
 
+  # 2. 전체 문서 요약
+  start_time = time.time()
   summary_content = prompt_service.summarize_document(documents)
+  end_time = time.time()
+  logging.info(f"summary texts: {end_time - start_time:.4f} seconds")
 
+  # 3. 문서별 청킹
   document_chunks = chunk_agreement_documents(documents)
 
   sorted_chunks = gather_chunks_by_clause_number(document_chunks)
 
 
   # 5️⃣ 벡터화 + 유사도 비교 (리턴값 추가)
+  # 4. 바운드 박스 추출을 위한 파일 객체 전달
+  byte_data(pdf_bytes_io)
+
+  # 5. 벡터화 + 유사도, 문장 생성
   start_time = time.time()
   chunks = run_async(
       vectorize_and_calculate_similarity(
