@@ -3,6 +3,8 @@ import logging
 import uuid
 from datetime import datetime
 from typing import List
+
+import numpy as np
 from httpx import ConnectTimeout
 from qdrant_client.http.exceptions import ResponseHandlingException
 
@@ -65,7 +67,7 @@ async def process_clause(article_title: str, clause: ClauseChunk,
 
   return PointStruct(
       id=str(uuid.uuid4()),
-      vector=clause_vector,
+      vector=np.array(clause_vector, dtype=np.float32).tolist(),
       payload=payload.to_dict()
   )
 
