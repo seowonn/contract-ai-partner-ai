@@ -1,7 +1,8 @@
 import re
 from typing import List, Optional, Tuple
 
-from app.common.constants import Constants
+from app.common.constants import ARTICLE_CHUNK_PATTERN, ARTICLE_HEADER_PATTERN, \
+  ARTICLE_CLAUSE_SEPARATOR
 from app.schemas.chunk_schema import ArticleChunk, ClauseChunk, DocumentChunk
 from app.schemas.chunk_schema import Document
 
