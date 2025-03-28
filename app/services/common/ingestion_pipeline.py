@@ -1,6 +1,6 @@
 from typing import List
 
-from app.common.constants import Constants
+from app.common.constants import CLAUSE_TEXT_SEPARATOR
 from app.common.exception.custom_exception import BaseCustomException
 from app.common.exception.error_code import ErrorCode
 from app.schemas.analysis_response import RagResult, ClauseData
@@ -76,7 +76,7 @@ def gather_chunks_by_clause_number(document_chunks: List[DocumentChunk]) -> List
       sorted_chunks.append(rag_result)
 
     if rag_result.incorrect_text:
-      rag_result.incorrect_text += Constants.CLAUSE_TEXT_SEPARATOR.value + doc.clause_content
+      rag_result.incorrect_text += CLAUSE_TEXT_SEPARATOR + doc.clause_content
     else:
       rag_result.incorrect_text = doc.clause_content
 

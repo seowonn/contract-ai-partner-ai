@@ -3,11 +3,14 @@ import logging
 import uuid
 from datetime import datetime
 from typing import List
+from httpx import ConnectTimeout
+from qdrant_client.http.exceptions import ResponseHandlingException
 
 from qdrant_client.models import Distance, VectorParams, PointStruct
 
 from app.blueprints.standard.standard_exception import StandardException
 from app.clients.qdrant_client import get_qdrant_client
+from app.common.exception.custom_exception import BaseCustomException
 from app.common.exception.error_code import ErrorCode
 from app.containers.service_container import embedding_service, prompt_service
 from app.models.vector import VectorPayload
@@ -77,22 +80,32 @@ async def retry_make_correction(clause_content: str) -> dict:
 
 
 async def ensure_qdrant_collection(collection_name: str) -> None:
-  client = get_qdrant_client()
-  exists = await client.collection_exists(collection_name=collection_name)
-  if not exists:
-    await create_qdrant_collection(collection_name)
+  try:
+    client = get_qdrant_client()
+    exists = await client.collection_exists(collection_name=collection_name)
+    if not exists:
+      await create_qdrant_collection(collection_name)
 
+  except (ConnectTimeout, ResponseHandlingException):
+    raise BaseCustomException(ErrorCode.QDRANT_CONNECTION_TIMEOUT)
 
 async def create_qdrant_collection(collection_name: str):
-  client = get_qdrant_client()
-  return await client.create_collection(
-      collection_name=collection_name,
-      vectors_config=VectorParams(size=1536, distance=Distance.COSINE)
-  )
+  try:
+    client = get_qdrant_client()
+    return await client.create_collection(
+        collection_name=collection_name,
+        vectors_config=VectorParams(size=1536, distance=Distance.COSINE)
+    )
+  except (ConnectTimeout, ResponseHandlingException):
+    raise BaseCustomException(ErrorCode.QDRANT_CONNECTION_TIMEOUT)
 
 
 async def upload_points_to_qdrant(collection_name, points):
   if len(points) == 0:
     raise StandardException(ErrorCode.NO_POINTS_FOUND)
-  client = get_qdrant_client()
-  await client.upsert(collection_name=collection_name, points=points)
+
+  try:
+    client = get_qdrant_client()
+    await client.upsert(collection_name=collection_name, points=points)
+  except (ConnectTimeout, ResponseHandlingException):
+    raise BaseCustomException(ErrorCode.QDRANT_CONNECTION_TIMEOUT)
