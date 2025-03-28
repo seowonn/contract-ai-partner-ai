@@ -1,4 +1,4 @@
-from dataclasses import dataclass, asdict, is_dataclass
+from dataclasses import asdict, is_dataclass, dataclass
 from typing import Optional, Any
 
 from flask import jsonify
@@ -12,17 +12,25 @@ class SuccessResponse:
   data: Optional[Any] = None
 
   def of(self):
-    # 인스턴스(속성 정보가 들어간게)가 아니라 클래스 자체(껍데기)일 수도 있어 검사가 필요함
-    if is_dataclass(self.data) and not isinstance(self.data, type):
-      response_data = self.convert_keys_to_camel_case(asdict(self.data))
-    else:
-      response_data = self.convert_keys_to_camel_case(self.data)
+    response_data = self._convert_data(self.data)
 
     return jsonify({
       "code": self.success.code,
       "message": self.success.message,
       "data": response_data if self.data else None
     })
+
+  def _convert_data(self, data: Any) -> Any:
+    if is_dataclass(data):
+      return self.convert_keys_to_camel_case(asdict(data))
+    elif isinstance(data, list):
+      return [
+        self._convert_data(item) for item in data
+      ]
+    elif isinstance(data, dict):
+      return self.convert_keys_to_camel_case(data)
+    else:
+      return data
 
   @staticmethod
   def convert_keys_to_camel_case(data: Any) -> Any:

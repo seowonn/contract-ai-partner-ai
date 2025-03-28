@@ -1,7 +1,7 @@
 import json
 import logging
 import re
-from typing import List, Any, Optional
+from typing import List, Any
 
 import httpx
 from openai import AsyncOpenAI
