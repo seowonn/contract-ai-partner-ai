@@ -4,6 +4,7 @@ from typing import List
 from qdrant_client import models
 
 from app.clients.qdrant_client import get_qdrant_client
+from app.schemas.analysis_response import RagResult
 from app.schemas.analysis_response import RagResult, ClauseData
 from app.schemas.chunk_schema import DocumentChunk
 from app.schemas.document_request import DocumentRequest
@@ -21,20 +22,15 @@ def byte_data(pdf_bytes_io: io.BytesIO):
     return pdf_document
 
 async def vectorize_and_calculate_similarity(
-    document_chunks: List[DocumentChunk],
-    collection_name: str, document_request: DocumentRequest,
-    ) -> List[RagResult]:
+    sorted_chunks: List[RagResult],
+    collection_name: str, document_request: DocumentRequest) -> List[RagResult]:
+
   await ensure_qdrant_collection(collection_name)
 
   tasks = []
-  for chunk in document_chunks:
-    if len(chunk.clause_content) <= 1:
-      continue
-
-    rag_result = RagResult()
-    tasks.append(process_clause(rag_result, chunk.clause_content,
-                                collection_name, document_request.categoryName,
-                                chunk.page, chunk.order_index))
+  for chunk in sorted_chunks:
+    tasks.append(process_clause(chunk, chunk.incorrect_text,
+                                collection_name, document_request.categoryName))
 
   # 모든 임베딩 및 유사도 검색 태스크를 병렬로 실행
   results = await asyncio.gather(*tasks)
@@ -42,7 +38,7 @@ async def vectorize_and_calculate_similarity(
 
 
 async def process_clause(rag_result: RagResult, clause_content: str,
-    collection_name: str, category_name: str, page: int, order_index: int):
+    collection_name: str, category_name: str):
   embedding = await embedding_service.embed_text(clause_content)
 
   client = get_qdrant_client()
@@ -76,10 +72,8 @@ async def process_clause(rag_result: RagResult, clause_content: str,
   corrected_result = await prompt_service.correct_contract(
       clause_content=clause_content,
       proof_text=[item["proof_text"] for item in clause_results],  # 기준 문서들
-      incorrect_text=[item["incorrect_text"] for item in clause_results],
-      # 잘못된 문장들
-      corrected_text=[item["corrected_text"] for item in clause_results]
-      # 교정된 문장들
+      incorrect_text=[item["incorrect_text"] for item in clause_results],  # 잘못된 문장들
+      corrected_text=[item["corrected_text"] for item in clause_results]  # 교정된 문장들
   )
 
   # accuracy가 0.5 이하일 경우 결과를 반환하지 않음
@@ -129,22 +123,16 @@ async def process_clause(rag_result: RagResult, clause_content: str,
     rag_result.corrected_text = corrected_result["corrected_text"]
     rag_result.incorrect_text = corrected_result["clause_content"]  # 원본 문장
     rag_result.proof_text = corrected_result["proof_text"]
-    page = page
-    order_index = order_index
+
 
     # ClauseData 객체 생성
     clause_data = ClauseData(
-        order_index=order_index,
-        page=page,
         position=positions
     )
-
     rag_result.clauseData = [clause_data]  # 위치정보
 
-    return rag_result
 
   # accuracy가 0.5 이하일 경우 빈 객체 반환
-  else:
     return None
 
 

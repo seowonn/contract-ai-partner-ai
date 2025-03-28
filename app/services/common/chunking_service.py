@@ -1,10 +1,12 @@
 import re
-from typing import List
+from typing import List, Optional, Tuple
 
+from app.common.constants import Constants
 from app.schemas.chunk_schema import ArticleChunk, ClauseChunk, DocumentChunk
 from app.schemas.chunk_schema import Document
 
 MIN_CLAUSE_BODY_LENGTH = 5
+
 
 def split_text_by_pattern(text: str, pattern: str) -> List[str]:
   return re.split(pattern, text)
@@ -29,7 +31,7 @@ def chunk_by_article_and_clause(extracted_text: str) -> List[ArticleChunk]:
       continue
 
     match_idx = first_clause_match.start()
-    article_title += ' ' +article_body[:match_idx]
+    article_title += ' ' + article_body[:match_idx]
     if first_clause_match:
       clause_pattern = r'([\n\s]*[①-⑨])' if first_clause_match.group(1) == '①' else r'(\n\s*\d+\.)'
       clause_chunks = split_text_by_pattern("\n" + article_body[match_idx:], clause_pattern)
@@ -52,65 +54,122 @@ def chunk_by_article_and_clause_with_page(documents: List[Document]) -> List[
   for doc in documents:
     page = doc.metadata.page
     page_text = doc.page_content
+    order_index = 1
 
-    sentence_index = 1  # 문장 번호 초기화
-    # 1. '제X조'를 기준으로 텍스트를 분리
-    pattern = r'(제\d+조\s*【[^】]+】)(.*?)(?=(제\d+조|$))'  # 제X조를 기준으로 분리
-    matches = re.findall(pattern, page_text, flags=re.DOTALL)
+    if page != 1 and not is_page_text_starting_with_article_heading(Constants.ARTICLE_HEADER_PATTERN.value, page_text):
+      first_article_match = re.search(Constants.ARTICLE_HEADER_PATTERN.value, page_text, flags=re.MULTILINE)
 
-    # 2. 각 조항을 청킹
-    for match in matches:
-      article_body = match[1].strip()  # 조 내용
-      # 3. 항목 번호가 있는 경우 번호와 내용으로 분리
-      clause_pattern = r'([①-⑨])\s*([^\①②③④⑤⑥⑦⑧⑨\.\n]+(?:\n(?![①-⑨]|\d+\.)[^\①②③④⑤⑥⑦⑧⑨\.\n]+)*)'
-      clause_matches = re.findall(clause_pattern, article_body)
+      order_index, result = append_preamble(
+          result,
+          page_text[:first_article_match.start()] if first_article_match else page_text,
+          page, order_index
+      )
 
-      # 4. 번호가 있는 경우, 항목 번호별로 청킹 추가
-      if clause_matches:
-        for clause in clause_matches:
-          clause_number = clause[0]  # 항목 번호 (①, 1., 2., 등)
-          clause_content = clause[1].strip()  # 항목 내용
+    article_pattern = r'(제\d+조\s*【[^】]+】)(.*?)(?=(?:제\d+조\s*【[^】]+】|$))'
+    matches = re.findall(article_pattern, page_text, flags=re.DOTALL)
 
-          if len(clause_content) >= 10:  # 최소 10자 이상의 내용만 추가
-            result.append(DocumentChunk(clause_content=clause_content, page=page,
-                                        order_index=sentence_index, clause_number=clause_number))
-            sentence_index += 1  # 문장 번호 증가
-      else:
-        # 번호가 없으면, 전체 문장을 하나의 항목으로 처리
-        if article_body.endswith('.'):
-          result.append(DocumentChunk(clause_content=article_body, page=page,
-                                      order_index=sentence_index))
-          sentence_index += 1  # 문장 번호 증가
+    for header, body in matches:
+      header_match = re.match(r'제(\d+)조\s*【([^】]+)】', header)
+      if not header_match:
+        continue
 
-  return result
-
-
-
-def chunk_by_article_and_clause_with_page2(documents: List[Document]) -> List[
-  DocumentChunk]:
-  result: List[DocumentChunk] = []
-
-  for doc in documents:
-    sentence_index = 0
-    chunks = split_text_by_pattern(doc.page_content, r'\n(제\s*\d+조(?:\([^)]+\))?)')
-
-    for i in range(1, len(chunks), 2):
-      article_title = chunks[i].strip()
-      article_body = chunks[i + 1].strip() if i + 1 < len(chunks) else ""
-
-      article_title = article_title.replace('\n', ' ')
-      article_body = article_body.replace('\n', ' ')
+      article_number, article_title = header_match.groups()
+      article_body = body.strip()
 
       first_clause_match = re.search(r'(①|1\.)', article_body)
-      if first_clause_match is None:
-        result.append(
-          DocumentChunk(
-              clause_content=article_body,
-              page=doc.metadata.page,
-              order_index=sentence_index,
-              clause_number=article_title
+      if first_clause_match and article_body.startswith(first_clause_match.group(1)):
+        clause_pattern = r'([\n\s]*[①-⑨])' if first_clause_match.group(1) == '①' else r'(\n\s*\d+\.)'
+        clause_chunks = split_text_by_pattern("\n" + article_body, clause_pattern)
+
+        for j in range(1, len(clause_chunks), 2):
+          clause_number = clause_chunks[j].strip()
+          if clause_number.endswith("."):
+            clause_number = clause_number[:-1]
+
+          clause_content = clause_chunks[j + 1].strip() if j + 1 < len(clause_chunks) else ""
+
+          if len(clause_content) >= MIN_CLAUSE_BODY_LENGTH:
+            result.append(DocumentChunk(
+                clause_content=f"{article_title}{Constants.ARTICLE_CLAUSE_SEPARATOR.value}\n{clause_content}",
+                page=page,
+                order_index=order_index,
+                clause_number=f"제{article_number}조 {clause_number}항"
+            ))
+            order_index += 1
+      else:
+        if len(article_body) >= MIN_CLAUSE_BODY_LENGTH:
+          result.append(DocumentChunk(
+              clause_content=f"{article_title}{Constants.ARTICLE_CLAUSE_SEPARATOR.value}\n{article_body}",
+              page=page,
+              order_index=order_index,
+              clause_number=f"제{article_number}조 1항"
           ))
-        sentence_index += 1
+          order_index += 1
 
   return result
 
+
+def is_page_text_starting_with_article_heading(heading: str,
+    page_text: str) -> bool:
+  lines = page_text.strip().splitlines()
+  content_lines = [line for line in lines if not line.strip().startswith("페이지")]
+  return bool(re.match(heading, content_lines[0])) if content_lines else False
+
+
+def append_preamble(result: List[DocumentChunk], preamble: str, page: int,
+    order_index: int) -> Tuple[int, List[DocumentChunk]]:
+  if not result:
+    return order_index, result
+
+  pattern = get_clause_pattern(result[-1].clause_number)
+
+  if not pattern:
+    result.append(DocumentChunk(
+        clause_content=preamble,
+        page=page,
+        order_index=order_index,
+        clause_number=result[-1].clause_number
+    ))
+    return order_index + 1, result
+
+  clause_chunks = split_text_by_pattern(preamble, pattern)
+  lines = clause_chunks[0].strip().splitlines()
+  content_lines = [line for line in lines if not line.strip().startswith("페이지")]
+
+  result.append(DocumentChunk(
+      clause_content="\n".join(content_lines),
+      page=page,
+      order_index=order_index,
+      clause_number=result[-1].clause_number
+  ))
+  order_index += 1
+
+  for j in range(1, len(clause_chunks), 2):
+    clause_number = clause_chunks[j].strip()
+    clause_content = clause_chunks[j + 1].strip() if j + 1 < len(
+      clause_chunks) else ""
+
+    if len(clause_content) >= MIN_CLAUSE_BODY_LENGTH:
+      prev_clause_prefix = result[-1].clause_number.split(" ")[0]
+      result.append(DocumentChunk(
+          clause_content=clause_content,
+          page=page,
+          order_index=order_index,
+          clause_number=f"{prev_clause_prefix} {clause_number}항"
+      ))
+      order_index += 1
+
+  return order_index, result
+
+
+def get_clause_pattern(clause_number: str) -> Optional[str]:
+  parts = clause_number.split(" ")
+  if len(parts) < 1:
+    return None
+
+  pattern = parts[1].strip()
+  if re.match(r'[①-⑨]', pattern):
+    return r'([\n\s]*[①-⑨])'
+  elif re.match(r'\d+\.', pattern):
+    return r'(\n\s*\d+\.)'
+  return None
