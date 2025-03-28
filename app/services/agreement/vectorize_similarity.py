@@ -1,9 +1,13 @@
 import asyncio
 from typing import List
 
+from httpx import ConnectTimeout
 from qdrant_client import models
+from qdrant_client.http.exceptions import ResponseHandlingException
 
 from app.clients.qdrant_client import get_qdrant_client
+from app.common.exception.custom_exception import BaseCustomException
+from app.common.exception.error_code import ErrorCode
 from app.schemas.analysis_response import RagResult
 from app.schemas.document_request import DocumentRequest
 from app.containers.service_container import embedding_service, prompt_service
@@ -29,21 +33,24 @@ async def process_clause(rag_result: RagResult, clause_content: str,
     collection_name: str, category_name: str):
   embedding = await embedding_service.embed_text(clause_content)
 
-  client = get_qdrant_client()
-  search_results = await client.query_points(
-      collection_name=collection_name,
-      query=embedding,
-      query_filter=models.Filter(
-          must=[
-            models.FieldCondition(
-                key="category",
-                match=models.MatchValue(value=category_name)
-            )
-          ]
-      ),
-      search_params=models.SearchParams(hnsw_ef=128, exact=False),
-      limit=5
-  )
+  try:
+    client = get_qdrant_client()
+    search_results = await client.query_points(
+        collection_name=collection_name,
+        query=embedding,
+        query_filter=models.Filter(
+            must=[
+              models.FieldCondition(
+                  key="category",
+                  match=models.MatchValue(value=category_name)
+              )
+            ]
+        ),
+        search_params=models.SearchParams(hnsw_ef=128, exact=False),
+        limit=5
+    )
+  except (ConnectTimeout, ResponseHandlingException):
+    raise BaseCustomException(ErrorCode.QDRANT_CONNECTION_TIMEOUT)
 
   # 3️⃣ 유사한 문장들 처리
   clause_results = []
