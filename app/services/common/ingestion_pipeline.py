@@ -61,7 +61,7 @@ def chunk_agreement_documents(documents: List[Document]) -> List[DocumentChunk]:
   return chunks
 
 
-def sort_chunks_by_clause_number(document_chunks: List[DocumentChunk]) -> List[RagResult]:
+def gather_chunks_by_clause_number(document_chunks: List[DocumentChunk]) -> List[RagResult]:
   sorted_chunks: List[RagResult] = []
   clause_map: dict[str, RagResult] = {}
 
