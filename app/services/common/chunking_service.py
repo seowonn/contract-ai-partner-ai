@@ -65,20 +65,28 @@ def chunk_by_article_and_clause_with_page(documents: List[Document]) -> List[
           page, order_index
       )
 
-    article_pattern = r'(제\d+조\s*【[^】]+】)(.*?)(?=(?:제\d+조\s*【[^】]+】|$))'
+    article_pattern = r'(제\d+조\s*(?:【[^】]+】|\([^)]+\)))(.*?)(?=(?:제\d+조\s*(?:【[^】]+】|\([^)]+\))|$))'
     matches = re.findall(article_pattern, page_text, flags=re.DOTALL)
 
     for header, body in matches:
-      header_match = re.match(r'제(\d+)조\s*【([^】]+)】', header)
+      header_match = re.match(r'제(\d+)조\s*(?:【([^】]+)】|\(([^)]+)\))', header)
       if not header_match:
         continue
 
-      article_number, article_title = header_match.groups()
+      article_number = header_match.group(1)
+      article_title = header_match.group(2) or header_match.group(3)
       article_body = body.strip()
 
-      first_clause_match = re.search(r'(①|1\.)', article_body)
-      if first_clause_match and article_body.startswith(first_clause_match.group(1)):
-        clause_pattern = r'([\n\s]*[①-⑨])' if first_clause_match.group(1) == '①' else r'(\n\s*\d+\.)'
+      clause_pattern = ""
+      first_clause_match = re.search(r'(①|1\.|\(1\))', article_body)
+      if first_clause_match and article_body.startswith(
+          first_clause_match.group(1)):
+        if first_clause_match.group(1) == '①':
+          clause_pattern = r'([\n\s]*[①-⑨])'
+        elif first_clause_match.group(1) == '1.':
+          clause_pattern = r'(\n\s*\d+\.)'
+        elif first_clause_match.group(1) == '(1)':
+          clause_pattern = r'(\n\s*\(\d+\))'
         clause_chunks = split_text_by_pattern("\n" + article_body, clause_pattern)
 
         for j in range(1, len(clause_chunks), 2):
