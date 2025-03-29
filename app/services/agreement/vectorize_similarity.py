@@ -26,7 +26,7 @@ async def vectorize_and_calculate_similarity(
     pdf_document: fitz.Document) -> List[RagResult]:
   await ensure_qdrant_collection(collection_name)
 
-  semaphore = asyncio.Semaphore(5)  # 딱 한 번만 생성
+  semaphore = asyncio.Semaphore(3)  # 딱 한 번만 생성
   tasks = []
   for chunk in sorted_chunks:
     tasks.append(process_clause(chunk, chunk.incorrect_text, collection_name,
@@ -43,24 +43,29 @@ async def process_clause(rag_result: RagResult, clause_content: str,
     pdf_document: fitz.Document) -> Optional[RagResult]:
   embedding = await embedding_service.embed_text(clause_content)
 
-  try:
-    client = get_qdrant_client()
-    async with semaphore:
-      search_results = await client.query_points(
-          collection_name=collection_name,
-          query=embedding,
-          query_filter=models.Filter(
-              must=[models.FieldCondition(
-                  key="category",
-                  match=models.MatchValue(value=category_name)
-              )]
-          ),
-          search_params=models.SearchParams(hnsw_ef=128, exact=False),
-          limit=5
-      )
+  client = get_qdrant_client()
+  for retry in range(2):
+    try:
+      async with semaphore:
+        search_results = await client.query_points(
+            collection_name=collection_name,
+            query=embedding,
+            query_filter=models.Filter(
+                must=[models.FieldCondition(
+                    key="category",
+                    match=models.MatchValue(value=category_name)
+                )]
+            ),
+            search_params=models.SearchParams(hnsw_ef=128, exact=False),
+            limit=5
+        )
+      break
+    except Exception as e:
+      if retry == 1:
+        raise BaseCustomException(ErrorCode.QDRANT_SEARCH_FAILED)
+      logging.warning(f"query_points: Qdrant Search 재요청 발생 {e}")
+      await asyncio.sleep(1)
 
-  except Exception:
-    raise BaseCustomException(ErrorCode.QDRANT_SEARCH_FAILED)
 
   # 3️⃣ 유사한 문장들 처리
   clause_results = []
