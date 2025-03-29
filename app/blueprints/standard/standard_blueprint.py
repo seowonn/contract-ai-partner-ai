@@ -37,7 +37,7 @@ def process_standards_pdf_from_s3():
   status_code = HTTPStatus.OK
   try:
     if document_request.type == FileType.PDF:
-      documents = preprocess_data(document_request)
+      documents, _ = preprocess_data(document_request)
       extracted_text = "\n".join([doc.page_content for doc in documents])
 
       chunks = chunk_standard_texts(extracted_text)

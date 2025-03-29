@@ -19,7 +19,7 @@ from app.services.agreement.img_service import process_img
 from app.services.agreement.vectorize_similarity import \
   vectorize_and_calculate_similarity, byte_data
 from app.services.common.ingestion_pipeline import \
-  combine_chunks_by_clause_number, preprocess_data2
+  combine_chunks_by_clause_number, preprocess_data
 from app.services.common.ingestion_pipeline import chunk_agreement_documents
 from app.containers.service_container import prompt_service
 import time
@@ -45,7 +45,7 @@ def process_agreements_pdf_from_s3():
   if document_request.type in (FileType.PNG, FileType.JPG, FileType.JPEG):
     extracted_text = process_img(document_request)
   elif document_request.type == FileType.PDF:
-    documents, pdf_bytes_io = preprocess_data2(document_request)
+    documents, pdf_bytes_io = preprocess_data(document_request)
   else:
     raise AgreementException(ErrorCode.UNSUPPORTED_FILE_TYPE)
 
