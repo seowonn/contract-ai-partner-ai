@@ -19,7 +19,7 @@ from app.services.agreement.img_service import process_img
 from app.services.agreement.vectorize_similarity import \
   vectorize_and_calculate_similarity, byte_data
 from app.services.common.ingestion_pipeline import \
-  gather_chunks_by_clause_number, preprocess_data2
+  combine_chunks_by_clause_number, preprocess_data2
 from app.services.common.ingestion_pipeline import chunk_agreement_documents
 from app.containers.service_container import prompt_service
 import time
@@ -56,7 +56,10 @@ def process_agreements_pdf_from_s3():
 
   document_chunks = chunk_agreement_documents(documents)
 
-  sorted_chunks = gather_chunks_by_clause_number(document_chunks)
+  start_time = time.time()
+  combined_chunks = combine_chunks_by_clause_number(document_chunks)
+  end_time = time.time()
+  logging.info(f"combine_chunks_by_clause_number 소요 시간: {(end_time - start_time):.4f}")
 
   # 5️⃣ 벡터화 + 유사도 비교 (리턴값 추가)
   byte_data(pdf_bytes_io)
@@ -64,7 +67,7 @@ def process_agreements_pdf_from_s3():
   start_time = time.time()
   chunks = run_async(
       vectorize_and_calculate_similarity(
-          sorted_chunks, AppConfig.COLLECTION_NAME, document_request))
+          combined_chunks, AppConfig.COLLECTION_NAME, document_request))
   end_time = time.time()
   logging.info(
       f"Time vectorize and prompt texts: {end_time - start_time:.4f} seconds")

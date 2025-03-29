@@ -87,30 +87,24 @@ def chunk_agreement_documents(documents: List[Document]) -> List[DocumentChunk]:
   return chunks
 
 
-def gather_chunks_by_clause_number(document_chunks: List[DocumentChunk]) -> \
+def combine_chunks_by_clause_number(document_chunks: List[DocumentChunk]) -> \
 List[RagResult]:
-  sorted_chunks: List[RagResult] = []
+  combined_chunks: List[RagResult] = []
   clause_map: dict[str, RagResult] = {}
 
   for doc in document_chunks:
-    if doc.clause_number in clause_map:
-      rag_result = clause_map[doc.clause_number]
-    else:
-      rag_result = RagResult(
-          clause_data=[]
-      )
-      clause_map[doc.clause_number] = rag_result
-      sorted_chunks.append(rag_result)
+    rag_result = clause_map.setdefault(doc.clause_number, RagResult())
 
     if rag_result.incorrect_text:
-      rag_result.incorrect_text += CLAUSE_TEXT_SEPARATOR + doc.clause_content
+      rag_result.incorrect_text = (
+        CLAUSE_TEXT_SEPARATOR.join(clause_map[doc.clause_number].incorrect_text))
     else:
       rag_result.incorrect_text = doc.clause_content
+      combined_chunks.append(rag_result)
 
     rag_result.clause_data.append(ClauseData(
         order_index=doc.order_index,
-        page=doc.page,
-        position=[]
+        page=doc.page
     ))
 
-  return sorted_chunks
+  return combined_chunks
