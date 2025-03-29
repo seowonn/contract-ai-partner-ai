@@ -59,12 +59,13 @@ def process_agreements_pdf_from_s3():
   combined_chunks = combine_chunks_by_clause_number(document_chunks)
 
   # 5️⃣ 벡터화 + 유사도 비교 (리턴값 추가)
-  byte_data(pdf_bytes_io)
+  pdf_document = byte_data(pdf_bytes_io)
 
   start_time = time.time()
   chunks = run_async(
       vectorize_and_calculate_similarity(
-          combined_chunks, AppConfig.COLLECTION_NAME, document_request))
+          combined_chunks, AppConfig.COLLECTION_NAME,
+          document_request, pdf_document))
   end_time = time.time()
   logging.info(
       f"Time vectorize and prompt texts: {end_time - start_time:.4f} seconds")
