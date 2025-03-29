@@ -56,10 +56,7 @@ def process_agreements_pdf_from_s3():
 
   document_chunks = chunk_agreement_documents(documents)
 
-  start_time = time.time()
   combined_chunks = combine_chunks_by_clause_number(document_chunks)
-  end_time = time.time()
-  logging.info(f"combine_chunks_by_clause_number 소요 시간: {(end_time - start_time):.4f}")
 
   # 5️⃣ 벡터화 + 유사도 비교 (리턴값 추가)
   byte_data(pdf_bytes_io)
