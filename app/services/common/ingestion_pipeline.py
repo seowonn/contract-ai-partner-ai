@@ -54,8 +54,8 @@ List[RagResult]:
     rag_result = clause_map.setdefault(doc.clause_number, RagResult())
 
     if rag_result.incorrect_text:
-      rag_result.incorrect_text = (
-        CLAUSE_TEXT_SEPARATOR.join(clause_map[doc.clause_number].incorrect_text))
+      rag_result.incorrect_text += (
+        CLAUSE_TEXT_SEPARATOR + clause_map[doc.clause_number].incorrect_text)
     else:
       rag_result.incorrect_text = doc.clause_content
       combined_chunks.append(rag_result)
