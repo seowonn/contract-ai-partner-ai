@@ -90,6 +90,9 @@ async def process_clause(rag_result: RagResult, clause_content: str,
       corrected_text=[item["corrected_text"] for item in clause_results]
   )
 
+  if not corrected_result:
+    return None
+
   # accuracy가 0.5 이하일 경우 결과를 반환하지 않음
   if float(corrected_result["accuracy"]) > 0.5:
 
@@ -108,7 +111,6 @@ async def process_clause(rag_result: RagResult, clause_content: str,
     # 최종 결과 저장
     rag_result.accuracy = float(corrected_result["accuracy"])
     rag_result.corrected_text = corrected_result["corrected_text"]
-    rag_result.incorrect_text = corrected_result["clause_content"]  # 원본 문장
     rag_result.proof_text = corrected_result["proof_text"]
 
     # position_values 리스트를 rag_result.clauseData에 할당
