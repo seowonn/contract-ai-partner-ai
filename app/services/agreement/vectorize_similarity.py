@@ -16,7 +16,7 @@ import fitz
 import io
 
 
-def byte_data(pdf_bytes_io: io.BytesIO):
+def byte_data(pdf_bytes_io: io.BytesIO) -> fitz.Document:
   return fitz.open(stream=pdf_bytes_io, filetype="pdf")
 
 
@@ -117,7 +117,7 @@ async def process_clause(rag_result: RagResult, clause_content: str,
 
 
 async def find_text_positions(clause_content: str,
-    pdf_document: fitz.Document) -> List:
+    pdf_document: fitz.Document) -> List[dict]:
   positions = []  # 위치 정보를 저장할 리스트
 
   # +를 기준으로 문장을 나누고 뒤에 있는 부분만 사용
