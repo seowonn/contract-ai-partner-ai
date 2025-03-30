@@ -114,8 +114,8 @@ async def process_clause(rag_result: RagResult, clause_content: str,
 
     # `rag_result.clause_data`에 위치 정보 저장
     rag_result.accuracy = float(corrected_result["accuracy"])
-    rag_result.corrected_text = corrected_result["corrected_text"]
-    rag_result.proof_text = corrected_result["proof_text"]
+    rag_result.corrected_text = corrected_result["correctedText"]
+    rag_result.proof_text = corrected_result["proofText"]
 
 
     rag_result.clause_data[0].position = positions[0]
