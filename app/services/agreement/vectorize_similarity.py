@@ -1,5 +1,6 @@
 import asyncio
 import logging
+from asyncio import Semaphore
 from typing import List, Optional
 
 from qdrant_client import models
@@ -12,26 +13,20 @@ from app.schemas.document_request import DocumentRequest
 from app.containers.service_container import embedding_service, prompt_service
 from app.services.standard.vector_store import ensure_qdrant_collection
 import fitz
-import io
 
-
-def byte_data(pdf_bytes_io: io.BytesIO):
-    global pdf_document
-    # pdf_bytes_io를 사용하여 데이터를 읽고 pdf_document로 설정
-    pdf_document = fitz.open(stream=pdf_bytes_io, filetype="pdf")
-    return pdf_document
 
 async def vectorize_and_calculate_similarity(
     sorted_chunks: List[RagResult],
-    collection_name: str, document_request: DocumentRequest) -> List[RagResult]:
-
+    collection_name: str, document_request: DocumentRequest,
+    pdf_document: fitz.Document) -> List[RagResult]:
   await ensure_qdrant_collection(collection_name)
 
-  semaphore = asyncio.Semaphore(5)  # 딱 한 번만 생성
+  semaphore = asyncio.Semaphore(3)  # 딱 한 번만 생성
   tasks = []
   for chunk in sorted_chunks:
     tasks.append(process_clause(chunk, chunk.incorrect_text, collection_name,
-                                document_request.categoryName, semaphore))
+                                document_request.categoryName, semaphore,
+                                pdf_document))
 
   # 모든 임베딩 및 유사도 검색 태스크를 병렬로 실행
   results = await asyncio.gather(*tasks)
@@ -39,27 +34,33 @@ async def vectorize_and_calculate_similarity(
 
 
 async def process_clause(rag_result: RagResult, clause_content: str,
-    collection_name: str, category_name: str, semaphore) -> Optional[RagResult]:
+    collection_name: str, category_name: str, semaphore: Semaphore,
+    pdf_document: fitz.Document) -> Optional[RagResult]:
   embedding = await embedding_service.embed_text(clause_content)
 
-  try:
-    client = get_qdrant_client()
-    async with semaphore:
-      search_results = await client.query_points(
-          collection_name=collection_name,
-          query=embedding,
-          query_filter=models.Filter(
-              must=[models.FieldCondition(
-                  key="category",
-                  match=models.MatchValue(value=category_name)
-              )]
-          ),
-          search_params=models.SearchParams(hnsw_ef=128, exact=False),
-          limit=5
-      )
+  client = get_qdrant_client()
+  for retry in range(2):
+    try:
+      async with semaphore:
+        search_results = await client.query_points(
+            collection_name=collection_name,
+            query=embedding,
+            query_filter=models.Filter(
+                must=[models.FieldCondition(
+                    key="category",
+                    match=models.MatchValue(value=category_name)
+                )]
+            ),
+            search_params=models.SearchParams(hnsw_ef=128, exact=False),
+            limit=5
+        )
+      break
+    except Exception as e:
+      if retry == 1:
+        raise BaseCustomException(ErrorCode.QDRANT_SEARCH_FAILED)
+      logging.warning(f"query_points: Qdrant Search 재요청 발생 {e}")
+      await asyncio.sleep(1)
 
-  except Exception:
-    raise BaseCustomException(ErrorCode.QDRANT_SEARCH_FAILED)
 
   # 3️⃣ 유사한 문장들 처리
   clause_results = []
@@ -80,9 +81,12 @@ async def process_clause(rag_result: RagResult, clause_content: str,
   corrected_result = await prompt_service.correct_contract(
       clause_content=clause_content,
       proof_text=[item["proof_text"] for item in clause_results],  # 기준 문서들
-      incorrect_text=[item["incorrect_text"] for item in clause_results],  # 잘못된 문장들
-      corrected_text=[item["corrected_text"] for item in clause_results]  # 교정된 문장들
+      incorrect_text=[item["incorrect_text"] for item in clause_results],
+      corrected_text=[item["corrected_text"] for item in clause_results]
   )
+
+  if not corrected_result:
+    return None
 
   # accuracy가 0.5 이하일 경우 결과를 반환하지 않음
   if float(corrected_result["accuracy"]) > 0.5:
@@ -102,7 +106,6 @@ async def process_clause(rag_result: RagResult, clause_content: str,
     # 최종 결과 저장
     rag_result.accuracy = float(corrected_result["accuracy"])
     rag_result.corrected_text = corrected_result["corrected_text"]
-    rag_result.incorrect_text = corrected_result["clause_content"]  # 원본 문장
     rag_result.proof_text = corrected_result["proof_text"]
 
     # position_values 리스트를 rag_result.clauseData에 할당
@@ -111,10 +114,12 @@ async def process_clause(rag_result: RagResult, clause_content: str,
     return rag_result
 
   else:
-  # accuracy가 0.5 이하일 경우 빈 객체 반환
+    # accuracy가 0.5 이하일 경우 빈 객체 반환
     return None
 
-async def find_text_positions(clause_content: str, pdf_document):
+
+async def find_text_positions(clause_content: str,
+    pdf_document: fitz.Document) -> List[dict]:
   positions = []  # 위치 정보를 저장할 리스트
 
   # +를 기준으로 문장을 나누고 뒤에 있는 부분만 사용

@@ -10,7 +10,7 @@ class ClauseData:
 
 @dataclass
 class RagResult:
-  incorrect_text: Optional[str] = None
+  incorrect_text: str = ''
   corrected_text: Optional[str] = None
   proof_text: Optional[str] = None
   accuracy: Optional[float] = None

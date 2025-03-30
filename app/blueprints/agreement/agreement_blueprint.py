@@ -17,13 +17,14 @@ from app.schemas.success_code import SuccessCode
 from app.schemas.success_response import SuccessResponse
 from app.services.agreement.img_service import process_img
 from app.services.agreement.vectorize_similarity import \
-  vectorize_and_calculate_similarity, byte_data
+  vectorize_and_calculate_similarity
 from app.services.common.ingestion_pipeline import \
-  gather_chunks_by_clause_number, preprocess_data2
+  combine_chunks_by_clause_number, preprocess_data
 from app.services.common.ingestion_pipeline import chunk_agreement_documents
 from app.containers.service_container import prompt_service
 import time
 
+from app.services.common.pdf_service import byte_data
 from config.app_config import AppConfig
 
 agreements = Blueprint('agreements', __name__, url_prefix="/flask/agreements")
@@ -45,7 +46,7 @@ def process_agreements_pdf_from_s3():
   if document_request.type in (FileType.PNG, FileType.JPG, FileType.JPEG):
     extracted_text = process_img(document_request)
   elif document_request.type == FileType.PDF:
-    documents, pdf_bytes_io = preprocess_data2(document_request)
+    documents, pdf_bytes_io = preprocess_data(document_request)
   else:
     raise AgreementException(ErrorCode.UNSUPPORTED_FILE_TYPE)
 
@@ -56,15 +57,16 @@ def process_agreements_pdf_from_s3():
 
   document_chunks = chunk_agreement_documents(documents)
 
-  sorted_chunks = gather_chunks_by_clause_number(document_chunks)
+  combined_chunks = combine_chunks_by_clause_number(document_chunks)
 
   # 5️⃣ 벡터화 + 유사도 비교 (리턴값 추가)
-  byte_data(pdf_bytes_io)
+  pdf_document = byte_data(pdf_bytes_io)
 
   start_time = time.time()
   chunks = run_async(
       vectorize_and_calculate_similarity(
-          sorted_chunks, AppConfig.COLLECTION_NAME, document_request))
+          combined_chunks, AppConfig.COLLECTION_NAME,
+          document_request, pdf_document))
   end_time = time.time()
   logging.info(
       f"Time vectorize and prompt texts: {end_time - start_time:.4f} seconds")

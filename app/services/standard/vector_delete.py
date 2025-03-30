@@ -10,7 +10,7 @@ from app.common.exception.error_code import ErrorCode
 from app.schemas.success_code import SuccessCode
 
 
-async def delete_by_standard_id(standard_id: int) -> SuccessCode:
+async def delete_by_standard_id(standard_id: int, collection_name: str) -> SuccessCode:
   filter_condition = Filter(
       must=[
         FieldCondition(key="standard_id", match=MatchValue(value=standard_id))]
@@ -30,9 +30,9 @@ async def delete_by_standard_id(standard_id: int) -> SuccessCode:
     return SuccessCode.NO_DOCUMENT_FOUND
 
   try:
-    await get_qdrant_client.delete(
-        collection_name=Constants.QDRANT_COLLECTION.value,
-        points_selector=filter_condition
+    await client.delete(
+      collection_name=collection_name,
+      points_selector=filter_condition
     )
   except UnexpectedResponse:
     raise StandardException(ErrorCode.DELETE_FAIL)
