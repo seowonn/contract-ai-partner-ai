@@ -55,7 +55,7 @@ List[RagResult]:
 
     if rag_result.incorrect_text:
       rag_result.incorrect_text += (
-        CLAUSE_TEXT_SEPARATOR + clause_map[doc.clause_number].incorrect_text)
+        CLAUSE_TEXT_SEPARATOR + doc.clause_content)
     else:
       rag_result.incorrect_text = doc.clause_content
       combined_chunks.append(rag_result)
