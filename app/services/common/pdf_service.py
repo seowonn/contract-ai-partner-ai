@@ -39,3 +39,6 @@ def extract_documents_from_pdf_io(pdf_bytes_io: io.BytesIO) -> List[Document]:
 
   return documents
 
+
+def byte_data(pdf_bytes_io: io.BytesIO) -> fitz.Document:
+  return fitz.open(stream=pdf_bytes_io, filetype="pdf")

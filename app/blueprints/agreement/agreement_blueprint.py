@@ -17,13 +17,14 @@ from app.schemas.success_code import SuccessCode
 from app.schemas.success_response import SuccessResponse
 from app.services.agreement.img_service import process_img
 from app.services.agreement.vectorize_similarity import \
-  vectorize_and_calculate_similarity, byte_data
+  vectorize_and_calculate_similarity
 from app.services.common.ingestion_pipeline import \
   combine_chunks_by_clause_number, preprocess_data
 from app.services.common.ingestion_pipeline import chunk_agreement_documents
 from app.containers.service_container import prompt_service
 import time
 
+from app.services.common.pdf_service import byte_data
 from config.app_config import AppConfig
 
 agreements = Blueprint('agreements', __name__, url_prefix="/flask/agreements")

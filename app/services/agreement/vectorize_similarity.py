@@ -13,11 +13,6 @@ from app.schemas.document_request import DocumentRequest
 from app.containers.service_container import embedding_service, prompt_service
 from app.services.standard.vector_store import ensure_qdrant_collection
 import fitz
-import io
-
-
-def byte_data(pdf_bytes_io: io.BytesIO) -> fitz.Document:
-  return fitz.open(stream=pdf_bytes_io, filetype="pdf")
 
 
 async def vectorize_and_calculate_similarity(
