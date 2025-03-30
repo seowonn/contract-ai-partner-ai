@@ -92,24 +92,37 @@ async def process_clause(rag_result: RagResult, clause_content: str,
   if float(corrected_result["accuracy"]) > 0.5:
 
     # 원문 텍스트에 대한 위치 정보 찾기
-    positions = await find_text_positions(clause_content, pdf_document)
+    all_positions = await find_text_positions(clause_content, pdf_document)
 
-    position_values = []  # position_values를 저장할 리스트
+    # 페이지를 기준으로 position을 나누어 저장할 리스트
+    positions = [[], []] 
 
-    # 각 문장에 대해 position 정보를 포함한 ClauseData 객체 생성
-    for position in positions:
-      bbox = position['bbox']
+    first_page = None  # 첫 번째 문장이 시작되는 페이지를 추적
 
-      # ClauseData 객체를 position_values 리스트에 추가
-      position_values.append(list(bbox))
+    # `rag_result.clause_data`에 두 개만 저장
+    for page_num, positions_in_page in all_positions.items():
+      # 첫 번째 문장이 시작되는 페이지를 찾으면 첫 번째 위치에 저장
+      if first_page is None:
+        first_page = page_num
+        for position in positions_in_page:
+          positions[0].append(position['bbox'])  # 첫 번째 페이지에 저장
+      else:
+        # 첫 번째 문장이 시작된 후, 페이지가 변경되면 두 번째 위치에 저장
+        if page_num != first_page:
+          for position in positions_in_page:
+            positions[1].append(position['bbox'])  # 두 번째 페이지에 저장
 
-    # 최종 결과 저장
+    # `rag_result.clause_data`에 위치 정보 저장
     rag_result.accuracy = float(corrected_result["accuracy"])
     rag_result.corrected_text = corrected_result["corrected_text"]
     rag_result.proof_text = corrected_result["proof_text"]
 
-    # position_values 리스트를 rag_result.clauseData에 할당
-    rag_result.clause_data[0].position = position_values  # 위치정보
+
+    rag_result.clause_data[0].position = positions[0]
+
+    # 문장이 다음페이지로 넘어가는 경우에만 [1] 에 저장
+    if positions[1]:
+        rag_result.clause_data[1].position = positions[1]
 
     return rag_result
 
@@ -118,14 +131,19 @@ async def process_clause(rag_result: RagResult, clause_content: str,
     return None
 
 
+
+
 async def find_text_positions(clause_content: str,
-    pdf_document: fitz.Document) -> List[dict]:
-  positions = []  # 위치 정보를 저장할 리스트
+    pdf_document: fitz.Document):
+  all_positions = {}  # 페이지별로 위치 정보를 저장할 딕셔너리
 
   # +를 기준으로 문장을 나누고 뒤에 있는 부분만 사용
   clause_content_parts = clause_content.split('+', 1)
   if len(clause_content_parts) > 1:
     clause_content = clause_content_parts[1].strip()  # `+` 뒤의 내용만 사용
+
+  # "!!!"을 기준으로 더 나눠서 각각을 위치 찾기
+  clause_parts = clause_content.split('!!!')
 
   # 모든 페이지를 검색
   for page_num in range(pdf_document.page_count):
@@ -135,51 +153,63 @@ async def find_text_positions(clause_content: str,
     page_width = float(page.rect.width)  # 명시적으로 float로 처리
     page_height = float(page.rect.height)  # 명시적으로 float로 처리
 
-    # 문장의 위치를 찾기 위해 search_for 사용
-    text_instances = page.search_for(clause_content)
+    page_positions = []  # 현재 페이지에 대한 위치 정보를 담을 리스트
 
-    # y값을 기준으로 묶을 변수
-    grouped_positions = {}
+    # 각 문장에 대해 위치를 찾기
+    for part in clause_parts:
+      part = part.strip()  # 앞뒤 공백 제거
+      if part == "":
+        continue
 
-    # 텍스트 인스턴스들에 대해 위치 정보를 추출
-    for text_instance in text_instances:
-      x0, y0, x1, y1 = text_instance  # 바운딩 박스 좌표
+      # 문장의 위치를 찾기 위해 search_for 사용
+      text_instances = page.search_for(part)
 
-      # 상대적인 위치로 계산 (픽셀을 페이지 크기로 나누어 상대값 계산)
-      rel_x0 = x0 / page_width
-      rel_y0 = y0 / page_height
-      rel_x1 = x1 / page_width
-      rel_y1 = y1 / page_height
+      # y값을 기준으로 묶을 변수
+      grouped_positions = {}
 
-      # y 값을 기준으로 그룹화
-      if rel_y0 not in grouped_positions:
-        grouped_positions[rel_y0] = []
+      # 텍스트 인스턴스들에 대해 위치 정보를 추출
+      for text_instance in text_instances:
+        x0, y0, x1, y1 = text_instance  # 바운딩 박스 좌표
 
-      grouped_positions[rel_y0].append((rel_x0, rel_x1, rel_y0, rel_y1))
+        # 상대적인 위치로 계산 (픽셀을 페이지 크기로 나누어 상대값 계산)
+        rel_x0 = x0 / page_width
+        rel_y0 = y0 / page_height
+        rel_x1 = x1 / page_width
+        rel_y1 = y1 / page_height
+
+        # y 값을 기준으로 그룹화
+        if rel_y0 not in grouped_positions:
+          grouped_positions[rel_y0] = []
+
+        grouped_positions[rel_y0].append((rel_x0, rel_x1, rel_y0, rel_y1))
 
       # 그룹화된 바운딩 박스를 하나의 큰 박스로 묶기
-    for y_key, group in grouped_positions.items():
-      # 하나의 그룹에서 x0, x1의 최솟값과 최댓값을 구하기
-      min_x0 = min([x[0] for x in group])  # 최소 x0 값
-      max_x1 = max([x[1] for x in group])  # 최대 x1 값
+      for y_key, group in grouped_positions.items():
+        # 하나의 그룹에서 x0, x1의 최솟값과 최댓값을 구하기
+        min_x0 = min([x[0] for x in group])  # 최소 x0 값
+        max_x1 = max([x[1] for x in group])  # 최대 x1 값
 
-      # 하나의 그룹에서 y0, y1의 최솟값과 최댓값을 구하기
-      min_y0 = min([x[2] for x in group])  # 최소 y0 값
-      max_y1 = max([x[3] for x in group])  # 최대 y1 값
+        # 하나의 그룹에서 y0, y1의 최솟값과 최댓값을 구하기
+        min_y0 = min([x[2] for x in group])  # 최소 y0 값
+        max_y1 = max([x[3] for x in group])  # 최대 y1 값
 
-      # 상대적인 값에 100을 곱해줍니다
-      min_x0 *= 100
-      min_y0 *= 100
-      max_x1 *= 100
-      max_y1 *= 100
+        # 상대적인 값에 100을 곱해줍니다
+        min_x0 *= 100
+        min_y0 *= 100
+        max_x1 *= 100
+        max_y1 *= 100
 
-      width = max_x1 - min_x0
-      height = max_y1 - min_y0
+        width = max_x1 - min_x0
+        height = max_y1 - min_y0
 
-      # 바운딩 박스를 생성 (최소값과 최대값을 사용)
-      positions.append({
-        "page": page_num + 1,
-        "bbox": (min_x0, min_y0, width, height)  # 상대적 x, y, 너비, 높이
-      })
+        # 바운딩 박스를 생성 (최소값과 최대값을 사용)
+        page_positions.append({
+          "page": page_num + 1,
+          "bbox": (min_x0, min_y0, width, height)  # 상대적 x, y, 너비, 높이
+        })
 
-  return positions
+    # 페이지별로 위치를 딕셔너리에 추가
+    if page_positions:
+      all_positions[page_num + 1] = page_positions
+
+  return all_positions
