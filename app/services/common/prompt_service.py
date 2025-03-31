@@ -114,7 +114,7 @@ class PromptService:
         )
 
     response_text = response.choices[0].message.content
-    response_text_cleaned = re.sub(r'(?<!\\)\n', ' ', response_text).strip()
+    response_text_cleaned = response_text.strip()
 
     if response_text_cleaned.startswith(
         "```json") and response_text_cleaned.endswith("```"):

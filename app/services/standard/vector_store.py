@@ -98,7 +98,7 @@ async def ensure_qdrant_collection(collection_name: str) -> None:
       await create_qdrant_collection(collection_name)
 
   except (ConnectTimeout, ResponseHandlingException):
-    raise BaseCustomException(ErrorCode.QDRANT_CONNECTION_TIMEOUT)
+    raise BaseCustomException(ErrorCode.QDRANT_NOT_STARTED)
 
 async def create_qdrant_collection(collection_name: str):
   try:

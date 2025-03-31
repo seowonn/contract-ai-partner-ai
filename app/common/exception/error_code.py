@@ -27,6 +27,7 @@ class ErrorCode(Enum):
   EMBEDDING_FAILED = (HTTPStatus.INTERNAL_SERVER_ERROR, "C012", "임베딩 실패")
   NO_POINTS_FOUND = (HTTPStatus.INTERNAL_SERVER_ERROR, "C013", "생성된 포인트 없음")
   QDRANT_CONNECTION_TIMEOUT = (HTTPStatus.INTERNAL_SERVER_ERROR, "C014", "Qdrant 연결 타임 아웃")
+  QDRANT_NOT_STARTED = (HTTPStatus.NOT_FOUND, "C015", "Qdrant 실행 여부 확인 필요")
 
   # agreement 관련 에러
   REVIEW_FAIL = (HTTPStatus.INTERNAL_SERVER_ERROR, "A001", "AI 검토 보고서 생성 작업 중 에러 발생")
