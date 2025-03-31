@@ -7,6 +7,7 @@ from pydantic import ValidationError
 
 from app.blueprints.agreement.agreement_exception import AgreementException
 from app.blueprints.common.async_loop import run_async
+from app.common.constants import QDRANT_COLLECTION
 from app.common.exception.custom_exception import BaseCustomException
 from app.common.exception.error_code import ErrorCode
 from app.common.file_type import FileType
@@ -21,11 +22,9 @@ from app.services.agreement.vectorize_similarity import \
 from app.services.common.ingestion_pipeline import \
   combine_chunks_by_clause_number, preprocess_data
 from app.services.common.ingestion_pipeline import chunk_agreement_documents
-from app.containers.service_container import prompt_service
 import time
 
 from app.services.common.pdf_service import byte_data
-from config.app_config import AppConfig
 
 agreements = Blueprint('agreements', __name__, url_prefix="/flask/agreements")
 
@@ -63,7 +62,7 @@ def process_agreements_pdf_from_s3():
   start_time = time.time()
   chunks = run_async(
       vectorize_and_calculate_similarity(
-          combined_chunks, AppConfig.COLLECTION_NAME,
+          combined_chunks, QDRANT_COLLECTION,
           document_request, pdf_document))
   end_time = time.time()
   logging.info(

@@ -1,5 +1,4 @@
 QDRANT_COLLECTION = "standard"
-TEST_COLLECTION = "test"
 
 SUCCESS = "success"
 

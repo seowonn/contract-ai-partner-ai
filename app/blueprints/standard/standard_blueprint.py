@@ -7,7 +7,7 @@ from pydantic import ValidationError
 
 from app.blueprints.agreement.agreement_exception import AgreementException
 from app.blueprints.common.async_loop import run_async
-from app.common.constants import SUCCESS
+from app.common.constants import SUCCESS, QDRANT_COLLECTION
 from app.common.exception.custom_exception import BaseCustomException
 from app.common.exception.error_code import ErrorCode
 from app.common.file_type import FileType
@@ -18,7 +18,6 @@ from app.services.common.ingestion_pipeline import preprocess_data, \
   chunk_standard_texts
 from app.services.standard.vector_delete import delete_by_standard_id
 from app.services.standard.vector_store import vectorize_and_save
-from config.app_config import AppConfig
 
 standards = Blueprint('standards', __name__, url_prefix="/flask/standards")
 
@@ -45,7 +44,7 @@ def process_standards_pdf_from_s3():
       # 5️⃣ 벡터화 + Qdrant 저장
       start_time = time.time()
       run_async(vectorize_and_save(
-          chunks, AppConfig.COLLECTION_NAME, document_request))
+          chunks, QDRANT_COLLECTION, document_request))
       end_time = time.time()
       logging.info(f"vectorize_and_save 소요 시간: {end_time - start_time}")
 
@@ -66,5 +65,5 @@ def delete_standard(standardId: str):
 
   success_code = (
     run_async(
-        delete_by_standard_id(int(standardId), AppConfig.COLLECTION_NAME)))
+        delete_by_standard_id(int(standardId), QDRANT_COLLECTION)))
   return SuccessResponse(success_code, SUCCESS).of(), HTTPStatus.OK
