@@ -36,29 +36,28 @@ async def process_clause(rag_result: RagResult, clause_content: str,
     collection_name: str, category_name: str, semaphore, pdf_document: fitz.Document) -> Optional[RagResult]:
   embedding = await embedding_service.embed_text(clause_content)
 
-  try:
-    client = get_qdrant_client()
-    async with semaphore:
-      search_results = await client.query_points(
-          collection_name=collection_name,
-          query=embedding,
-          query_filter=models.Filter(
-              must=[models.FieldCondition(
-                  key="category",
-                  match=models.MatchValue(value=category_name)
-              )
-            ]
-        ),
-        search_params=models.SearchParams(hnsw_ef=128, exact=False),
-        limit=5
-      )
-  except Exception as e:
-    logging.error(f"서치 에러 : {e}")
-    logging.info(f"type of e: {type(e)}")
-    logging.error(traceback.format_exc())
-    logging.info(f"서치 에러 : {e}")
-    raise BaseCustomException(ErrorCode.QDRANT_SEARCH_FAILED)
-
+  client = get_qdrant_client()
+  for retry in range(3):
+    try:
+      async with semaphore:
+        search_results = await client.query_points(
+           collection_name=collection_name,
+           query=embedding,
+           query_filter=models.Filter(
+               must=[models.FieldCondition(
+                   key="category",
+                   match=models.MatchValue(value=category_name)
+               )]
+           ),
+           search_params=models.SearchParams(hnsw_ef=128, exact=False),
+           limit=5
+        )
+      break
+    except Exception as e:
+      if retry == 2:
+        raise BaseCustomException(ErrorCode.QDRANT_SEARCH_FAILED)
+      logging.warning(f"query_points: Qdrant Search 재요청 발생 {e}")
+      await asyncio.sleep(1)
 
   # 3️⃣ 유사한 문장들 처리
   clause_results = []
