@@ -24,8 +24,6 @@ from app.services.common.ingestion_pipeline import \
 from app.services.common.ingestion_pipeline import chunk_agreement_documents
 import time
 
-from app.services.common.pdf_service import byte_data
-
 agreements = Blueprint('agreements', __name__, url_prefix="/flask/agreements")
 
 
@@ -33,52 +31,25 @@ agreements = Blueprint('agreements', __name__, url_prefix="/flask/agreements")
 def process_agreements_pdf_from_s3():
   try:
     json_data = request.get_json()
-    logging.info(f"json:{ json_data}")
     if json_data is None:
       raise BaseCustomException(ErrorCode.INVALID_JSON_FORMAT)
 
     document_request = DocumentRequest(**json_data)
-    logging.info(f"document-request: {document_request}")
   except ValidationError:
     raise BaseCustomException(ErrorCode.FIELD_MISSING)
 
-  documents: List[Document] = []
-  pdf_bytes_io = None
-  if document_request.type in (FileType.PNG, FileType.JPG, FileType.JPEG):
-    extracted_text = process_img(document_request)
-  elif document_request.type == FileType.PDF:
-    documents, pdf_bytes_io = preprocess_data(document_request)
-    logging.info(f"document: {documents}")
-    logging.info(f"pdf_bytes_io:{pdf_bytes_io}")
-  else:
-    raise AgreementException(ErrorCode.UNSUPPORTED_FILE_TYPE)
-
-  if len(documents) == 0:
-    raise AgreementException(ErrorCode.NO_TEXTS_EXTRACTED)
-
+  documents, byte_type_pdf = preprocess_data(document_request)
   document_chunks = chunk_agreement_documents(documents)
-  logging.info(f"document_chunks:{document_chunks}")
-
   combined_chunks = combine_chunks_by_clause_number(document_chunks)
-  logging.info(f"combined_chunks:{combined_chunks}")
-
-  # 5️⃣ 벡터화 + 유사도 비교 (리턴값 추가)
-  pdf_document = byte_data(pdf_bytes_io)
-  logging.info(f"pdf_document:{pdf_document}")
 
   start_time = time.time()
   chunks = run_async(
-      vectorize_and_calculate_similarity(
-          combined_chunks, QDRANT_COLLECTION,
-          document_request, pdf_document))
+    vectorize_and_calculate_similarity(combined_chunks, QDRANT_COLLECTION,
+                                       document_request, byte_type_pdf))
   end_time = time.time()
   logging.info(
       f"Time vectorize and prompt texts: {end_time - start_time:.4f} seconds")
 
-  response = AnalysisResponse(
-      total_page=len(documents),
-      chunks=chunks
-  )
-
   return SuccessResponse(SuccessCode.REVIEW_SUCCESS,
-                         response).of(), HTTPStatus.OK
+                         AnalysisResponse(total_page=len(documents),
+                                          chunks=chunks)).of(), HTTPStatus.OK

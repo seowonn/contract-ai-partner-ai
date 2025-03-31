@@ -35,22 +35,16 @@ def process_standards_pdf_from_s3():
     raise BaseCustomException(ErrorCode.FIELD_MISSING)
 
   status_code = HTTPStatus.OK
-  try:
-    if document_request.type == FileType.PDF:
-      documents, _ = preprocess_data(document_request)
-      extracted_text = "\n".join([doc.page_content for doc in documents])
+  documents, _ = preprocess_data(document_request)
+  extracted_text = "\n".join([doc.page_content for doc in documents])
+  chunks = chunk_standard_texts(extracted_text)
 
-      chunks = chunk_standard_texts(extracted_text)
-
-      # 5️⃣ 벡터화 + Qdrant 저장
-      start_time = time.time()
-      run_async(vectorize_and_save(
-          chunks, QDRANT_COLLECTION, document_request))
-      end_time = time.time()
-      logging.info(f"vectorize_and_save 소요 시간: {end_time - start_time}")
-
-  except Exception as e:
-    raise e
+  # 5️⃣ 벡터화 + Qdrant 저장
+  start_time = time.time()
+  run_async(vectorize_and_save(
+      chunks, QDRANT_COLLECTION, document_request))
+  end_time = time.time()
+  logging.info(f"vectorize_and_save 소요 시간: {end_time - start_time}")
 
   return SuccessResponse(SuccessCode.ANALYSIS_COMPLETE,
                          SUCCESS).of(), status_code
