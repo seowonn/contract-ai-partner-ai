@@ -18,7 +18,6 @@ class RagResult:
 
 @dataclass
 class AnalysisResponse:
-  summary_content: str = ""
   total_page: int = 0
   chunks: List[RagResult] = field(default_factory=list)
 
