@@ -132,23 +132,6 @@ class PromptService:
       logging.error(
           f"[PromptService] ❌ OpenAI 응답이 JSON 형식이 아님:\n{response_text_cleaned}"
       )
-
-      # 파일에 에러 데이터를 기록하여 추적 가능하도록 함
-      error_data = {
-        "response_text_cleaned": response_text_cleaned,
-        "pure_json": pure_json
-      }
-
-      # 파일로 저장
-      if not os.path.exists(error_log_file):
-        with open(error_log_file, 'w', encoding='utf-8') as f:
-          json.dump([error_data], f, ensure_ascii=False, indent=4)
-      else:
-        # 기존 파일에 추가
-        with open(error_log_file, 'a', encoding='utf-8') as f:
-          f.write(",\n")
-          json.dump(error_data, f, ensure_ascii=False, indent=4)
-
       return None
 
     return parsed_response
