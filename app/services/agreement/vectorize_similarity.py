@@ -49,7 +49,10 @@ async def process_clause(rag_result: RagResult, clause_content: str,
         search_params=models.SearchParams(hnsw_ef=128, exact=False),
         limit=5
     )
+    logging.info(f"search_results: {search_results}")
   except Exception as e:
+    logging.error(f"서치 에러 : {e}")
+    logging.info(f"서치 에러 : {e}")
     raise BaseCustomException(ErrorCode.QDRANT_SEARCH_FAILED)
 
 

@@ -33,10 +33,12 @@ agreements = Blueprint('agreements', __name__, url_prefix="/flask/agreements")
 def process_agreements_pdf_from_s3():
   try:
     json_data = request.get_json()
+    logging.info(f"json:{ json_data}")
     if json_data is None:
       raise BaseCustomException(ErrorCode.INVALID_JSON_FORMAT)
 
     document_request = DocumentRequest(**json_data)
+    logging.info(f"document-request: {document_request}")
   except ValidationError:
     raise BaseCustomException(ErrorCode.FIELD_MISSING)
 
@@ -46,6 +48,8 @@ def process_agreements_pdf_from_s3():
     extracted_text = process_img(document_request)
   elif document_request.type == FileType.PDF:
     documents, pdf_bytes_io = preprocess_data(document_request)
+    logging.info(f"document: {documents}")
+    logging.info(f"pdf_bytes_io:{pdf_bytes_io}")
   else:
     raise AgreementException(ErrorCode.UNSUPPORTED_FILE_TYPE)
 
@@ -53,11 +57,14 @@ def process_agreements_pdf_from_s3():
     raise AgreementException(ErrorCode.NO_TEXTS_EXTRACTED)
 
   document_chunks = chunk_agreement_documents(documents)
+  logging.info(f"document_chunks:{document_chunks}")
 
   combined_chunks = combine_chunks_by_clause_number(document_chunks)
+  logging.info(f"combined_chunks:{combined_chunks}")
 
   # 5️⃣ 벡터화 + 유사도 비교 (리턴값 추가)
   pdf_document = byte_data(pdf_bytes_io)
+  logging.info(f"pdf_document:{pdf_document}")
 
   start_time = time.time()
   chunks = run_async(

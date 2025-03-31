@@ -15,7 +15,8 @@ from app.schemas.document_request import DocumentRequest
 from app.schemas.success_code import SuccessCode
 from app.schemas.success_response import SuccessResponse
 from app.services.common.ingestion_pipeline import preprocess_data, \
-  chunk_standard_texts
+  chunk_standard_texts, chunk_agreement_documents, \
+  combine_chunks_by_clause_number
 from app.services.standard.vector_delete import delete_by_standard_id
 from app.services.standard.vector_store import vectorize_and_save
 
