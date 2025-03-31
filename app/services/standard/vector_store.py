@@ -113,7 +113,7 @@ async def create_qdrant_collection(collection_name: str):
 
 async def upload_points_to_qdrant(collection_name, points):
   if len(points) == 0:
-    raise StandardException(ErrorCode.NO_POINTS_FOUND)
+    raise StandardException(ErrorCode.NO_POINTS_GENERATED)
 
   try:
     client = get_qdrant_client()

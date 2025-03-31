@@ -25,7 +25,7 @@ class ErrorCode(Enum):
   INVALID_URL_PARAMETER = (HTTPStatus.BAD_REQUEST, "C010", "url 경로에 필수 항목이 누락됨")
   CANNOT_CONVERT_TO_NUM = (HTTPStatus.BAD_REQUEST, "C011", "URL 매개변수를 숫자로 변환할 수 없음")
   EMBEDDING_FAILED = (HTTPStatus.INTERNAL_SERVER_ERROR, "C012", "임베딩 실패")
-  NO_POINTS_FOUND = (HTTPStatus.INTERNAL_SERVER_ERROR, "C013", "생성된 포인트 없음")
+  NO_POINTS_GENERATED = (HTTPStatus.INTERNAL_SERVER_ERROR, "C013", "생성된 포인트 없음")
   QDRANT_CONNECTION_TIMEOUT = (HTTPStatus.INTERNAL_SERVER_ERROR, "C014", "Qdrant 연결 타임 아웃")
   QDRANT_NOT_STARTED = (HTTPStatus.NOT_FOUND, "C015", "Qdrant 실행 여부 확인 필요")
 
@@ -36,6 +36,7 @@ class ErrorCode(Enum):
   NO_TEXTS_EXTRACTED = (HTTPStatus.INTERNAL_SERVER_ERROR, "A004", "해당 파일에서 추출된 텍스트 없음")
   NO_SEARCH_RESULT = (HTTPStatus.INTERNAL_SERVER_ERROR, "A005", "Qdrant 내 검색된 데이터 없음")
   QDRANT_SEARCH_FAILED = (HTTPStatus.INTERNAL_SERVER_ERROR, "A006", "Qdrant 검색 결과 반환 실패")
+  NO_POINTS_FOUND = (HTTPStatus.INTERNAL_SERVER_ERROR, "A007", "Qdrant 내 조회 가능한 포인트 없음")
 
   def __init__(self, status: HTTPStatus, code: str, message: str):
     self.status = status

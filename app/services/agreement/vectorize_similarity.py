@@ -4,6 +4,7 @@ from typing import List, Optional
 
 from qdrant_client import models
 
+from app.blueprints.agreement.agreement_exception import AgreementException
 from app.clients.qdrant_client import get_qdrant_client
 from app.common.exception.custom_exception import BaseCustomException
 from app.common.exception.error_code import ErrorCode
@@ -71,9 +72,7 @@ async def process_clause(rag_result: RagResult, clause_content: str,
     logging.warning("[process_clause]: search_results.points 비어 있음")
 
   if not clause_results:
-    logging.warning(
-      "[process_clause]: clause_results 비어 있음")
-    return None
+    raise AgreementException(ErrorCode.NO_POINTS_FOUND)
 
   # 4️⃣ 계약서 문장을 수정 (해당 조항의 TOP 5개 유사 문장을 기반으로)
   corrected_result = await prompt_service.correct_contract(
