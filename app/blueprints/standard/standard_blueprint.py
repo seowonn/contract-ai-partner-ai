@@ -8,7 +8,7 @@ from pydantic import ValidationError
 from app.blueprints.agreement.agreement_exception import AgreementException
 from app.blueprints.common.async_loop import run_async
 from app.common.constants import SUCCESS, QDRANT_COLLECTION
-from app.common.exception.custom_exception import BaseCustomException
+from app.common.exception.custom_exception import CommonException
 from app.common.exception.error_code import ErrorCode
 from app.common.file_type import FileType
 from app.schemas.document_request import DocumentRequest
@@ -28,11 +28,11 @@ def process_standards_pdf_from_s3():
   try:
     json_data = request.get_json()
     if json_data is None:
-      raise BaseCustomException(ErrorCode.INVALID_JSON_FORMAT)
+      raise CommonException(ErrorCode.INVALID_JSON_FORMAT)
 
     document_request = DocumentRequest(**json_data)
   except ValidationError:
-    raise BaseCustomException(ErrorCode.FIELD_MISSING)
+    raise CommonException(ErrorCode.FIELD_MISSING)
 
   status_code = HTTPStatus.OK
   documents, _ = preprocess_data(document_request)

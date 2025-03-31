@@ -3,7 +3,7 @@ from typing import List
 
 import fitz
 
-from app.common.exception.custom_exception import BaseCustomException
+from app.common.exception.custom_exception import CommonException
 from app.common.exception.error_code import ErrorCode
 from app.schemas.chunk_schema import Document, DocumentMetadata
 
@@ -14,7 +14,7 @@ def convert_to_bytes_io(s3_stream: bytes) -> io.BytesIO:
     pdf_bytes_io.seek(0)
     return pdf_bytes_io
   except Exception:
-    raise BaseCustomException(ErrorCode.CONVERT_TO_IO_FAILED)
+    raise CommonException(ErrorCode.CONVERT_TO_IO_FAILED)
 
 
 def extract_documents_from_pdf_io(pdf_bytes_io: io.BytesIO) -> List[Document]:
@@ -35,7 +35,7 @@ def extract_documents_from_pdf_io(pdf_bytes_io: io.BytesIO) -> List[Document]:
         ))
 
   except Exception:
-    raise BaseCustomException(ErrorCode.FILE_FORMAT_INVALID)
+    raise CommonException(ErrorCode.FILE_FORMAT_INVALID)
 
   return documents
 

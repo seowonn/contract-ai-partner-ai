@@ -6,7 +6,7 @@ from pydantic import ValidationError
 
 from app.blueprints.agreement.agreement_exception import AgreementException
 from app.blueprints.standard.standard_exception import StandardException
-from app.common.exception.custom_exception import BaseCustomException
+from app.common.exception.custom_exception import CommonException
 from app.common.exception.error_code import ErrorCode
 from app.schemas.error_response import ErrorResponse
 
@@ -33,8 +33,8 @@ def register_error_handlers(app):
     error_response = ErrorResponse(e.code, str(e))
     return error_response.of(), e.status
 
-  @app.errorhandler(BaseCustomException)
-  def handle_custom_exception(e: BaseCustomException):
+  @app.errorhandler(CommonException)
+  def handle_custom_exception(e: CommonException):
     logger.error(f"[BaseCustomException]: {str(e)}\n{traceback.format_exc()}")
     error_response = ErrorResponse(e.code, str(e))
     return error_response.of(), e.status

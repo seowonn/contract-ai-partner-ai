@@ -5,7 +5,7 @@ from qdrant_client.models import Filter, FieldCondition, MatchValue
 
 from app.blueprints.standard.standard_exception import StandardException
 from app.clients.qdrant_client import get_qdrant_client
-from app.common.exception.custom_exception import BaseCustomException
+from app.common.exception.custom_exception import CommonException
 from app.common.exception.error_code import ErrorCode
 from app.schemas.success_code import SuccessCode
 
@@ -24,7 +24,7 @@ async def delete_by_standard_id(standard_id: int, collection_name: str) -> Succe
       limit=1
     )
   except (ConnectTimeout, ResponseHandlingException):
-    raise BaseCustomException(ErrorCode.QDRANT_CONNECTION_TIMEOUT)
+    raise CommonException(ErrorCode.QDRANT_CONNECTION_TIMEOUT)
 
   if not points:
     return SuccessCode.NO_DOCUMENT_FOUND
@@ -38,6 +38,6 @@ async def delete_by_standard_id(standard_id: int, collection_name: str) -> Succe
     raise StandardException(ErrorCode.DELETE_FAIL)
 
   except (ConnectTimeout, ResponseHandlingException):
-    raise BaseCustomException(ErrorCode.QDRANT_CONNECTION_TIMEOUT)
+    raise CommonException(ErrorCode.QDRANT_CONNECTION_TIMEOUT)
 
   return SuccessCode.DELETE_SUCCESS

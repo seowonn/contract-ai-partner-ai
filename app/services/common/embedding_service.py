@@ -4,7 +4,7 @@ import httpx
 import numpy as np
 from openai import AsyncOpenAI
 
-from app.common.exception.custom_exception import BaseCustomException
+from app.common.exception.custom_exception import CommonException
 from app.common.exception.error_code import ErrorCode
 
 
@@ -22,6 +22,6 @@ class EmbeddingService:
         )
 
     if not response or not response.data or not response.data[0].embedding:
-      raise BaseCustomException(ErrorCode.EMBEDDING_FAILED)
+      raise CommonException(ErrorCode.EMBEDDING_FAILED)
 
     return np.array(response.data[0].embedding, dtype=np.float32).tolist()

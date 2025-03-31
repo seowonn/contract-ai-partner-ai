@@ -6,7 +6,7 @@ from qdrant_client import models
 
 from app.blueprints.agreement.agreement_exception import AgreementException
 from app.clients.qdrant_client import get_qdrant_client
-from app.common.exception.custom_exception import BaseCustomException
+from app.common.exception.custom_exception import CommonException
 from app.common.exception.error_code import ErrorCode
 from app.schemas.analysis_response import RagResult
 from app.schemas.document_request import DocumentRequest
@@ -56,7 +56,7 @@ async def process_clause(rag_result: RagResult, clause_content: str,
       break
     except Exception as e:
       if retry == 2:
-        raise BaseCustomException(ErrorCode.QDRANT_SEARCH_FAILED)
+        raise CommonException(ErrorCode.QDRANT_SEARCH_FAILED)
       logging.warning(f"query_points: Qdrant Search 재요청 발생 {e}")
       await asyncio.sleep(1)
 

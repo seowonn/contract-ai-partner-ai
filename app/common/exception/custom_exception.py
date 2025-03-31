@@ -1,7 +1,7 @@
 from app.common.exception.error_code import ErrorCode
 
 
-class BaseCustomException(Exception):
+class CommonException(Exception):
 
   def __init__(self, error_code: ErrorCode):
     super().__init__(error_code.message)

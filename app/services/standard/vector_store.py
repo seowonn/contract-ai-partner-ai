@@ -13,7 +13,7 @@ from qdrant_client.models import Distance, VectorParams, PointStruct
 
 from app.blueprints.standard.standard_exception import StandardException
 from app.clients.qdrant_client import get_qdrant_client
-from app.common.exception.custom_exception import BaseCustomException
+from app.common.exception.custom_exception import CommonException
 from app.common.exception.error_code import ErrorCode
 from app.containers.service_container import embedding_service, prompt_service
 from app.models.vector import VectorPayload
@@ -98,7 +98,7 @@ async def ensure_qdrant_collection(collection_name: str) -> None:
       await create_qdrant_collection(collection_name)
 
   except (ConnectTimeout, ResponseHandlingException):
-    raise BaseCustomException(ErrorCode.QDRANT_NOT_STARTED)
+    raise CommonException(ErrorCode.QDRANT_NOT_STARTED)
 
 
 async def create_qdrant_collection(collection_name: str):
@@ -109,7 +109,7 @@ async def create_qdrant_collection(collection_name: str):
         vectors_config=VectorParams(size=1536, distance=Distance.COSINE)
     )
   except (ConnectTimeout, ResponseHandlingException):
-    raise BaseCustomException(ErrorCode.QDRANT_CONNECTION_TIMEOUT)
+    raise CommonException(ErrorCode.QDRANT_CONNECTION_TIMEOUT)
 
 
 async def upload_points_to_qdrant(collection_name, points):
@@ -120,5 +120,5 @@ async def upload_points_to_qdrant(collection_name, points):
   try:
     await client.upsert(collection_name=collection_name, points=points)
   except (ConnectTimeout, ResponseHandlingException):
-    raise BaseCustomException(ErrorCode.QDRANT_CONNECTION_TIMEOUT)
+    raise CommonException(ErrorCode.QDRANT_CONNECTION_TIMEOUT)
 
