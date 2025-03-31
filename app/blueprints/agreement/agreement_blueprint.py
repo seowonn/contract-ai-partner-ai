@@ -1,22 +1,17 @@
 import logging
 from http import HTTPStatus
-from typing import List
 
 from flask import Blueprint, request
 from pydantic import ValidationError
 
-from app.blueprints.agreement.agreement_exception import AgreementException
 from app.blueprints.common.async_loop import run_async
 from app.common.constants import QDRANT_COLLECTION
 from app.common.exception.custom_exception import CommonException
 from app.common.exception.error_code import ErrorCode
-from app.common.file_type import FileType
 from app.schemas.analysis_response import AnalysisResponse
-from app.schemas.chunk_schema import Document
 from app.schemas.document_request import DocumentRequest
 from app.schemas.success_code import SuccessCode
 from app.schemas.success_response import SuccessResponse
-from app.services.agreement.img_service import process_img
 from app.services.agreement.vectorize_similarity import \
   vectorize_and_calculate_similarity
 from app.services.common.ingestion_pipeline import \

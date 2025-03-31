@@ -2,7 +2,6 @@ from typing import List, Tuple
 
 import fitz
 
-from app.blueprints.agreement.agreement_exception import AgreementException
 from app.common.constants import CLAUSE_TEXT_SEPARATOR
 from app.common.exception.custom_exception import CommonException
 from app.common.exception.error_code import ErrorCode
