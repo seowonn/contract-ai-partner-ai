@@ -25,8 +25,6 @@ async def delete_by_standard_id(standard_id: int, collection_name: str) -> Succe
     )
   except (ConnectTimeout, ResponseHandlingException):
     raise BaseCustomException(ErrorCode.QDRANT_CONNECTION_TIMEOUT)
-  finally:
-    await client.aclose()
 
   if not points:
     return SuccessCode.NO_DOCUMENT_FOUND
@@ -41,7 +39,5 @@ async def delete_by_standard_id(standard_id: int, collection_name: str) -> Succe
 
   except (ConnectTimeout, ResponseHandlingException):
     raise BaseCustomException(ErrorCode.QDRANT_CONNECTION_TIMEOUT)
-  finally:
-    await client.aclose()
 
   return SuccessCode.DELETE_SUCCESS

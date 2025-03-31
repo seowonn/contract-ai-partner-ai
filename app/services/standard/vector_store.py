@@ -99,8 +99,7 @@ async def ensure_qdrant_collection(collection_name: str) -> None:
 
   except (ConnectTimeout, ResponseHandlingException):
     raise BaseCustomException(ErrorCode.QDRANT_NOT_STARTED)
-  finally:
-    await client.aclose()
+
 
 async def create_qdrant_collection(collection_name: str):
   client = get_qdrant_client()
@@ -111,8 +110,6 @@ async def create_qdrant_collection(collection_name: str):
     )
   except (ConnectTimeout, ResponseHandlingException):
     raise BaseCustomException(ErrorCode.QDRANT_CONNECTION_TIMEOUT)
-  finally:
-    await client.aclose()
 
 
 async def upload_points_to_qdrant(collection_name, points):
@@ -124,5 +121,4 @@ async def upload_points_to_qdrant(collection_name, points):
     await client.upsert(collection_name=collection_name, points=points)
   except (ConnectTimeout, ResponseHandlingException):
     raise BaseCustomException(ErrorCode.QDRANT_CONNECTION_TIMEOUT)
-  finally:
-    await client.aclose()
+
