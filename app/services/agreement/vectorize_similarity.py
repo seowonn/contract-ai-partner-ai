@@ -95,7 +95,7 @@ async def process_clause(rag_result: RagResult, clause_content: str,
     all_positions = await find_text_positions(clause_content, pdf_document)
 
     # 페이지를 기준으로 position을 나누어 저장할 리스트
-    positions = [[], []] 
+    positions = [[], []]
 
     first_page = None  # 첫 번째 문장이 시작되는 페이지를 추적
 
@@ -104,13 +104,11 @@ async def process_clause(rag_result: RagResult, clause_content: str,
       # 첫 번째 문장이 시작되는 페이지를 찾으면 첫 번째 위치에 저장
       if first_page is None:
         first_page = page_num
-        for position in positions_in_page:
-          positions[0].append(position['bbox'])  # 첫 번째 페이지에 저장
+        positions[0].extend(p['bbox'] for p in positions_in_page)
       else:
         # 첫 번째 문장이 시작된 후, 페이지가 변경되면 두 번째 위치에 저장
         if page_num != first_page:
-          for position in positions_in_page:
-            positions[1].append(position['bbox'])  # 두 번째 페이지에 저장
+          positions[1].extend(p['bbox'] for p in positions_in_page)
 
     # `rag_result.clause_data`에 위치 정보 저장
     rag_result.accuracy = float(corrected_result["accuracy"])
@@ -131,10 +129,8 @@ async def process_clause(rag_result: RagResult, clause_content: str,
     return None
 
 
-
-
 async def find_text_positions(clause_content: str,
-    pdf_document: fitz.Document):
+    pdf_document: fitz.Document) -> dict[int, List[dict]]:
   all_positions = {}  # 페이지별로 위치 정보를 저장할 딕셔너리
 
   # +를 기준으로 문장을 나누고 뒤에 있는 부분만 사용
