@@ -1,5 +1,6 @@
 import asyncio
 import logging
+import traceback
 from typing import List, Optional
 
 from qdrant_client import models
@@ -52,8 +53,12 @@ async def process_clause(rag_result: RagResult, clause_content: str,
     logging.info(f"search_results: {search_results}")
   except Exception as e:
     logging.error(f"서치 에러 : {e}")
+    logging.info(f"type of e: {type(e)}")
+    logging.error(traceback.format_exc())
     logging.info(f"서치 에러 : {e}")
     raise BaseCustomException(ErrorCode.QDRANT_SEARCH_FAILED)
+  finally:
+    await client.aclose()
 
 
   # 3️⃣ 유사한 문장들 처리

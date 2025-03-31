@@ -16,8 +16,8 @@ async def delete_by_standard_id(standard_id: int, collection_name: str) -> Succe
         FieldCondition(key="standard_id", match=MatchValue(value=standard_id))]
   )
 
+  client = get_qdrant_client()
   try:
-    client = get_qdrant_client()
     points, _ = await client.scroll(
       collection_name=collection_name,
       scroll_filter=filter_condition,
@@ -25,6 +25,8 @@ async def delete_by_standard_id(standard_id: int, collection_name: str) -> Succe
     )
   except (ConnectTimeout, ResponseHandlingException):
     raise BaseCustomException(ErrorCode.QDRANT_CONNECTION_TIMEOUT)
+  finally:
+    await client.aclose()
 
   if not points:
     return SuccessCode.NO_DOCUMENT_FOUND
@@ -39,5 +41,7 @@ async def delete_by_standard_id(standard_id: int, collection_name: str) -> Succe
 
   except (ConnectTimeout, ResponseHandlingException):
     raise BaseCustomException(ErrorCode.QDRANT_CONNECTION_TIMEOUT)
+  finally:
+    await client.aclose()
 
   return SuccessCode.DELETE_SUCCESS
