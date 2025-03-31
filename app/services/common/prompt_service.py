@@ -99,9 +99,9 @@ class PromptService:
                         [출력 형식]
                         {{
                             "clause_content": 계약서 원문
-                            "corrected_text": "계약서의 문장을 올바르게 교정한 문장",
-                            "proof_text": 입력데이터를 참조해 잘못된 포인트와 이유"
-                            "accuracy": "위배된 비율, 신뢰도, 무조건 소수점 셋째 자리까지 반환"
+                            "correctedText": "계약서의 문장을 올바르게 교정한 문장",
+                            "proofText": 입력데이터를 참조해 잘못된 포인트와 이유"
+                            "accuracy": "clause_content 문장이 위배된 비율, 신뢰도, 무조건 소수점 셋째 자리까지 반환"
                         }}
     
                         [조건]
