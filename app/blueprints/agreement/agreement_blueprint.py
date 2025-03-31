@@ -53,7 +53,7 @@ def process_agreements_pdf_from_s3():
   if len(documents) == 0:
     raise AgreementException(ErrorCode.NO_TEXTS_EXTRACTED)
 
-  summary_content = prompt_service.summarize_document(documents)
+  # summary_content = prompt_service.summarize_document(documents)
 
   document_chunks = chunk_agreement_documents(documents)
 
@@ -73,7 +73,6 @@ def process_agreements_pdf_from_s3():
 
   response = AnalysisResponse(
       total_page=len(documents),
-      summary_content=summary_content,
       chunks=chunks
   )
 
