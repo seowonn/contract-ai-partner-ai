@@ -22,43 +22,42 @@ async def vectorize_and_calculate_similarity(
     pdf_document: fitz.Document) -> List[RagResult]:
   await ensure_qdrant_collection(collection_name)
 
+  semaphore = asyncio.Semaphore(5)
   tasks = []
   for chunk in sorted_chunks:
     tasks.append(process_clause(chunk, chunk.incorrect_text, collection_name,
-                                document_request.categoryName, pdf_document))
-
+                                 document_request.categoryName, semaphore, pdf_document))
   # 모든 임베딩 및 유사도 검색 태스크를 병렬로 실행
   results = await asyncio.gather(*tasks)
   return [result for result in results if result is not None]
 
 
 async def process_clause(rag_result: RagResult, clause_content: str,
-    collection_name: str, category_name: str, pdf_document: fitz.Document) -> Optional[RagResult]:
+    collection_name: str, category_name: str, semaphore, pdf_document: fitz.Document) -> Optional[RagResult]:
   embedding = await embedding_service.embed_text(clause_content)
 
-  client = get_qdrant_client()
   try:
-    search_results = await client.query_points(
-        collection_name=collection_name,
-        query=embedding,
-        query_filter=models.Filter(
-            must=[models.FieldCondition(
-                key="category",
-                match=models.MatchValue(value=category_name)
-            )]
+    client = get_qdrant_client()
+    async with semaphore:
+      search_results = await client.query_points(
+          collection_name=collection_name,
+          query=embedding,
+          query_filter=models.Filter(
+              must=[models.FieldCondition(
+                  key="category",
+                  match=models.MatchValue(value=category_name)
+              )
+            ]
         ),
         search_params=models.SearchParams(hnsw_ef=128, exact=False),
         limit=5
-    )
-    logging.info(f"search_results: {search_results}")
+      )
   except Exception as e:
     logging.error(f"서치 에러 : {e}")
     logging.info(f"type of e: {type(e)}")
     logging.error(traceback.format_exc())
     logging.info(f"서치 에러 : {e}")
     raise BaseCustomException(ErrorCode.QDRANT_SEARCH_FAILED)
-  finally:
-    await client.aclose()
 
 
   # 3️⃣ 유사한 문장들 처리
