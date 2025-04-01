@@ -25,7 +25,8 @@ def extract_documents_from_pdf_io(pdf_bytes_io: io.BytesIO) -> List[Document]:
 
     for page_num in range(doc.page_count):
       page = doc.load_page(page_num)
-      text = page.get_text().strip()
+      text = page.get_text("text").strip()
+      text = text.replace("", '"')
 
       if text:
         meta = DocumentMetadata(page=page_num + 1)
