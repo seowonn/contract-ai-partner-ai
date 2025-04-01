@@ -25,17 +25,18 @@ class ErrorCode(Enum):
   INVALID_URL_PARAMETER = (HTTPStatus.BAD_REQUEST, "C010", "url 경로에 필수 항목이 누락됨")
   CANNOT_CONVERT_TO_NUM = (HTTPStatus.BAD_REQUEST, "C011", "URL 매개변수를 숫자로 변환할 수 없음")
   EMBEDDING_FAILED = (HTTPStatus.INTERNAL_SERVER_ERROR, "C012", "임베딩 실패")
-  NO_POINTS_FOUND = (HTTPStatus.INTERNAL_SERVER_ERROR, "C013", "생성된 포인트 없음")
+  NO_POINTS_GENERATED = (HTTPStatus.INTERNAL_SERVER_ERROR, "C013", "생성된 포인트 없음")
   QDRANT_CONNECTION_TIMEOUT = (HTTPStatus.INTERNAL_SERVER_ERROR, "C014", "Qdrant 연결 타임 아웃")
   QDRANT_NOT_STARTED = (HTTPStatus.NOT_FOUND, "C015", "Qdrant 실행 여부 확인 필요")
+  UNSUPPORTED_FILE_TYPE = (HTTPStatus.BAD_REQUEST, "C016", "지원되지 않는 타입의 파일")
+  NO_TEXTS_EXTRACTED = (HTTPStatus.INTERNAL_SERVER_ERROR, "C017", "해당 파일에서 추출된 텍스트 없음")
 
   # agreement 관련 에러
   REVIEW_FAIL = (HTTPStatus.INTERNAL_SERVER_ERROR, "A001", "AI 검토 보고서 생성 작업 중 에러 발생")
   INVALID_S3_PATH = (HTTPStatus.BAD_REQUEST, "A002", "openai 파싱에 적합하지 않은 s3 경로")
-  UNSUPPORTED_FILE_TYPE = (HTTPStatus.BAD_REQUEST, "A003", "지원되지 않는 타입의 파일")
-  NO_TEXTS_EXTRACTED = (HTTPStatus.INTERNAL_SERVER_ERROR, "A004", "해당 파일에서 추출된 텍스트 없음")
-  NO_SEARCH_RESULT = (HTTPStatus.INTERNAL_SERVER_ERROR, "A005", "Qdrant 내 검색된 데이터 없음")
-  QDRANT_SEARCH_FAILED = (HTTPStatus.INTERNAL_SERVER_ERROR, "A006", "Qdrant 검색 결과 반환 실패")
+  NO_SEARCH_RESULT = (HTTPStatus.INTERNAL_SERVER_ERROR, "A003", "Qdrant 내 검색된 데이터 없음")
+  QDRANT_SEARCH_FAILED = (HTTPStatus.INTERNAL_SERVER_ERROR, "A004", "Qdrant 검색 결과 반환 실패")
+  NO_POINTS_FOUND = (HTTPStatus.INTERNAL_SERVER_ERROR, "A005", "Qdrant 내 조회 가능한 포인트 없음")
 
   def __init__(self, status: HTTPStatus, code: str, message: str):
     self.status = status

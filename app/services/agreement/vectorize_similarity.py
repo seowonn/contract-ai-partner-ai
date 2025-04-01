@@ -1,12 +1,12 @@
 import asyncio
 import logging
-from asyncio import Semaphore
 from typing import List, Optional
 
 from qdrant_client import models
 
+from app.blueprints.agreement.agreement_exception import AgreementException
 from app.clients.qdrant_client import get_qdrant_client
-from app.common.exception.custom_exception import BaseCustomException
+from app.common.exception.custom_exception import CommonException
 from app.common.exception.error_code import ErrorCode
 from app.schemas.analysis_response import RagResult
 from app.schemas.document_request import DocumentRequest
@@ -18,28 +18,27 @@ import fitz
 async def vectorize_and_calculate_similarity(
     sorted_chunks: List[RagResult],
     collection_name: str, document_request: DocumentRequest,
-    pdf_document: fitz.Document) -> List[RagResult]:
+    byte_type_pdf: fitz.Document) -> List[RagResult]:
   await ensure_qdrant_collection(collection_name)
 
-  semaphore = asyncio.Semaphore(3)  # 딱 한 번만 생성
+  semaphore = asyncio.Semaphore(5)
   tasks = []
   for chunk in sorted_chunks:
     tasks.append(process_clause(chunk, chunk.incorrect_text, collection_name,
                                 document_request.categoryName, semaphore,
-                                pdf_document))
-
+                                byte_type_pdf))
   # 모든 임베딩 및 유사도 검색 태스크를 병렬로 실행
   results = await asyncio.gather(*tasks)
   return [result for result in results if result is not None]
 
 
 async def process_clause(rag_result: RagResult, clause_content: str,
-    collection_name: str, category_name: str, semaphore: Semaphore,
-    pdf_document: fitz.Document) -> Optional[RagResult]:
+    collection_name: str, category_name: str, semaphore,
+    byte_type_pdf: fitz.Document) -> Optional[RagResult]:
   embedding = await embedding_service.embed_text(clause_content)
 
   client = get_qdrant_client()
-  for retry in range(2):
+  for retry in range(3):
     try:
       async with semaphore:
         search_results = await client.query_points(
@@ -56,26 +55,31 @@ async def process_clause(rag_result: RagResult, clause_content: str,
         )
       break
     except Exception as e:
-      if retry == 1:
-        raise BaseCustomException(ErrorCode.QDRANT_SEARCH_FAILED)
+      if retry == 2:
+        raise CommonException(ErrorCode.QDRANT_SEARCH_FAILED)
       logging.warning(f"query_points: Qdrant Search 재요청 발생 {e}")
       await asyncio.sleep(1)
 
-
   # 3️⃣ 유사한 문장들 처리
   clause_results = []
-  for match in search_results.points:
-    try:
-      payload_data = match.payload or {}
-      clause_results.append({
-        "id": match.id,  # ✅ 벡터 ID
-        "proof_text": payload_data.get("proof_text", ""),  # ✅ 원본 문장
-        "incorrect_text": payload_data.get("incorrect_text", ""),  # ✅ 잘못된 문장
-        "corrected_text": payload_data.get("corrected_text", "")  # ✅ 교정된 문장
-      })
-    except Exception as e:
-      logging.error(f"[process_clause]: {e}")
-      continue
+  if search_results and search_results.points:
+    for match in search_results.points:
+      try:
+        payload_data = match.payload or {}
+        clause_results.append({
+          "id": match.id,
+          "proof_text": payload_data.get("proof_text", ""),
+          "incorrect_text": payload_data.get("incorrect_text", ""),
+          "corrected_text": payload_data.get("corrected_text", "")
+        })
+      except Exception as e:
+        logging.error(f"[process_clause]: {e}")
+        continue
+  else:
+    logging.warning("[process_clause]: search_results.points 비어 있음")
+
+  if not clause_results:
+    raise AgreementException(ErrorCode.NO_POINTS_FOUND)
 
   # 4️⃣ 계약서 문장을 수정 (해당 조항의 TOP 5개 유사 문장을 기반으로)
   corrected_result = await prompt_service.correct_contract(
@@ -92,7 +96,7 @@ async def process_clause(rag_result: RagResult, clause_content: str,
   if float(corrected_result["violation_score"]) > 0.8:
 
     # 원문 텍스트에 대한 위치 정보 찾기
-    all_positions = await find_text_positions(clause_content, pdf_document)
+    all_positions = await find_text_positions(clause_content, byte_type_pdf)
 
     # 페이지를 기준으로 position을 나누어 저장할 리스트
     positions = [[], []]
@@ -116,12 +120,11 @@ async def process_clause(rag_result: RagResult, clause_content: str,
     rag_result.corrected_text = corrected_result["correctedText"]
     rag_result.proof_text = corrected_result["proofText"]
 
-
     rag_result.clause_data[0].position = positions[0]
 
     # 문장이 다음페이지로 넘어가는 경우에만 [1] 에 저장
     if positions[1]:
-        rag_result.clause_data[1].position = positions[1]
+      rag_result.clause_data[1].position = positions[1]
 
     return rag_result
 

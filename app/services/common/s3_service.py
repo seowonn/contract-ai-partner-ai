@@ -3,7 +3,7 @@ from botocore.exceptions import ClientError
 from botocore.response import StreamingBody
 
 from app.blueprints.agreement.agreement_exception import AgreementException
-from app.common.exception.custom_exception import BaseCustomException
+from app.common.exception.custom_exception import CommonException
 from app.common.exception.error_code import ErrorCode
 from config.s3_config import AWS_S3_BUCKET_REGION
 import requests
@@ -21,7 +21,7 @@ def s3_connection():
         aws_secret_access_key=os.getenv("AWS_SECRET_ACCESS_KEY")
     )
   except Exception:
-    raise BaseCustomException(ErrorCode.S3_CLIENT_ERROR)
+    raise CommonException(ErrorCode.S3_CLIENT_ERROR)
 
 s3 = s3_connection()
 
@@ -42,20 +42,20 @@ def s3_get_object(url: str) -> bytes:
     if response.status_code != 200:
       print(
           f"Failed to fetch the file, Status code: {response.status_code}, Response: {response.text}")  # 디버깅용 출력
-      raise BaseCustomException(ErrorCode.FILE_LOAD_FAILED)
+      raise CommonException(ErrorCode.FILE_LOAD_FAILED)
 
     return response.content   # 파일 데이터 반환
 
   except requests.exceptions.RequestException as e:
     print(f"Error occurred while fetching the file: {e}")
-    raise BaseCustomException(ErrorCode.S3_CLIENT_ERROR)
+    raise CommonException(ErrorCode.S3_CLIENT_ERROR)
 
 
 def read_s3_stream(s3_stream: StreamingBody):
   try:
     return s3_stream.read()
   except (OSError, IOError):
-    raise BaseCustomException(ErrorCode.S3_STREAM_READ_FAILED)
+    raise CommonException(ErrorCode.S3_STREAM_READ_FAILED)
 
 
 def generate_pre_signed_url(s3_path: str, expiration=3600) -> str:

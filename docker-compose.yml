@@ -18,6 +18,10 @@ services:
     volumes:
       - qdrant_storage:/qdrant/storage # 데이터 영속화
     restart: always # 자동 재시작
+    ulimits:
+      nofile:
+        soft: 1000000
+        hard: 1000000
 
 volumes:
   qdrant_storage: # Qdrant 데이터 보존

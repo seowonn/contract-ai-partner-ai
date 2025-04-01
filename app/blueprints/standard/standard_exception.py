@@ -1,5 +1,5 @@
-from app.common.exception.custom_exception import BaseCustomException
+from app.common.exception.custom_exception import CommonException
 
 
-class StandardException(BaseCustomException):
+class StandardException(CommonException):
   pass
