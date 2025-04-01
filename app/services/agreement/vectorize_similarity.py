@@ -93,7 +93,7 @@ async def process_clause(rag_result: RagResult, clause_content: str,
     return None
 
   # accuracy가 0.5 이하일 경우 결과를 반환하지 않음
-  if float(corrected_result["violation_score"]) > 0.8:
+  if float(corrected_result["violation_score"]) > 0.5:
 
     # 원문 텍스트에 대한 위치 정보 찾기
     all_positions = await find_text_positions(clause_content, byte_type_pdf)
