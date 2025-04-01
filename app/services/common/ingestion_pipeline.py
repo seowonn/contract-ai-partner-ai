@@ -48,6 +48,9 @@ def chunk_standard_texts(extracted_text: str) -> List[ArticleChunk]:
 
 def chunk_agreement_documents(documents: List[Document]) -> List[DocumentChunk]:
   chunks = chunk_by_article_and_clause_with_page(documents)
+  keep_text, _ = chunks[-1].clause_content.split("날짜 :", 1)
+  chunks[-1].clause_content = keep_text.strip()
+
   if len(chunks) == 0:
     raise CommonException(ErrorCode.CHUNKING_FAIL)
   return chunks
