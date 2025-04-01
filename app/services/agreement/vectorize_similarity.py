@@ -132,6 +132,7 @@ async def process_clause(rag_result: RagResult, clause_content: str,
       article_content
       .replace(CLAUSE_TEXT_SEPARATOR, " ")
       .replace("\n", " ")
+      .replace("", '"')
     )
     rag_result.corrected_text = corrected_result["correctedText"]
     rag_result.proof_text = corrected_result["proofText"]
