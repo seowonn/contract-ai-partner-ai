@@ -2,17 +2,18 @@ import asyncio
 import logging
 from typing import List, Optional
 
+import fitz
 from qdrant_client import models
 
 from app.blueprints.agreement.agreement_exception import AgreementException
 from app.clients.qdrant_client import get_qdrant_client
+from app.common.constants import ARTICLE_CLAUSE_SEPARATOR, CLAUSE_TEXT_SEPARATOR
 from app.common.exception.custom_exception import CommonException
 from app.common.exception.error_code import ErrorCode
+from app.containers.service_container import embedding_service, prompt_service
 from app.schemas.analysis_response import RagResult
 from app.schemas.document_request import DocumentRequest
-from app.containers.service_container import embedding_service, prompt_service
 from app.services.standard.vector_store import ensure_qdrant_collection
-import fitz
 
 
 async def vectorize_and_calculate_similarity(
@@ -35,7 +36,18 @@ async def vectorize_and_calculate_similarity(
 async def process_clause(rag_result: RagResult, clause_content: str,
     collection_name: str, category_name: str, semaphore,
     byte_type_pdf: fitz.Document) -> Optional[RagResult]:
-  embedding = await embedding_service.embed_text(clause_content)
+
+  parts = clause_content.split(ARTICLE_CLAUSE_SEPARATOR, 1)
+
+  article_title = ""
+  if len(parts) == 2:
+    article_title = parts[0].strip()
+    article_content = parts[1].strip()
+  else:
+    article_content = parts[0].strip()
+
+  embedding = await embedding_service.embed_text(
+    article_title + " " + article_content)
 
   client = get_qdrant_client()
   for retry in range(3):
@@ -83,7 +95,7 @@ async def process_clause(rag_result: RagResult, clause_content: str,
 
   # 4️⃣ 계약서 문장을 수정 (해당 조항의 TOP 5개 유사 문장을 기반으로)
   corrected_result = await prompt_service.correct_contract(
-      clause_content=clause_content,
+      clause_content=article_content,
       proof_text=[item["proof_text"] for item in clause_results],  # 기준 문서들
       incorrect_text=[item["incorrect_text"] for item in clause_results],
       corrected_text=[item["corrected_text"] for item in clause_results]
@@ -116,7 +128,11 @@ async def process_clause(rag_result: RagResult, clause_content: str,
 
     # `rag_result.clause_data`에 위치 정보 저장
     rag_result.accuracy = float(corrected_result["violation_score"])
-    rag_result.incorrect_text = corrected_result["clause_content"]
+    rag_result.incorrect_text = (
+      article_content
+      .replace(CLAUSE_TEXT_SEPARATOR, " ")
+      .replace("\n", " ")
+    )
     rag_result.corrected_text = corrected_result["correctedText"]
     rag_result.proof_text = corrected_result["proofText"]
 
