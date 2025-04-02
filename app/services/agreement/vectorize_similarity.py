@@ -105,6 +105,9 @@ async def process_clause(rag_result: RagResult, clause_content: str,
           incorrect_text=[item["incorrect_text"] for item in clause_results],
           corrected_text=[item["corrected_text"] for item in clause_results]
       )
+
+      if corrected_result:
+        break
     except Exception as e:
       if attempt == MAX_RETRIES:
         raise AgreementException(ErrorCode.REVIEW_FAIL)
