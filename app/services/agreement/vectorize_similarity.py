@@ -6,8 +6,9 @@ import fitz
 from qdrant_client import models
 
 from app.blueprints.agreement.agreement_exception import AgreementException
-from app.clients.qdrant_client import get_qdrant_client
-from app.common.constants import ARTICLE_CLAUSE_SEPARATOR, CLAUSE_TEXT_SEPARATOR
+from app.clients.qdrant_client import async_qdrant_client
+from app.common.constants import ARTICLE_CLAUSE_SEPARATOR, \
+  CLAUSE_TEXT_SEPARATOR, MAX_RETRIES
 from app.common.exception.custom_exception import CommonException
 from app.common.exception.error_code import ErrorCode
 from app.containers.service_container import embedding_service, prompt_service
@@ -49,11 +50,11 @@ async def process_clause(rag_result: RagResult, clause_content: str,
   embedding = await embedding_service.embed_text(
     article_title + " " + article_content)
 
-  client = get_qdrant_client()
-  for retry in range(3):
+  search_results = None
+  for attempt in range(1, MAX_RETRIES + 1):
     try:
       async with semaphore:
-        search_results = await client.query_points(
+        search_results = await async_qdrant_client.query_points(
             collection_name=collection_name,
             query=embedding,
             query_filter=models.Filter(
@@ -63,13 +64,13 @@ async def process_clause(rag_result: RagResult, clause_content: str,
                 )]
             ),
             search_params=models.SearchParams(hnsw_ef=128, exact=False),
-            limit=5
+            limit=3
         )
       break
     except Exception as e:
-      if retry == 2:
+      if attempt == MAX_RETRIES:
         raise CommonException(ErrorCode.QDRANT_SEARCH_FAILED)
-      logging.warning(f"query_points: Qdrant Search 재요청 발생 {e}")
+      logging.warning(f"query_points: Qdrant Search 재요청 발생 {attempt}/{MAX_RETRIES} {e}")
       await asyncio.sleep(1)
 
   # 3️⃣ 유사한 문장들 처리
@@ -94,18 +95,30 @@ async def process_clause(rag_result: RagResult, clause_content: str,
     raise AgreementException(ErrorCode.NO_POINTS_FOUND)
 
   # 4️⃣ 계약서 문장을 수정 (해당 조항의 TOP 5개 유사 문장을 기반으로)
-  corrected_result = await prompt_service.correct_contract(
-      clause_content=article_content,
-      proof_text=[item["proof_text"] for item in clause_results],  # 기준 문서들
-      incorrect_text=[item["incorrect_text"] for item in clause_results],
-      corrected_text=[item["corrected_text"] for item in clause_results]
-  )
+  corrected_result = None
+  for attempt in range(1, MAX_RETRIES + 1):
+    try:
+      corrected_result = await prompt_service.correct_contract(
+          clause_content=article_content,
+          proof_text=[item["proof_text"] for item in clause_results],  # 기준 문서들
+          incorrect_text=[item["incorrect_text"] for item in clause_results],
+          corrected_text=[item["corrected_text"] for item in clause_results]
+      )
+
+      if corrected_result:
+        break
+    except Exception as e:
+      if attempt == MAX_RETRIES:
+        raise AgreementException(ErrorCode.REVIEW_FAIL)
+      logging.warning(
+        f"query_points: 계약서 LLM 재요청 발생 {attempt}/{MAX_RETRIES} {e}")
+      await asyncio.sleep(1)
 
   if not corrected_result:
     return None
 
   # accuracy가 0.5 이하일 경우 결과를 반환하지 않음
-  if float(corrected_result["violation_score"]) > 0.5:
+  if float(corrected_result["violation_score"]) > 0.89:
 
     # 원문 텍스트에 대한 위치 정보 찾기
     all_positions = await find_text_positions(clause_content, byte_type_pdf)
@@ -130,8 +143,8 @@ async def process_clause(rag_result: RagResult, clause_content: str,
     rag_result.accuracy = float(corrected_result["violation_score"])
     rag_result.incorrect_text = (
       article_content
-      .replace(CLAUSE_TEXT_SEPARATOR, " ")
-      .replace("\n", " ")
+      .replace(CLAUSE_TEXT_SEPARATOR, "")
+      .replace("\n", "")
       .replace("", '"')
     )
     rag_result.corrected_text = corrected_result["correctedText"]
