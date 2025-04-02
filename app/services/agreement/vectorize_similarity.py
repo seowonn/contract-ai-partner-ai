@@ -3,10 +3,9 @@ import logging
 from typing import List, Optional
 
 import fitz
-from qdrant_client import models
+from qdrant_client import models, AsyncQdrantClient
 
 from app.blueprints.agreement.agreement_exception import AgreementException
-from app.clients.qdrant_client import async_qdrant_client
 from app.common.constants import ARTICLE_CLAUSE_SEPARATOR, \
   CLAUSE_TEXT_SEPARATOR, MAX_RETRIES
 from app.common.exception.custom_exception import CommonException
@@ -18,15 +17,16 @@ from app.services.standard.vector_store import ensure_qdrant_collection
 
 
 async def vectorize_and_calculate_similarity(
+    qd_client: AsyncQdrantClient,
     sorted_chunks: List[RagResult],
     collection_name: str, document_request: DocumentRequest,
     byte_type_pdf: fitz.Document) -> List[RagResult]:
-  await ensure_qdrant_collection(collection_name)
+  await ensure_qdrant_collection(qd_client, collection_name)
 
   semaphore = asyncio.Semaphore(5)
   tasks = []
   for chunk in sorted_chunks:
-    tasks.append(process_clause(chunk, chunk.incorrect_text, collection_name,
+    tasks.append(process_clause(qd_client, chunk, chunk.incorrect_text, collection_name,
                                 document_request.categoryName, semaphore,
                                 byte_type_pdf))
   # 모든 임베딩 및 유사도 검색 태스크를 병렬로 실행
@@ -34,7 +34,7 @@ async def vectorize_and_calculate_similarity(
   return [result for result in results if result is not None]
 
 
-async def process_clause(rag_result: RagResult, clause_content: str,
+async def process_clause(qd_client: AsyncQdrantClient, rag_result: RagResult, clause_content: str,
     collection_name: str, category_name: str, semaphore,
     byte_type_pdf: fitz.Document) -> Optional[RagResult]:
 
@@ -54,7 +54,7 @@ async def process_clause(rag_result: RagResult, clause_content: str,
   for attempt in range(1, MAX_RETRIES + 1):
     try:
       async with semaphore:
-        search_results = await async_qdrant_client.query_points(
+        search_results = await qd_client.query_points(
             collection_name=collection_name,
             query=embedding,
             query_filter=models.Filter(

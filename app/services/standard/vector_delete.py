@@ -1,25 +1,23 @@
 from httpx import ConnectTimeout
+from qdrant_client import AsyncQdrantClient
 from qdrant_client.http.exceptions import UnexpectedResponse, \
   ResponseHandlingException
 from qdrant_client.models import Filter, FieldCondition, MatchValue
 
 from app.blueprints.standard.standard_exception import StandardException
-from app.clients.qdrant_client import async_qdrant_client
-# from app.clients.qdrant_client import get_qdrant_client
 from app.common.exception.custom_exception import CommonException
 from app.common.exception.error_code import ErrorCode
 from app.schemas.success_code import SuccessCode
 
 
-async def delete_by_standard_id(standard_id: int, collection_name: str) -> SuccessCode:
+async def delete_by_standard_id(qd_client: AsyncQdrantClient, standard_id: int, collection_name: str) -> SuccessCode:
   filter_condition = Filter(
       must=[
         FieldCondition(key="standard_id", match=MatchValue(value=standard_id))]
   )
 
-  # client = get_qdrant_client()
   try:
-    points, _ = await async_qdrant_client.scroll(
+    points, _ = await qd_client.scroll(
       collection_name=collection_name,
       scroll_filter=filter_condition,
       limit=1
@@ -31,7 +29,7 @@ async def delete_by_standard_id(standard_id: int, collection_name: str) -> Succe
     return SuccessCode.NO_DOCUMENT_FOUND
 
   try:
-    await async_qdrant_client.delete(
+    await qd_client.delete(
       collection_name=collection_name,
       points_selector=filter_condition
     )
