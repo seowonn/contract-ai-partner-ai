@@ -7,7 +7,8 @@ from qdrant_client import models
 
 from app.blueprints.agreement.agreement_exception import AgreementException
 from app.clients.qdrant_client import get_qdrant_client
-from app.common.constants import ARTICLE_CLAUSE_SEPARATOR, CLAUSE_TEXT_SEPARATOR
+from app.common.constants import ARTICLE_CLAUSE_SEPARATOR, \
+  CLAUSE_TEXT_SEPARATOR, MAX_RETRIES
 from app.common.exception.custom_exception import CommonException
 from app.common.exception.error_code import ErrorCode
 from app.containers.service_container import embedding_service, prompt_service
@@ -50,7 +51,8 @@ async def process_clause(rag_result: RagResult, clause_content: str,
     article_title + " " + article_content)
 
   client = get_qdrant_client()
-  for retry in range(3):
+  search_results = None
+  for attempt in range(1, MAX_RETRIES + 1):
     try:
       async with semaphore:
         search_results = await client.query_points(
@@ -67,9 +69,9 @@ async def process_clause(rag_result: RagResult, clause_content: str,
         )
       break
     except Exception as e:
-      if retry == 2:
+      if attempt == MAX_RETRIES:
         raise CommonException(ErrorCode.QDRANT_SEARCH_FAILED)
-      logging.warning(f"query_points: Qdrant Search 재요청 발생 {e}")
+      logging.warning(f"query_points: Qdrant Search 재요청 발생 {attempt}/{MAX_RETRIES} {e}")
       await asyncio.sleep(1)
 
   # 3️⃣ 유사한 문장들 처리
@@ -94,12 +96,21 @@ async def process_clause(rag_result: RagResult, clause_content: str,
     raise AgreementException(ErrorCode.NO_POINTS_FOUND)
 
   # 4️⃣ 계약서 문장을 수정 (해당 조항의 TOP 5개 유사 문장을 기반으로)
-  corrected_result = await prompt_service.correct_contract(
-      clause_content=article_content,
-      proof_text=[item["proof_text"] for item in clause_results],  # 기준 문서들
-      incorrect_text=[item["incorrect_text"] for item in clause_results],
-      corrected_text=[item["corrected_text"] for item in clause_results]
-  )
+  corrected_result = None
+  for attempt in range(1, MAX_RETRIES + 1):
+    try:
+      corrected_result = await prompt_service.correct_contract(
+          clause_content=article_content,
+          proof_text=[item["proof_text"] for item in clause_results],  # 기준 문서들
+          incorrect_text=[item["incorrect_text"] for item in clause_results],
+          corrected_text=[item["corrected_text"] for item in clause_results]
+      )
+    except Exception as e:
+      if attempt == MAX_RETRIES:
+        raise AgreementException(ErrorCode.REVIEW_FAIL)
+      logging.warning(
+        f"query_points: 계약서 LLM 재요청 발생 {attempt}/{MAX_RETRIES} {e}")
+      await asyncio.sleep(1)
 
   if not corrected_result:
     return None

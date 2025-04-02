@@ -13,6 +13,7 @@ from qdrant_client.models import Distance, VectorParams, PointStruct
 
 from app.blueprints.standard.standard_exception import StandardException
 from app.clients.qdrant_client import get_qdrant_client
+from app.common.constants import MAX_RETRIES
 from app.common.exception.custom_exception import CommonException
 from app.common.exception.error_code import ErrorCode
 from app.containers.service_container import embedding_service, prompt_service
@@ -20,7 +21,7 @@ from app.models.vector import VectorPayload
 from app.schemas.chunk_schema import ArticleChunk, ClauseChunk
 from app.schemas.document_request import DocumentRequest
 
-MAX_RETRIES = 3
+
 async def vectorize_and_save(chunks: List[ArticleChunk],
     collection_name: str, pdf_request: DocumentRequest) -> None:
   await ensure_qdrant_collection(collection_name)
