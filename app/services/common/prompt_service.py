@@ -55,10 +55,19 @@ class PromptService:
 
       response_text = response.choices[0].message.content
       response_text_cleaned = re.sub(r'(?<!\\)\n', ' ', response_text).strip()
+
+      if response_text_cleaned.startswith("```json"):
+        response_text_cleaned = re.sub(r"^```json|```$", "",
+                                       response_text_cleaned).strip()
+      elif response_text_cleaned.startswith("```"):
+        response_text_cleaned = re.sub(r"^```|```$", "",
+                                       response_text_cleaned).strip()
+
       try:
         parsed_response = json.loads(response_text_cleaned)
-      except json.JSONDecodeError:
-        logging.error(f"[PromptService]: jsonDecodeError response_text {response_text_cleaned}")
+      except json.JSONDecodeError as e:
+        logging.error(
+          f"[PromptService]: jsonDecodeError: {e} | raw response: {response_text}")
         return None
 
       return parsed_response
