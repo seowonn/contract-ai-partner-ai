@@ -12,7 +12,7 @@ from qdrant_client.http.exceptions import ResponseHandlingException
 from qdrant_client.models import Distance, VectorParams, PointStruct
 
 from app.blueprints.standard.standard_exception import StandardException
-from app.clients.qdrant_client import get_qdrant_client
+from app.clients.qdrant_client import async_qdrant_client
 from app.common.constants import MAX_RETRIES
 from app.common.exception.custom_exception import CommonException
 from app.common.exception.error_code import ErrorCode
@@ -92,9 +92,9 @@ async def retry_make_correction(clause_content: str) -> dict:
 
 
 async def ensure_qdrant_collection(collection_name: str) -> None:
-  client = get_qdrant_client()
+  # client = get_qdrant_client()
   try:
-    exists = await client.collection_exists(collection_name=collection_name)
+    exists = await async_qdrant_client.collection_exists(collection_name=collection_name)
     if not exists:
       await create_qdrant_collection(collection_name)
 
@@ -103,9 +103,8 @@ async def ensure_qdrant_collection(collection_name: str) -> None:
 
 
 async def create_qdrant_collection(collection_name: str):
-  client = get_qdrant_client()
   try:
-    return await client.create_collection(
+    return await async_qdrant_client.create_collection(
         collection_name=collection_name,
         vectors_config=VectorParams(size=1536, distance=Distance.COSINE)
     )
@@ -117,9 +116,8 @@ async def upload_points_to_qdrant(collection_name, points):
   if len(points) == 0:
     raise StandardException(ErrorCode.NO_POINTS_GENERATED)
 
-  client = get_qdrant_client()
   try:
-    await client.upsert(collection_name=collection_name, points=points)
+    await async_qdrant_client.upsert(collection_name=collection_name, points=points)
   except (ConnectTimeout, ResponseHandlingException):
     raise CommonException(ErrorCode.QDRANT_CONNECTION_TIMEOUT)
 

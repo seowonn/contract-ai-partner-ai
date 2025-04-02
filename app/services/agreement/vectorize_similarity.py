@@ -6,7 +6,7 @@ import fitz
 from qdrant_client import models
 
 from app.blueprints.agreement.agreement_exception import AgreementException
-from app.clients.qdrant_client import get_qdrant_client
+from app.clients.qdrant_client import async_qdrant_client
 from app.common.constants import ARTICLE_CLAUSE_SEPARATOR, \
   CLAUSE_TEXT_SEPARATOR, MAX_RETRIES
 from app.common.exception.custom_exception import CommonException
@@ -50,12 +50,11 @@ async def process_clause(rag_result: RagResult, clause_content: str,
   embedding = await embedding_service.embed_text(
     article_title + " " + article_content)
 
-  client = get_qdrant_client()
   search_results = None
   for attempt in range(1, MAX_RETRIES + 1):
     try:
       async with semaphore:
-        search_results = await client.query_points(
+        search_results = await async_qdrant_client.query_points(
             collection_name=collection_name,
             query=embedding,
             query_filter=models.Filter(
@@ -65,7 +64,7 @@ async def process_clause(rag_result: RagResult, clause_content: str,
                 )]
             ),
             search_params=models.SearchParams(hnsw_ef=128, exact=False),
-            limit=5
+            limit=3
         )
       break
     except Exception as e:
