@@ -141,6 +141,7 @@ class PromptService:
               }
             ],
             temperature=0.1,
+            max_tokens=512,
         )
 
     response_text = response.choices[0].message.content
@@ -178,6 +179,7 @@ class PromptService:
                      f"\n\n 문서 : {documents}"
         }],
         temperature=0.5,
+        max_tokens=512,
         top_p=1
     )
 
