@@ -158,7 +158,7 @@ class PromptService:
       parsed_response = json.loads(pure_json)
     except json.JSONDecodeError:
       logging.error(
-          f"[PromptService] ❌ OpenAI 응답이 JSON 형식이 아님:\n{response_text_cleaned}"
+          f"[PromptService] 응답이 JSON 형식이 아님:\n{response_text_cleaned}"
       )
       return None
 

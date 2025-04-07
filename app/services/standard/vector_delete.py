@@ -1,16 +1,17 @@
 from httpx import ConnectTimeout
-from qdrant_client import AsyncQdrantClient
 from qdrant_client.http.exceptions import UnexpectedResponse, \
   ResponseHandlingException
 from qdrant_client.models import Filter, FieldCondition, MatchValue
 
 from app.blueprints.standard.standard_exception import StandardException
+from app.clients.qdrant_client import get_qdrant_client
 from app.common.exception.custom_exception import CommonException
 from app.common.exception.error_code import ErrorCode
 from app.schemas.success_code import SuccessCode
 
 
-async def delete_by_standard_id(qd_client: AsyncQdrantClient, standard_id: int, collection_name: str) -> SuccessCode:
+async def delete_by_standard_id(standard_id: int, collection_name: str) -> SuccessCode:
+  qd_client = get_qdrant_client()
   filter_condition = Filter(
       must=[
         FieldCondition(key="standard_id", match=MatchValue(value=standard_id))]
