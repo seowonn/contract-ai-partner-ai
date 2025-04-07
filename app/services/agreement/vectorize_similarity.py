@@ -6,6 +6,7 @@ import fitz
 from qdrant_client import models, AsyncQdrantClient
 
 from app.blueprints.agreement.agreement_exception import AgreementException
+from app.clients.qdrant_client import get_qdrant_client
 from app.common.constants import ARTICLE_CLAUSE_SEPARATOR, \
   CLAUSE_TEXT_SEPARATOR, MAX_RETRIES
 from app.common.exception.custom_exception import CommonException
@@ -17,10 +18,10 @@ from app.services.standard.vector_store import ensure_qdrant_collection
 
 
 async def vectorize_and_calculate_similarity(
-    qd_client: AsyncQdrantClient,
     sorted_chunks: List[RagResult],
     collection_name: str, document_request: DocumentRequest,
     byte_type_pdf: fitz.Document) -> List[RagResult]:
+  qd_client = get_qdrant_client()
   await ensure_qdrant_collection(qd_client, collection_name)
 
   semaphore = asyncio.Semaphore(5)
