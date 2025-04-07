@@ -7,6 +7,7 @@ from typing import List
 
 import numpy as np
 from httpx import ConnectTimeout
+from qdrant_client import AsyncQdrantClient
 from qdrant_client.http.exceptions import ResponseHandlingException
 
 from qdrant_client.models import Distance, VectorParams, PointStruct
@@ -24,7 +25,8 @@ from app.schemas.document_request import DocumentRequest
 
 async def vectorize_and_save(chunks: List[ArticleChunk],
     collection_name: str, pdf_request: DocumentRequest) -> None:
-  await ensure_qdrant_collection(collection_name)
+  qd_client = get_qdrant_client()
+  await ensure_qdrant_collection(qd_client, collection_name)
   tasks = []
 
   for article in chunks:
@@ -39,7 +41,7 @@ async def vectorize_and_save(chunks: List[ArticleChunk],
 
   # None 제거 후 업로드
   points = [point for point in results if point]
-  await upload_points_to_qdrant(collection_name, points)
+  await upload_points_to_qdrant(qd_client, collection_name, points)
 
 
 async def process_clause(article_title: str, clause: ClauseChunk,
@@ -91,21 +93,19 @@ async def retry_make_correction(clause_content: str) -> dict:
   raise StandardException(ErrorCode.PROMPT_MAX_TRIAL_FAILED)
 
 
-async def ensure_qdrant_collection(collection_name: str) -> None:
-  client = get_qdrant_client()
+async def ensure_qdrant_collection(qd_client: AsyncQdrantClient, collection_name: str) -> None:
   try:
-    exists = await client.collection_exists(collection_name=collection_name)
+    exists = await qd_client.collection_exists(collection_name=collection_name)
     if not exists:
-      await create_qdrant_collection(collection_name)
+      await create_qdrant_collection(qd_client, collection_name)
 
   except (ConnectTimeout, ResponseHandlingException):
     raise CommonException(ErrorCode.QDRANT_NOT_STARTED)
 
 
-async def create_qdrant_collection(collection_name: str):
-  client = get_qdrant_client()
+async def create_qdrant_collection(qd_client: AsyncQdrantClient, collection_name: str):
   try:
-    return await client.create_collection(
+    return await qd_client.create_collection(
         collection_name=collection_name,
         vectors_config=VectorParams(size=1536, distance=Distance.COSINE)
     )
@@ -113,13 +113,12 @@ async def create_qdrant_collection(collection_name: str):
     raise CommonException(ErrorCode.QDRANT_CONNECTION_TIMEOUT)
 
 
-async def upload_points_to_qdrant(collection_name, points):
+async def upload_points_to_qdrant(qd_client: AsyncQdrantClient, collection_name, points):
   if len(points) == 0:
     raise StandardException(ErrorCode.NO_POINTS_GENERATED)
 
-  client = get_qdrant_client()
   try:
-    await client.upsert(collection_name=collection_name, points=points)
+    await qd_client.upsert(collection_name=collection_name, points=points)
   except (ConnectTimeout, ResponseHandlingException):
     raise CommonException(ErrorCode.QDRANT_CONNECTION_TIMEOUT)
 

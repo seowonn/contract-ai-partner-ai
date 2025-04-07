@@ -24,6 +24,7 @@ agreements = Blueprint('agreements', __name__, url_prefix="/flask/agreements")
 
 @agreements.route('/analysis', methods=['POST'])
 def process_agreements_pdf_from_s3():
+
   try:
     json_data = request.get_json()
     if json_data is None:

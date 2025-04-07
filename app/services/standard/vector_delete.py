@@ -11,14 +11,14 @@ from app.schemas.success_code import SuccessCode
 
 
 async def delete_by_standard_id(standard_id: int, collection_name: str) -> SuccessCode:
+  qd_client = get_qdrant_client()
   filter_condition = Filter(
       must=[
         FieldCondition(key="standard_id", match=MatchValue(value=standard_id))]
   )
 
-  client = get_qdrant_client()
   try:
-    points, _ = await client.scroll(
+    points, _ = await qd_client.scroll(
       collection_name=collection_name,
       scroll_filter=filter_condition,
       limit=1
@@ -30,7 +30,7 @@ async def delete_by_standard_id(standard_id: int, collection_name: str) -> Succe
     return SuccessCode.NO_DOCUMENT_FOUND
 
   try:
-    await client.delete(
+    await qd_client.delete(
       collection_name=collection_name,
       points_selector=filter_condition
     )

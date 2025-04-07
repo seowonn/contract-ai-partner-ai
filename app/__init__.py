@@ -1,10 +1,16 @@
 import logging
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s - %(levelname)s - %(filename)s:%(lineno)d - %(message)s",
+    datefmt="%Y-%m-%d %H:%M:%S",
+    force=True
+)
+
 import os
 
 from dotenv import load_dotenv
 from flask import Flask
-from app.clients.qdrant_client import get_qdrant_client
-from app.clients.openai_clients import embedding_client, prompt_client
 from app.common.exception.error_handler import register_error_handlers
 from app.blueprints.standard import standard_blueprint
 from app.blueprints.agreement import agreement_blueprint
@@ -22,14 +28,6 @@ def create_app():
   # 로깅 설정
   werkzeug_logger = logging.getLogger('werkzeug')
   werkzeug_logger.disabled = True
-
-  # ✅ 상세 로그 포맷 적용 (파일명, 라인번호 포함)
-  logging.basicConfig(
-      level=logging.INFO,  # ERROR 로그만 출력
-      format="%(asctime)s - %(levelname)s - %(filename)s:%(lineno)d - %(message)s",
-      datefmt="%Y-%m-%d %H:%M:%S",
-      force=True
-  )
 
   # 예외 핸들러 등록
   register_error_handlers(app)
