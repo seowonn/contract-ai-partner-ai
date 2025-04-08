@@ -5,6 +5,7 @@ from typing import Optional, Tuple
 
 import nltk
 import tiktoken
+from nltk import find
 from sklearn.metrics.pairwise import cosine_similarity
 
 from app.blueprints.standard.standard_exception import StandardException
@@ -52,8 +53,15 @@ def semantic_chunk(extracted_text: str, similarity_threshold: float = 0.9,
   return chunks
 
 
+def ensure_punkt():
+  try:
+    find('tokenizers/punkt')
+  except LookupError:
+    nltk.download('punkt')
+
+
 def split_into_sentences(extracted_text: str):
-  nltk.download('punkt', quiet=True)
+  ensure_punkt()
   return nltk.sent_tokenize(extracted_text)
 
 
