@@ -6,7 +6,21 @@ from typing import List, Any
 import httpx
 from openai import AsyncOpenAI
 
-from app.clients.openai_clients import sync_openai_client, prompt_client
+from app.clients.openai_clients import sync_openai_client, prompt_async_client, \
+  prompt_sync_client
+
+
+def clean_markdown_block(response_text: str) -> str:
+  response_text_cleaned = response_text
+
+  if response_text_cleaned.startswith(
+      "```json") and response_text_cleaned.endswith("```"):
+    return response_text_cleaned[7:-3].strip()
+  elif response_text_cleaned.startswith(
+      "```") and response_text_cleaned.endswith("```"):
+    return response_text_cleaned[3:-3].strip()
+  else:
+    return response_text_cleaned
 
 
 class PromptService:
@@ -14,7 +28,7 @@ class PromptService:
     self.deployment_name = deployment_name
 
   async def make_correction_data(self, clause_content: str) -> Any | None:
-    response = await prompt_client.chat.completions.create(
+    response = await prompt_async_client.chat.completions.create(
         model=self.deployment_name,
         messages=[
           {
@@ -54,21 +68,15 @@ class PromptService:
         top_p=1
     )
 
-    response_text = response.choices[0].message.content
-    response_text_cleaned = re.sub(r'(?<!\\)\n', ' ', response_text).strip()
-
-    if response_text_cleaned.startswith("```json"):
-      response_text_cleaned = re.sub(r"^```json|```$", "",
-                                     response_text_cleaned).strip()
-    elif response_text_cleaned.startswith("```"):
-      response_text_cleaned = re.sub(r"^```|```$", "",
-                                     response_text_cleaned).strip()
+    raw_response_text = response.choices[
+      0].message.content if response.choices else ''
+    cleaned_text = clean_markdown_block(raw_response_text)
 
     try:
-      parsed_response = json.loads(response_text_cleaned)
+      parsed_response = json.loads(cleaned_text)
     except json.JSONDecodeError as e:
       logging.error(
-          f"[PromptService]: jsonDecodeError: {e} | raw response: {response_text}")
+          f"[PromptService]: jsonDecodeError: {e} | raw response: {cleaned_text}")
       return None
 
     return parsed_response
@@ -91,7 +99,7 @@ class PromptService:
 
     # async with httpx.AsyncClient() as httpx_client:
     #   async with AsyncOpenAI(http_client=httpx_client) as client:
-    response = await prompt_client.chat.completions.create(
+    response = await prompt_async_client.chat.completions.create(
         model=self.deployment_name,
         messages=[
           {

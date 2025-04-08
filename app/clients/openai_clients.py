@@ -22,7 +22,7 @@ embedding_sync_client = openai.AzureOpenAI(
 )
 embedding_deployment_name = os.getenv("EMBEDDING_OPENAI_DEPLOYMENT_NAME")
 
-prompt_client = openai.AsyncAzureOpenAI(
+prompt_async_client = openai.AsyncAzureOpenAI(
     api_key=os.getenv("AZURE_PROMPT_API_KEY"),
     api_version=os.getenv("AZURE_PROMPT_OPENAI_API_VERSION"),
     azure_endpoint=os.getenv("AZURE_PROMPT_OPENAI_ENDPOINT")
