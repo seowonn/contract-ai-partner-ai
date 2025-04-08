@@ -6,8 +6,7 @@ from typing import List, Any
 import httpx
 from openai import AsyncOpenAI
 
-from app.clients.openai_clients import sync_openai_client, prompt_async_client, \
-  prompt_sync_client
+from app.clients.openai_clients import sync_openai_client, prompt_async_client
 
 
 def clean_markdown_block(response_text: str) -> str:
