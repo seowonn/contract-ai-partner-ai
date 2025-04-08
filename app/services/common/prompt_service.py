@@ -89,60 +89,60 @@ class PromptService:
       "corrected_text": corrected_text
     }
 
-    async with httpx.AsyncClient() as httpx_client:
-      async with AsyncOpenAI(http_client=httpx_client) as client:
-        response = await client.chat.completions.create(
-            model=self.deployment_name,
-            messages=[
-              {
-                "role": "developer",
-                "content":
-                  f"""
-                    너는 한국에서 계약서 및 법률 문서를 검토하는 최고의 변호사야.
-                    계약서에서 법률 위반 가능성이 있는 부분을 정확히 찾아내고,
-                    그 부분을 교정할 때 법적인 근거를 설명해야 해.
-                  """
-              },
-              {
-                "role": "user",
-                "content":
-                  f"""
-                    입력 데이터를 참고해서
-                    계약서 문장에서 부당한 문구가 있는지 찾아 수정해주세요.
-                    특히, 법적인 요구 사항에 맞지 않는 부분, 
-                    노동자에게 불리한 문장을 교정하고 그 이유를 proofText 에 설명해 주세요.
-                    입력 데이터 변수명을 proofText 에 포함시키면 안됩니다.
-                    근로자와의 협의를 덜 고려해 주세요.                    
+    # async with httpx.AsyncClient() as httpx_client:
+    #   async with AsyncOpenAI(http_client=httpx_client) as client:
+    response = await prompt_client.chat.completions.create(
+        model=self.deployment_name,
+        messages=[
+          {
+            "role": "developer",
+            "content":
+              f"""
+                너는 한국에서 계약서 및 법률 문서를 검토하는 최고의 변호사야.
+                계약서에서 법률 위반 가능성이 있는 부분을 정확히 찾아내고,
+                그 부분을 교정할 때 법적인 근거를 설명해야 해.
+              """
+          },
+          {
+            "role": "user",
+            "content":
+              f"""
+                입력 데이터를 참고해서
+                계약서 문장에서 부당한 문구가 있는지 찾아 수정해주세요.
+                특히, 법적인 요구 사항에 맞지 않는 부분, 
+                노동자에게 불리한 문장을 교정하고 그 이유를 proofText 에 설명해 주세요.
+                입력 데이터 변수명을 proofText 에 포함시키면 안됩니다.
+                근로자와의 협의를 덜 고려해 주세요.                    
 
-                    틀린 확률이 높아보인다면 violation_score를 높게 반환해 주세요.
-                    문법적인 측면이 아닌 내용적인 측면에서 교정해 주세요.
+            틀린 확률이 높아보인다면 violation_score를 높게 반환해 주세요.
+            문법적인 측면이 아닌 내용적인 측면에서 교정해 주세요.
 
-                    [입력 데이터 설명]
-                    - clause_content: 계약서 문장
-                    - proof_text: 법률 문서의 문장 목록
-                    - incorrect_text: 법률 위반할 가능성이 있는 예시 문장 
-                    - corrected_text: 법률 위반 가능성이 있는 예시 문장을 올바르게 수정한 문장 목록
+            [입력 데이터 설명]
+            - clause_content: 계약서 문장
+            - proof_text: 법률 문서의 문장 목록
+            - incorrect_text: 법률 위반할 가능성이 있는 예시 문장 
+            - corrected_text: 법률 위반 가능성이 있는 예시 문장을 올바르게 수정한 문장 목록
 
-                    [입력 데이터]
-                    {json.dumps(input_data, ensure_ascii=False, indent=2)}
+            [입력 데이터]
+            {json.dumps(input_data, ensure_ascii=False, indent=2)}
 
-                    [출력 형식]
-                    {{
-                        "clause_content": 계약서 원문
-                        "correctedText": "계약서의 문장을 올바르게 교정한 문장",
-                        "proofText": 입력데이터를 참조해 잘못된 포인트와 이유"
-                        "violation_score": "문장이 틀리거나 법률을 위배할 확률 "
-                    }}
+            [출력 형식]
+            {{
+                "clause_content": 계약서 원문
+                "correctedText": "계약서의 문장을 올바르게 교정한 문장",
+                "proofText": 입력데이터를 참조해 잘못된 포인트와 이유"
+                "violation_score": "문장이 틀리거나 법률을 위배할 확률 "
+            }}
 
-                    json 바깥에는 아무것도 반환하지 마세요
-                    violation_score는 0~1 범위의 소수점 셋째자리까지 반환해 주세요. 
+            json 바깥에는 아무것도 반환하지 마세요
+            violation_score는 0~1 범위의 소수점 셋째자리까지 반환해 주세요. 
 
-                  """
-              }
-            ],
-            temperature=0.1,
-            max_tokens=512,
-        )
+          """
+        }
+      ],
+      temperature=0.1,
+      max_tokens=512,
+    )
 
     response_text = response.choices[0].message.content
     response_text_cleaned = response_text.strip()

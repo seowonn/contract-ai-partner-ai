@@ -15,13 +15,13 @@ class EmbeddingService:
     self.deployment_name = deployment_name
 
   async def embed_text(self, text: str) -> List[float]:
-    async with httpx.AsyncClient() as httpx_client:
-      async with AsyncOpenAI(http_client=httpx_client) as client:
-        response = await client.embeddings.create(
-            model=self.deployment_name,
-            input=text,
-            encoding_format="float"
-        )
+    # async with httpx.AsyncClient() as httpx_client:
+    #   async with AsyncOpenAI(http_client=httpx_client) as client:
+    response = await embedding_async_client.embeddings.create(
+        model=self.deployment_name,
+        input=text,
+        encoding_format="float"
+    )
 
     if not response or not response.data or not response.data[0].embedding:
       raise CommonException(ErrorCode.EMBEDDING_FAILED)
