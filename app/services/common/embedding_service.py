@@ -4,7 +4,8 @@ import httpx
 import numpy as np
 from openai import AsyncOpenAI
 
-from app.clients.openai_clients import embedding_client
+from app.clients.openai_clients import embedding_async_client, \
+  embedding_sync_client
 from app.common.exception.custom_exception import CommonException
 from app.common.exception.error_code import ErrorCode
 
@@ -29,7 +30,7 @@ class EmbeddingService:
 
 
   def get_embeddings(self, sentences: List[str]) -> List[List[float]]:
-    response = embedding_client.embeddings.create(
+    response = embedding_sync_client.embeddings.create(
         input=sentences,
         model=self.deployment_name,
         encoding_format="float"
