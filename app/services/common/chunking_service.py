@@ -4,9 +4,12 @@ from typing import List
 from typing import Optional, Tuple
 
 import nltk
+import numpy as np
 import tiktoken
 from nltk import find
+from sklearn.manifold import TSNE
 from sklearn.metrics.pairwise import cosine_similarity
+import matplotlib.pyplot as plt
 
 from app.blueprints.standard.standard_exception import StandardException
 from app.common.constants import ARTICLE_CHUNK_PATTERN, ARTICLE_HEADER_PATTERN, \
@@ -19,7 +22,7 @@ from app.schemas.chunk_schema import Document
 
 MIN_CLAUSE_BODY_LENGTH = 20
 def semantic_chunk(extracted_text: str, similarity_threshold: float = 0.9,
-    max_tokens: int = 250) -> \
+    max_tokens: int = 250, visualize: bool = False) -> \
     List[str]:
   sentences = split_into_sentences(extracted_text)
   if not sentences:
@@ -27,6 +30,12 @@ def semantic_chunk(extracted_text: str, similarity_threshold: float = 0.9,
 
   sentences = [s for s in sentences if len(s.strip()) > MIN_CLAUSE_BODY_LENGTH]
   embeddings = embedding_service.get_embeddings(sentences)
+
+  if visualize:
+    try:
+        visualize_embeddings_3d(embeddings, sentences)
+    except Exception as e:
+        print(f"[시각화 오류] {e}")
 
   chunks = []
   current_chunk = [sentences[0]]
@@ -51,6 +60,25 @@ def semantic_chunk(extracted_text: str, similarity_threshold: float = 0.9,
     chunks.append(chunk_text)
 
   return chunks
+
+
+def visualize_embeddings_3d(embeddings: List[List[float]], sentences: List[str]):
+  plt.rcParams['font.family'] = 'Malgun Gothic'  # 또는 'AppleGothic'
+  plt.rcParams['axes.unicode_minus'] = False
+
+  tsne = TSNE(n_components=3, random_state=0, perplexity=5)
+  reduced = tsne.fit_transform(np.array(embeddings))
+
+  fig = plt.figure(figsize=(10, 8))
+  ax = fig.add_subplot(111, projection='3d')
+
+  for i, text in enumerate(sentences):
+    x, y, z = reduced[i]
+    ax.scatter(x, y, z)
+    ax.text(x, y, z, text[:30] + "...", size=9)
+  ax.set_title("Semantic Embedding 결과")
+  plt.tight_layout()
+  plt.show()
 
 
 def ensure_punkt():
