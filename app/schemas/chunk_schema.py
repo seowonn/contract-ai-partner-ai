@@ -16,9 +16,9 @@ class ArticleChunk:
 
 @dataclass
 class DocumentChunk:
-  clause_content: str
-  page: int
-  order_index: int
+  clause_content: str = ''
+  page: int = 0
+  order_index: int = 0
   clause_number: Optional[str] = None
 
 @dataclass
