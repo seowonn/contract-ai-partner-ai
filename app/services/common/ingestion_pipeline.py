@@ -7,7 +7,7 @@ from app.common.exception.custom_exception import CommonException
 from app.common.exception.error_code import ErrorCode
 from app.common.file_type import FileType
 from app.schemas.analysis_response import RagResult, ClauseData
-from app.schemas.chunk_schema import ArticleChunk, DocumentChunk
+from app.schemas.chunk_schema import DocumentChunk
 from app.schemas.chunk_schema import Document
 from app.schemas.document_request import DocumentRequest
 from app.services.agreement.img_service import process_img
