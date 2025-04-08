@@ -6,7 +6,7 @@ from typing import List, Any
 import httpx
 from openai import AsyncOpenAI
 
-from app.clients.openai_clients import sync_openai_client
+from app.clients.openai_clients import sync_openai_client, prompt_client
 
 
 class PromptService:
@@ -14,63 +14,64 @@ class PromptService:
     self.deployment_name = deployment_name
 
   async def make_correction_data(self, clause_content: str) -> Any | None:
-    async with httpx.AsyncClient() as httpx_client:
-      async with AsyncOpenAI(http_client=httpx_client) as client:
-        response = await client.chat.completions.create(
-            model=self.deployment_name,
-            messages=[
-              {
-                "role": "user",
-                "content": f"""
-                    너는 입력으로 들어온 문장을 보고 '계약 체결자에게 불리하게 작용할 수 있는 문장'을 생성하고, 이를 공정하게 수정하는 문장을 제시하는 전문가야.
+    response = await prompt_client.chat.completions.create(
+        model=self.deployment_name,
+        messages=[
+          {
+            "role": "user",
+            "content": f"""
+              너는 입력 문장을 검토하여 '계약 체결자에게 불리하게 작용할 수 있는 문장'을 **적극적으로 생성**하고, 이를 **공정하게 수정한 문장**을 제시하는 계약서 공정성 분석 전문가야.
+      
+              다음 조건을 반드시 지켜:
+              - 원문에 명확한 위배 문장이 없어 보여도, **해석 가능성이나 맥락에 근거해 위배 소지가 있는 문장을 추정해서 생성할 것**
+              - **절대 원문 그대로 반환하지 말 것**
+              - **맞춤법, 어휘 표현 개선은 하지 말고, 오직 불공정성/위배 가능성에만 초점 둘 것**
+              - 반드시 아래와 같은 **한 줄짜리 JSON 형식만 출력**할 것 (줄바꿈 금지):
+      
+              예시 출력 형식:
+              {{
+                "incorrect_text": "계약 해지 시 위약금을 무조건 부담해야 한다.",
+                "corrected_text": "계약 해지 사유에 따라 위약금 부담 여부를 조정할 수 있다."
+              }}
+      
+              원문:
+              \"\"\"{clause_content}\"\"\"
+      
+              불공정 판단 기준:
+              - 특정 당사자의 권리를 과도하게 제한하거나
+              - 의무를 일방에게만 지우거나
+              - 해석 여지로 인해 불리하게 적용될 가능성이 있으며
+              - 효력 발생 조건이 불명확하거나 불공정한 경우
+      
+              지금 문장을 분석해 위 기준에 따라 **불리할 수 있는 문장을 생성하고**, **공정하게 수정**해서 JSON 한 줄로 반환해.
+              """
 
-                    아래 조건을 반드시 지켜.
-                    - 계약자에게 불리한 문장을 찾지 못하더라도 원문 그대로 반환하지 말고 '불리할 여지가 있는 해석'을 적극적으로 추정할 것.
-                    - 줄바꿈 없이 한 줄짜리 JSON만 출력할 것.
-                    - 맞춤법 관련 내용은 제외.
-                    - 반드시 아래와 같은 JSON 형식만 출력:
-                      {{
-                        "incorrect_text": "원문을 보고 위배 소지가 될 수 있는 문장을 생성한 문장",
-                        "corrected_text": "공정하게 수정한 문장"
-                      }}
+          }
+        ],
+        temperature=0.5,
+        max_tokens=800,
+        top_p=1
+    )
 
-                    원문:
-                    \"\"\"
-                    {clause_content}
-                    \"\"\"
+    response_text = response.choices[0].message.content
+    response_text_cleaned = re.sub(r'(?<!\\)\n', ' ', response_text).strip()
 
-                    위배 판단 기준:
-                    - 일방의 권리를 과도하게 제한하거나
-                    - 해석 여지가 있어 불리한 결과가 나올 수 있으며
-                    - 효력 발생 조건이 불공정한 경우 등
+    if response_text_cleaned.startswith("```json"):
+      response_text_cleaned = re.sub(r"^```json|```$", "",
+                                     response_text_cleaned).strip()
+    elif response_text_cleaned.startswith("```"):
+      response_text_cleaned = re.sub(r"^```|```$", "",
+                                     response_text_cleaned).strip()
 
-                    지금 문서를 분석해서 JSON으로 한 줄만 반환해.
-                """
-              }
-            ],
-            temperature=0.5,
-            max_tokens=512,
-            top_p=1
-        )
+    try:
+      parsed_response = json.loads(response_text_cleaned)
+    except json.JSONDecodeError as e:
+      logging.error(
+          f"[PromptService]: jsonDecodeError: {e} | raw response: {response_text}")
+      return None
 
-      response_text = response.choices[0].message.content
-      response_text_cleaned = re.sub(r'(?<!\\)\n', ' ', response_text).strip()
+    return parsed_response
 
-      if response_text_cleaned.startswith("```json"):
-        response_text_cleaned = re.sub(r"^```json|```$", "",
-                                       response_text_cleaned).strip()
-      elif response_text_cleaned.startswith("```"):
-        response_text_cleaned = re.sub(r"^```|```$", "",
-                                       response_text_cleaned).strip()
-
-      try:
-        parsed_response = json.loads(response_text_cleaned)
-      except json.JSONDecodeError as e:
-        logging.error(
-            f"[PromptService]: jsonDecodeError: {e} | raw response: {response_text}")
-        return None
-
-      return parsed_response
 
   async def correct_contract(self, clause_content: str, proof_text: List[str],
       incorrect_text: List[str], corrected_text: List[str]):
