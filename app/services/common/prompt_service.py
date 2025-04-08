@@ -166,24 +166,3 @@ class PromptService:
 
     return parsed_response
 
-  def summarize_document(self, documents: str) -> str:
-    # OpenAI API 호출하여 문서 요약
-    response = sync_openai_client.chat.completions.create(
-        model=self.deployment_name,
-        messages=[{
-          "role": "user",
-          # 과 엔터키 '\n', '\n\n' 모두 제거하고 출력해줘"
-          "content": f"문서 전체 내용을 요약해줘."
-                     f"출력할때 강조하는 '**'  제거하고 출력해줘"
-                     f"\n\n 문서 : {documents}"
-        }],
-        temperature=0.5,
-        max_tokens=512,
-        top_p=1
-    )
-
-    # 요약된 내용만 추출하여 반환
-    summary_content = response.choices[
-      0].message.content if response.choices else ''
-
-    return summary_content
