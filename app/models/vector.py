@@ -1,10 +1,9 @@
-from dataclasses import dataclass, asdict
+from dataclasses import dataclass
 
 
 @dataclass
 class VectorPayload:
   standard_id: int
-  category: str
   incorrect_text: str | None
   proof_text: str | None
   corrected_text: str | None
@@ -13,7 +12,6 @@ class VectorPayload:
   def to_dict(self) -> dict:
     return {
       "standard_id": self.standard_id or "",
-      "category": self.category or "",
       "incorrect_text": self.incorrect_text or "",
       "proof_text": self.proof_text or "",
       "corrected_text": self.corrected_text or "",

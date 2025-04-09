@@ -7,9 +7,10 @@ from pydantic import ValidationError
 
 from app.blueprints.agreement.agreement_exception import AgreementException
 from app.blueprints.common.async_loop import run_async
-from app.common.constants import SUCCESS, QDRANT_COLLECTION
+from app.common.constants import SUCCESS
 from app.common.exception.custom_exception import CommonException
 from app.common.exception.error_code import ErrorCode
+from app.schemas.analysis_response import StandardResponse
 from app.schemas.document_request import DocumentRequest
 from app.schemas.success_code import SuccessCode
 from app.schemas.success_response import SuccessResponse
@@ -32,23 +33,23 @@ def process_standards_pdf_from_s3():
   except ValidationError:
     raise CommonException(ErrorCode.FIELD_MISSING)
 
-  status_code = HTTPStatus.OK
   documents, _ = preprocess_data(document_request)
   extracted_text = "\n".join([doc.page_content for doc in documents])
   chunks = chunk_standard_texts(extracted_text)
 
   # 5️⃣ 벡터화 + Qdrant 저장
   start_time = time.time()
-  run_async(vectorize_and_save(chunks, QDRANT_COLLECTION, document_request))
+  run_async(vectorize_and_save(chunks, document_request))
   end_time = time.time()
   logging.info(f"vectorize_and_save 소요 시간: {end_time - start_time}")
 
+  contents = [doc.page_content for doc in documents]
   return SuccessResponse(SuccessCode.ANALYSIS_COMPLETE,
-                         SUCCESS).of(), status_code
+                         StandardResponse(contents=contents)).of(), HTTPStatus.OK
 
 
-@standards.route('/<standardId>', methods=["DELETE"])
-def delete_standard(standardId: str):
+@standards.route('<categoryName>/<standardId>', methods=["DELETE"])
+def delete_standard(categoryName: str, standardId: str):
   if not standardId.strip():
     raise AgreementException(ErrorCode.INVALID_URL_PARAMETER)
 
@@ -56,5 +57,5 @@ def delete_standard(standardId: str):
     raise AgreementException(ErrorCode.CANNOT_CONVERT_TO_NUM)
 
   success_code = (
-    run_async(delete_by_standard_id(int(standardId), QDRANT_COLLECTION)))
+    run_async(delete_by_standard_id(int(standardId), categoryName)))
   return SuccessResponse(success_code, SUCCESS).of(), HTTPStatus.OK
