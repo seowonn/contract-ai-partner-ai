@@ -10,7 +10,6 @@ from app.schemas.analysis_response import RagResult, ClauseData
 from app.schemas.chunk_schema import DocumentChunk
 from app.schemas.chunk_schema import Document
 from app.schemas.document_request import DocumentRequest
-from app.services.agreement.img_service import call_vision_api
 from app.services.common.chunking_service import \
   chunk_by_article_and_clause_with_page, semantic_chunk
 from app.services.common.pdf_service import convert_to_bytes_io, \
