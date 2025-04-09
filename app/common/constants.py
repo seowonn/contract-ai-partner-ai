@@ -1,5 +1,3 @@
-QDRANT_COLLECTION = "standard"
-
 SUCCESS = "success"
 
 ARTICLE_HEADER_PATTERN = r'^\s*제\s*\d+\s*조'

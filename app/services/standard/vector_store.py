@@ -23,9 +23,9 @@ from app.schemas.document_request import DocumentRequest
 
 
 async def vectorize_and_save(chunks: List[str],
-    collection_name: str, pdf_request: DocumentRequest) -> None:
+    pdf_request: DocumentRequest) -> None:
   qd_client = get_qdrant_client()
-  await ensure_qdrant_collection(qd_client, collection_name)
+  await ensure_qdrant_collection(qd_client, pdf_request.categoryName)
   tasks = []
 
   for article in chunks:
@@ -36,7 +36,7 @@ async def vectorize_and_save(chunks: List[str],
 
   # None 제거 후 업로드
   points = [point for point in results if point]
-  await upload_points_to_qdrant(qd_client, collection_name, points)
+  await upload_points_to_qdrant(qd_client, pdf_request.categoryName, points)
 
 
 async def process_clause(article: str, pdf_request: DocumentRequest) -> \
@@ -60,7 +60,6 @@ async def process_clause(article: str, pdf_request: DocumentRequest) -> \
 
   payload = VectorPayload(
       standard_id=pdf_request.id,
-      category=pdf_request.categoryName,
       incorrect_text=result.get("incorrect_text") or "",
       proof_text=article or "",
       corrected_text=result.get("corrected_text") or "",
@@ -83,7 +82,8 @@ async def retry_make_correction(clause_content: str) -> dict:
   raise StandardException(ErrorCode.PROMPT_MAX_TRIAL_FAILED)
 
 
-async def ensure_qdrant_collection(qd_client: AsyncQdrantClient, collection_name: str) -> None:
+async def ensure_qdrant_collection(qd_client: AsyncQdrantClient,
+    collection_name: str) -> None:
   try:
     exists = await qd_client.collection_exists(collection_name=collection_name)
     if not exists:
@@ -93,7 +93,8 @@ async def ensure_qdrant_collection(qd_client: AsyncQdrantClient, collection_name
     raise CommonException(ErrorCode.QDRANT_NOT_STARTED)
 
 
-async def create_qdrant_collection(qd_client: AsyncQdrantClient, collection_name: str):
+async def create_qdrant_collection(qd_client: AsyncQdrantClient,
+    collection_name: str):
   try:
     return await qd_client.create_collection(
         collection_name=collection_name,
@@ -103,7 +104,8 @@ async def create_qdrant_collection(qd_client: AsyncQdrantClient, collection_name
     raise CommonException(ErrorCode.QDRANT_CONNECTION_TIMEOUT)
 
 
-async def upload_points_to_qdrant(qd_client: AsyncQdrantClient, collection_name, points):
+async def upload_points_to_qdrant(qd_client: AsyncQdrantClient, collection_name,
+    points):
   if len(points) == 0:
     raise StandardException(ErrorCode.NO_POINTS_GENERATED)
 
