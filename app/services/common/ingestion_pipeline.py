@@ -7,12 +7,13 @@ from app.common.exception.custom_exception import CommonException
 from app.common.exception.error_code import ErrorCode
 from app.common.file_type import FileType
 from app.schemas.analysis_response import RagResult, ClauseData
-from app.schemas.chunk_schema import DocumentChunk
+from app.schemas.chunk_schema import DocumentChunk, ArticleChunk
 from app.schemas.chunk_schema import Document
 from app.schemas.document_request import DocumentRequest
 from app.services.agreement.img_service import process_img
 from app.services.common.chunking_service import \
-  chunk_by_article_and_clause_with_page, semantic_chunk
+  chunk_by_article_and_clause_with_page, semantic_chunk, \
+  chunk_by_article_and_clause
 from app.services.common.pdf_service import convert_to_bytes_io, \
   extract_documents_from_pdf_io, byte_data
 from app.services.common.s3_service import s3_get_object
@@ -42,7 +43,7 @@ def preprocess_data(document_request: DocumentRequest) -> Tuple[
 def chunk_standard_texts(extracted_text: str) -> List[str]:
   chunks =  semantic_chunk(
       extracted_text,
-      similarity_threshold=0.3,
+      similarity_threshold=0.6,
       visualize=True
   )
   if len(chunks) == 0:
