@@ -19,22 +19,17 @@ from app.common.exception.custom_exception import CommonException
 from app.common.exception.error_code import ErrorCode
 from app.containers.service_container import embedding_service, prompt_service
 from app.models.vector import VectorPayload
-from app.schemas.chunk_schema import ArticleChunk, ClauseChunk
 from app.schemas.document_request import DocumentRequest
 
 
-async def vectorize_and_save(chunks: List[ArticleChunk],
+async def vectorize_and_save(chunks: List[str],
     collection_name: str, pdf_request: DocumentRequest) -> None:
   qd_client = get_qdrant_client()
   await ensure_qdrant_collection(qd_client, collection_name)
   tasks = []
 
   for article in chunks:
-    if len(article.clauses) == 0:
-      continue
-
-    for clause in article.clauses:
-      tasks.append(process_clause(article.article_title, clause, pdf_request))
+    tasks.append(process_clause(article, pdf_request))
 
   # 비동기 실행
   results = await asyncio.gather(*tasks)
@@ -44,18 +39,13 @@ async def vectorize_and_save(chunks: List[ArticleChunk],
   await upload_points_to_qdrant(qd_client, collection_name, points)
 
 
-async def process_clause(article_title: str, clause: ClauseChunk,
-    pdf_request: DocumentRequest) -> PointStruct | None:
-  if len(clause.clause_content) <= 1:
-    return None
-
-  clause_content = clause.clause_content
-  combined_text = f"조 {article_title}, 항 {clause.clause_number}: {clause_content}"
+async def process_clause(article: str, pdf_request: DocumentRequest) -> \
+    PointStruct | None:
 
   try:
     clause_vector, result = await asyncio.gather(
-        embedding_service.embed_text(combined_text),
-        retry_make_correction(clause_content)
+        embedding_service.embed_text(article),
+        retry_make_correction(article)
     )
   except StandardException:
     return None
@@ -72,7 +62,7 @@ async def process_clause(article_title: str, clause: ClauseChunk,
       standard_id=pdf_request.id,
       category=pdf_request.categoryName,
       incorrect_text=result.get("incorrect_text") or "",
-      proof_text=clause_content or "",
+      proof_text=article or "",
       corrected_text=result.get("corrected_text") or "",
       created_at=datetime.now().strftime("%Y-%m-%d %H:%M:%S")
   )
