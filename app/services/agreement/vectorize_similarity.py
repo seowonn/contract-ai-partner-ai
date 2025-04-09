@@ -18,7 +18,7 @@ from app.services.standard.vector_store import ensure_qdrant_collection
 
 
 async def vectorize_and_calculate_similarity(
-    sorted_chunks: List[RagResult],
+    combined_chunks: List[RagResult],
     collection_name: str, document_request: DocumentRequest,
     byte_type_pdf: fitz.Document) -> List[RagResult]:
   qd_client = get_qdrant_client()
@@ -26,7 +26,7 @@ async def vectorize_and_calculate_similarity(
 
   semaphore = asyncio.Semaphore(5)
   tasks = []
-  for chunk in sorted_chunks:
+  for chunk in combined_chunks:
     tasks.append(process_clause(qd_client, chunk, chunk.incorrect_text, collection_name,
                                 document_request.categoryName, semaphore,
                                 byte_type_pdf))
