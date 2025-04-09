@@ -95,7 +95,7 @@ def split_into_sentences(extracted_text: str):
 
 def count_tokens(text: str) -> int:
   encoding = tiktoken.encoding_for_model(
-      os.getenv("PROMPT_OPENAI_DEPLOYMENT_NAME"))
+      os.getenv("AZURE_PROMPT_OPENAI_DEPLOYMENT_NAME"))
   return len(encoding.encode(text))
 
 
