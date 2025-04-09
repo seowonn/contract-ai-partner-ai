@@ -43,8 +43,7 @@ def preprocess_data(document_request: DocumentRequest) -> Tuple[
 def chunk_standard_texts(extracted_text: str) -> List[str]:
   chunks =  semantic_chunk(
       extracted_text,
-      similarity_threshold=0.6,
-      visualize=True
+      similarity_threshold=0.6
   )
   if len(chunks) == 0:
     raise CommonException(ErrorCode.CHUNKING_FAIL)
