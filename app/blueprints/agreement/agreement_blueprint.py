@@ -5,7 +5,6 @@ from flask import Blueprint, request
 from pydantic import ValidationError
 
 from app.blueprints.common.async_loop import run_async
-from app.common.constants import QDRANT_COLLECTION
 from app.common.exception.custom_exception import CommonException
 from app.common.exception.error_code import ErrorCode
 from app.schemas.analysis_response import AnalysisResponse
@@ -24,7 +23,6 @@ agreements = Blueprint('agreements', __name__, url_prefix="/flask/agreements")
 
 @agreements.route('/analysis', methods=['POST'])
 def process_agreements_pdf_from_s3():
-
   try:
     json_data = request.get_json()
     if json_data is None:
@@ -40,12 +38,14 @@ def process_agreements_pdf_from_s3():
 
   start_time = time.time()
   chunks = run_async(
-    vectorize_and_calculate_similarity(combined_chunks, QDRANT_COLLECTION,
-                                       document_request, byte_type_pdf))
+      vectorize_and_calculate_similarity(combined_chunks, document_request,
+                                         byte_type_pdf))
   end_time = time.time()
   logging.info(
       f"Time vectorize and prompt texts: {end_time - start_time:.4f} seconds")
 
   return SuccessResponse(SuccessCode.REVIEW_SUCCESS,
                          AnalysisResponse(total_page=len(documents),
-                                          chunks=chunks)).of(), HTTPStatus.OK
+                                          chunks=chunks,
+                                          total_chunks=len(combined_chunks))
+                         ).of(), HTTPStatus.OK

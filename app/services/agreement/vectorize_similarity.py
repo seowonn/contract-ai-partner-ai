@@ -18,16 +18,15 @@ from app.services.standard.vector_store import ensure_qdrant_collection
 
 
 async def vectorize_and_calculate_similarity(
-    sorted_chunks: List[RagResult],
-    collection_name: str, document_request: DocumentRequest,
+    combined_chunks: List[RagResult], document_request: DocumentRequest,
     byte_type_pdf: fitz.Document) -> List[RagResult]:
   qd_client = get_qdrant_client()
-  await ensure_qdrant_collection(qd_client, collection_name)
+  await ensure_qdrant_collection(qd_client, document_request.categoryName)
 
   semaphore = asyncio.Semaphore(5)
   tasks = []
-  for chunk in sorted_chunks:
-    tasks.append(process_clause(qd_client, chunk, chunk.incorrect_text, collection_name,
+  for chunk in combined_chunks:
+    tasks.append(process_clause(qd_client, chunk, chunk.incorrect_text,
                                 document_request.categoryName, semaphore,
                                 byte_type_pdf))
   # 모든 임베딩 및 유사도 검색 태스크를 병렬로 실행
@@ -35,10 +34,9 @@ async def vectorize_and_calculate_similarity(
   return [result for result in results if result is not None]
 
 
-async def process_clause(qd_client: AsyncQdrantClient, rag_result: RagResult, clause_content: str,
-    collection_name: str, category_name: str, semaphore,
+async def process_clause(qd_client: AsyncQdrantClient, rag_result: RagResult,
+    clause_content: str, collection_name: str, semaphore,
     byte_type_pdf: fitz.Document) -> Optional[RagResult]:
-
   parts = clause_content.split(ARTICLE_CLAUSE_SEPARATOR, 1)
 
   article_title = ""
@@ -49,7 +47,7 @@ async def process_clause(qd_client: AsyncQdrantClient, rag_result: RagResult, cl
     article_content = parts[0].strip()
 
   embedding = await embedding_service.embed_text(
-    article_title + " " + article_content)
+      article_title + " " + article_content)
 
   search_results = None
   for attempt in range(1, MAX_RETRIES + 1):
@@ -58,12 +56,12 @@ async def process_clause(qd_client: AsyncQdrantClient, rag_result: RagResult, cl
         search_results = await qd_client.query_points(
             collection_name=collection_name,
             query=embedding,
-            query_filter=models.Filter(
-                must=[models.FieldCondition(
-                    key="category",
-                    match=models.MatchValue(value=category_name)
-                )]
-            ),
+            # query_filter=models.Filter(
+            #     must=[models.FieldCondition(
+            #         key="category",
+            #         match=models.MatchValue(value=category_name)
+            #     )]
+            # ),
             search_params=models.SearchParams(hnsw_ef=128, exact=False),
             limit=3
         )
@@ -71,7 +69,8 @@ async def process_clause(qd_client: AsyncQdrantClient, rag_result: RagResult, cl
     except Exception as e:
       if attempt == MAX_RETRIES:
         raise CommonException(ErrorCode.QDRANT_SEARCH_FAILED)
-      logging.warning(f"query_points: Qdrant Search 재요청 발생 {attempt}/{MAX_RETRIES} {e}")
+      logging.warning(
+        f"query_points: Qdrant Search 재요청 발생 {attempt}/{MAX_RETRIES} {e}")
       await asyncio.sleep(1)
 
   # 3️⃣ 유사한 문장들 처리
@@ -112,7 +111,7 @@ async def process_clause(qd_client: AsyncQdrantClient, rag_result: RagResult, cl
       if attempt == MAX_RETRIES:
         raise AgreementException(ErrorCode.REVIEW_FAIL)
       logging.warning(
-        f"query_points: 계약서 LLM 재요청 발생 {attempt}/{MAX_RETRIES} {e}")
+          f"query_points: 계약서 LLM 재요청 발생 {attempt}/{MAX_RETRIES} {e}")
       await asyncio.sleep(1)
 
   if not corrected_result:

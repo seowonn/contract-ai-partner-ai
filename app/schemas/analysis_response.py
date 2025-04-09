@@ -20,4 +20,9 @@ class RagResult:
 class AnalysisResponse:
   total_page: int = 0
   chunks: List[RagResult] = field(default_factory=list)
+  total_chunks: int = 0
+
+@dataclass
+class StandardResponse:
+  contents: List[str] = field(default_factory=list)
 

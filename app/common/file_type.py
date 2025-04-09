@@ -1,7 +1,7 @@
 from enum import Enum
 
 
-class FileType(Enum):
+class FileType(str, Enum):
   PDF = "PDF"
   JPEG = "JPEG"
   JPG = "JPG"

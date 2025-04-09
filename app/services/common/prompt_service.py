@@ -6,7 +6,8 @@ from typing import List, Any
 import httpx
 from openai import AsyncOpenAI
 
-from app.clients.openai_clients import sync_openai_client, prompt_async_client
+from app.clients.openai_clients import sync_openai_client, prompt_async_client, \
+  openai_client
 
 
 def clean_markdown_block(response_text: str) -> str:
@@ -27,6 +28,8 @@ class PromptService:
     self.deployment_name = deployment_name
 
   async def make_correction_data(self, clause_content: str) -> Any | None:
+    # async with httpx.AsyncClient() as httpx_client:
+    #   async with AsyncOpenAI(http_client=httpx_client) as client:
     response = await prompt_async_client.chat.completions.create(
         model=self.deployment_name,
         messages=[
