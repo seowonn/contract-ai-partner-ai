@@ -181,7 +181,7 @@ async def find_text_positions(clause_content: str,
     page = pdf_document.load_page(page_num)  # 페이지 로드
 
     # 페이지 크기 얻기 (페이지의 너비와 높이)
-    page_width = float(page.rect.width)  # 명시적으로 float로 처리 
+    page_width = float(page.rect.width)  # 명시적으로 float로 처리
     page_height = float(page.rect.height)  # 명시적으로 float로 처리
 
     page_positions = []  # 현재 페이지에 대한 위치 정보를 담을 리스트
