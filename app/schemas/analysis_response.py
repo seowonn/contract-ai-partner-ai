@@ -22,3 +22,7 @@ class AnalysisResponse:
   chunks: List[RagResult] = field(default_factory=list)
   total_chunks: int = 0
 
+@dataclass
+class StandardResponse:
+  contents: List[str] = field(default_factory=list)
+

@@ -10,6 +10,7 @@ from app.blueprints.common.async_loop import run_async
 from app.common.constants import SUCCESS, QDRANT_COLLECTION
 from app.common.exception.custom_exception import CommonException
 from app.common.exception.error_code import ErrorCode
+from app.schemas.analysis_response import StandardResponse
 from app.schemas.document_request import DocumentRequest
 from app.schemas.success_code import SuccessCode
 from app.schemas.success_response import SuccessResponse
@@ -32,7 +33,6 @@ def process_standards_pdf_from_s3():
   except ValidationError:
     raise CommonException(ErrorCode.FIELD_MISSING)
 
-  status_code = HTTPStatus.OK
   documents, _ = preprocess_data(document_request)
   extracted_text = "\n".join([doc.page_content for doc in documents])
   chunks = chunk_standard_texts(extracted_text)
@@ -43,8 +43,9 @@ def process_standards_pdf_from_s3():
   end_time = time.time()
   logging.info(f"vectorize_and_save 소요 시간: {end_time - start_time}")
 
+  contents = [doc.page_content for doc in documents]
   return SuccessResponse(SuccessCode.ANALYSIS_COMPLETE,
-                         SUCCESS).of(), status_code
+                         StandardResponse(contents=contents)).of(), HTTPStatus.OK
 
 
 @standards.route('/<standardId>', methods=["DELETE"])
