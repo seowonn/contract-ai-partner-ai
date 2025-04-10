@@ -50,7 +50,7 @@ def process_standards_pdf_from_s3():
 
 @standards.route('<categoryName>/<standardId>', methods=["DELETE"])
 def delete_standard(categoryName: str, standardId: str):
-  if not standardId.strip():
+  if not categoryName.strip() or not standardId.strip():
     raise AgreementException(ErrorCode.INVALID_URL_PARAMETER)
 
   if not standardId.isdigit():
