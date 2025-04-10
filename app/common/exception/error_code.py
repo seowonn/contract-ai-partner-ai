@@ -5,6 +5,7 @@ from http import HTTPStatus
 class ErrorCode(Enum):
   # global 에러
   REQUEST_UNMATCH = (HTTPStatus.BAD_REQUEST, "G001", "요청 json 매핑 불일치")
+  URL_NOT_FOUND = (HTTPStatus.BAD_REQUEST, "G002", "존재하지 않는 url 요청")
 
   # standard 관련 에러
   UPLOAD_FAIL = (HTTPStatus.INTERNAL_SERVER_ERROR, "S001", "기준 문서 저장 과정 중 에러 발생")

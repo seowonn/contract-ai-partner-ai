@@ -3,6 +3,7 @@ import traceback
 import logging
 
 from pydantic import ValidationError
+from werkzeug.exceptions import NotFound
 
 from app.blueprints.agreement.agreement_exception import AgreementException
 from app.blueprints.standard.standard_exception import StandardException
@@ -13,6 +14,13 @@ from app.schemas.error_response import ErrorResponse
 logger = logging.getLogger(__name__)
 
 def register_error_handlers(app):
+
+  @app.errorhandler(NotFound)
+  def handle_not_found_error(e: NotFound):
+    logger.error(f"[NotFound]: {str(e)}\n{traceback.format_exc()}")
+    error_code = ErrorCode.URL_NOT_FOUND
+    error_response = ErrorResponse(error_code.code, error_code.message)
+    return error_response.of(), HTTPStatus.BAD_REQUEST
 
   @app.errorhandler(ValidationError)
   def handle_validation_error(e: ValidationError):
