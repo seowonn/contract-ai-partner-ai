@@ -5,12 +5,15 @@ FROM python:3.10-slim
 WORKDIR /app
 
 # 프로젝트 파일 복사
-COPY . .
+COPY requirements.txt .
 
 # 필요한 패키지 설치
-RUN pip install --upgrade pip
-RUN pip install -r requirements.txt
-RUN pip install gunicorn
+RUN pip install --upgrade pip && \
+    pip install -r requirements.txt && \
+    pip install gunicorn && \
+    python -c "import nltk; nltk.download('punkt'); nltk.download('punkt_tab')"
 
-# Flask 실행 (Beanstalk이 포트 5000으로 자동 매핑)
+COPY . .
+
+# Flask 실행
 CMD ["gunicorn", "-w", "4", "-b", "0.0.0.0:5000", "--timeout", "3600", "run:create_app()"]
