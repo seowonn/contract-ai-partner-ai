@@ -27,7 +27,6 @@ def preprocess_data(document_request: DocumentRequest) -> Tuple[
   file_type = extract_file_type(document_request.url)
   if file_type in (FileType.PNG, FileType.JPG, FileType.JPEG):
     pre_signed_url = generate_pre_signed_url(document_request.url)
-    extracted_text = call_vision_api(pre_signed_url)
   elif file_type == FileType.PDF:
     s3_stream = s3_get_object(document_request.url)
     pdf_bytes_io = convert_to_bytes_io(s3_stream)
