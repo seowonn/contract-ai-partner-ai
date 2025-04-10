@@ -1,3 +1,4 @@
+import re
 from typing import List, Tuple
 
 import fitz
@@ -92,3 +93,11 @@ List[RagResult]:
     ))
 
   return combined_chunks
+
+
+
+def normalize_spacing(text: str) -> str:
+    text = text.replace('\n', '[[[NEWLINE]]]')
+    text = re.sub(r'\s{5,}', '\n', text)
+    text = text.replace('[[[NEWLINE]]]', '\n')
+    return text

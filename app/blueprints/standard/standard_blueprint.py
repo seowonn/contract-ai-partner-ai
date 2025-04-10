@@ -1,4 +1,5 @@
 import logging
+import re
 import time
 from http import HTTPStatus
 
@@ -15,7 +16,7 @@ from app.schemas.document_request import DocumentRequest
 from app.schemas.success_code import SuccessCode
 from app.schemas.success_response import SuccessResponse
 from app.services.common.ingestion_pipeline import preprocess_data, \
-  chunk_standard_texts
+  chunk_standard_texts, normalize_spacing
 from app.services.standard.vector_delete import delete_by_standard_id
 from app.services.standard.vector_store import vectorize_and_save
 
@@ -43,7 +44,7 @@ def process_standards_pdf_from_s3():
   end_time = time.time()
   logging.info(f"vectorize_and_save 소요 시간: {end_time - start_time}")
 
-  contents = [doc.page_content for doc in documents]
+  contents = [normalize_spacing(doc.page_content) for doc in documents]
   return SuccessResponse(SuccessCode.ANALYSIS_COMPLETE,
                          StandardResponse(contents=contents)).of(), HTTPStatus.OK
 
