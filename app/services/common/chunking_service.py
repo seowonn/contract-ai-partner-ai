@@ -29,7 +29,7 @@ def semantic_chunk(extracted_text: str, similarity_threshold: float = 0.9,
     raise StandardException(ErrorCode.CHUNKING_FAIL)
 
   sentences = [s for s in sentences if len(s.strip()) > MIN_CLAUSE_BODY_LENGTH]
-  embeddings = embedding_service.get_embeddings(sentences)
+  embeddings = embedding_service.batch_sync_embed_texts(sentences)
 
   if visualize:
     try:

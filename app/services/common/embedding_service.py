@@ -9,6 +9,8 @@ from app.clients.openai_clients import embedding_async_client, \
 from app.common.exception.custom_exception import CommonException
 from app.common.exception.error_code import ErrorCode
 
+MAX_BATCH_SIZE = 32
+
 
 class EmbeddingService:
   def __init__(self, deployment_name):
@@ -27,6 +29,18 @@ class EmbeddingService:
       raise CommonException(ErrorCode.EMBEDDING_FAILED)
 
     return np.array(response.data[0].embedding, dtype=np.float32).tolist()
+
+
+  def batch_sync_embed_texts(self, inputs: List[str]) -> List[List[float]]:
+    all_embeddings = []
+    for i in range(0, len(inputs), MAX_BATCH_SIZE):
+      batch = inputs[i:i + MAX_BATCH_SIZE]
+      try:
+        embeddings = self.get_embeddings(batch)
+        all_embeddings.extend(embeddings)
+      except Exception:
+        raise CommonException(ErrorCode.EMBEDDING_FAILED)
+    return all_embeddings
 
 
   def get_embeddings(self, sentences: List[str]) -> List[List[float]]:
