@@ -1,5 +1,6 @@
 import asyncio
 import logging
+import time
 from asyncio import Semaphore
 from typing import List, Optional, Any
 
@@ -19,8 +20,21 @@ from app.schemas.document_request import DocumentRequest
 from app.services.standard.vector_store import ensure_qdrant_collection
 
 SEARCH_COUNT = 3
+MAX_BATCH_SIZE = 32
 LLM_REQUIRED_KEYS = {"clause_content", "correctedText", "proofText",
                      "violation_score"}
+
+
+async def batch_embed_texts(inputs: List[str]) -> List[List[float]]:
+  all_embeddings = []
+  for i in range(0, len(inputs), MAX_BATCH_SIZE):
+    batch = inputs[i:i + MAX_BATCH_SIZE]
+    try:
+      embeddings = await embedding_service.embed_texts(batch)
+      all_embeddings.extend(embeddings)
+    except Exception:
+      raise CommonException(ErrorCode.EMBEDDING_FAILED)
+  return all_embeddings
 
 
 async def vectorize_and_calculate_similarity(
@@ -29,36 +43,37 @@ async def vectorize_and_calculate_similarity(
   qd_client = get_qdrant_client()
   await ensure_qdrant_collection(qd_client, document_request.categoryName)
 
-  semaphore = asyncio.Semaphore(5)
-  tasks = []
+  embedding_inputs = []
   for chunk in combined_chunks:
-    tasks.append(process_clause(qd_client, chunk, chunk.incorrect_text,
-                                document_request.categoryName, semaphore,
-                                byte_type_pdf))
+    parts = chunk.incorrect_text.split(ARTICLE_CLAUSE_SEPARATOR, 1)
+    title = parts[0].strip() if len(parts) == 2 else ""
+    content = parts[1].strip() if len(parts) == 2 else parts[0].strip()
+    embedding_inputs.append(f"{title} {content}")
+
+  start_time = time.time()
+  embeddings = await batch_embed_texts(embedding_inputs)
+  logging.info(f"임베딩 묶음 소요 시간: {time.time() - start_time}")
+
+  semaphore = asyncio.Semaphore(5)
+  tasks = [
+    process_clause(qd_client, chunk, embedding, document_request.categoryName,
+                   semaphore, byte_type_pdf)
+    for chunk, embedding in zip(combined_chunks, embeddings)
+  ]
+
   # 모든 임베딩 및 유사도 검색 태스크를 병렬로 실행
   results = await asyncio.gather(*tasks)
   return [result for result in results if result is not None]
 
 
 async def process_clause(qd_client: AsyncQdrantClient, rag_result: RagResult,
-    clause_content: str, collection_name: str, semaphore,
+    embedding: List[float], collection_name: str, semaphore: Semaphore,
     byte_type_pdf: fitz.Document) -> Optional[RagResult]:
-  parts = clause_content.split(ARTICLE_CLAUSE_SEPARATOR, 1)
-
-  article_title = ""
-  if len(parts) == 2:
-    article_title = parts[0].strip()
-    article_content = parts[1].strip()
-  else:
-    article_content = parts[0].strip()
-
-  embedding = \
-    await embedding_service.embed_text(article_title + " " + article_content)
   search_results = \
     await search_qdrant(semaphore, collection_name, embedding, qd_client)
   clause_results = await gather_search_results(search_results)
   corrected_result = \
-    await generate_clause_correction(article_content, clause_results)
+    await generate_clause_correction(rag_result.incorrect_text, clause_results)
 
   if not corrected_result:
     return None
@@ -69,48 +84,45 @@ async def process_clause(qd_client: AsyncQdrantClient, rag_result: RagResult,
     logging.warning(f"violation_score 추출 실패")
     return None
 
-  if score >= 0.90:
-    # 원문 텍스트에 대한 위치 정보 찾기
-    all_positions = await find_text_positions(clause_content, byte_type_pdf)
-
-    # 페이지를 기준으로 position을 나누어 저장할 리스트
-    positions = [[], []]
-
-    first_page = None  # 첫 번째 문장이 시작되는 페이지를 추적
-
-    # `rag_result.clause_data`에 두 개만 저장
-    for page_num, positions_in_page in all_positions.items():
-      # 첫 번째 문장이 시작되는 페이지를 찾으면 첫 번째 위치에 저장
-      if first_page is None:
-        first_page = page_num
-        positions[0].extend(p['bbox'] for p in positions_in_page)
-      else:
-        # 첫 번째 문장이 시작된 후, 페이지가 변경되면 두 번째 위치에 저장
-        if page_num != first_page:
-          positions[1].extend(p['bbox'] for p in positions_in_page)
-
-    # `rag_result.clause_data`에 위치 정보 저장
-    rag_result.accuracy = float(corrected_result["violation_score"])
-    rag_result.incorrect_text = (
-      article_content
-      .replace(CLAUSE_TEXT_SEPARATOR, "")
-      .replace("\n", "")
-      .replace("", '"')
-    )
-    rag_result.corrected_text = corrected_result["correctedText"]
-    rag_result.proof_text = corrected_result["proofText"]
-
-    rag_result.clause_data[0].position = positions[0]
-
-    # 문장이 다음페이지로 넘어가는 경우에만 [1] 에 저장
-    if positions[1]:
-      rag_result.clause_data[1].position = positions[1]
-
-    return rag_result
-
-  else:
-    # accuracy가 0.5 이하일 경우 빈 객체 반환
+  if score < 0.9:
     return None
+
+  all_positions = \
+    await find_text_positions(rag_result.incorrect_text, byte_type_pdf)
+
+  positions = [[], []]
+  first_page = None
+
+  # `rag_result.clause_data`에 두 개만 저장
+  for page_num, positions_in_page in all_positions.items():
+    # 첫 번째 문장이 시작되는 페이지를 찾으면 첫 번째 위치에 저장
+    if first_page is None:
+      first_page = page_num
+      positions[0].extend(p['bbox'] for p in positions_in_page)
+    else:
+      # 첫 번째 문장이 시작된 후, 페이지가 변경되면 두 번째 위치에 저장
+      if page_num != first_page:
+        positions[1].extend(p['bbox'] for p in positions_in_page)
+
+  # `rag_result.clause_data`에 위치 정보 저장
+  rag_result.accuracy = float(corrected_result["violation_score"])
+  rag_result.incorrect_text = (
+    rag_result.incorrect_text
+    .split(ARTICLE_CLAUSE_SEPARATOR, 1)[-1]
+    .replace(CLAUSE_TEXT_SEPARATOR, "")
+    .replace("\n", "")
+    .replace("", '"')
+  )
+  rag_result.corrected_text = corrected_result["correctedText"]
+  rag_result.proof_text = corrected_result["proofText"]
+
+  rag_result.clause_data[0].position = positions[0]
+
+  # 문장이 다음페이지로 넘어가는 경우에만 [1] 에 저장
+  if positions[1]:
+    rag_result.clause_data[1].position = positions[1]
+
+  return rag_result
 
 
 async def search_qdrant(semaphore: Semaphore, collection_name: str,
@@ -122,14 +134,9 @@ async def search_qdrant(semaphore: Semaphore, collection_name: str,
         search_results = await qd_client.query_points(
             collection_name=collection_name,
             query=embedding,
-            # query_filter=models.Filter(
-            #     must=[models.FieldCondition(
-            #         key="category",
-            #         match=models.MatchValue(value=category_name)
-            #     )]
-            # ),
             search_params=models.SearchParams(hnsw_ef=128, exact=False),
-            limit=SEARCH_COUNT
+            limit=SEARCH_COUNT,
+            with_payload=["incorrect_text", "corrected_text", "proof_text"]
         )
       break
     except Exception as e:

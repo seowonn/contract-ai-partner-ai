@@ -36,3 +36,12 @@ class EmbeddingService:
         encoding_format="float"
     )
     return [np.array(d.embedding, dtype=np.float32).tolist() for d in response.data]
+
+
+  async def embed_texts(self, sentences: List[str]) -> List[List[float]]:
+    response = await embedding_async_client.embeddings.create(
+        input=sentences,
+        model=self.deployment_name,
+        encoding_format="float"
+    )
+    return [np.array(d.embedding, dtype=np.float32).tolist() for d in response.data]
