@@ -20,21 +20,8 @@ from app.schemas.document_request import DocumentRequest
 from app.services.standard.vector_store import ensure_qdrant_collection
 
 SEARCH_COUNT = 3
-MAX_BATCH_SIZE = 32
 LLM_REQUIRED_KEYS = {"clause_content", "correctedText", "proofText",
                      "violation_score"}
-
-
-async def batch_embed_texts(inputs: List[str]) -> List[List[float]]:
-  all_embeddings = []
-  for i in range(0, len(inputs), MAX_BATCH_SIZE):
-    batch = inputs[i:i + MAX_BATCH_SIZE]
-    try:
-      embeddings = await embedding_service.embed_texts(batch)
-      all_embeddings.extend(embeddings)
-    except Exception:
-      raise CommonException(ErrorCode.EMBEDDING_FAILED)
-  return all_embeddings
 
 
 async def vectorize_and_calculate_similarity(
@@ -51,7 +38,7 @@ async def vectorize_and_calculate_similarity(
     embedding_inputs.append(f"{title} {content}")
 
   start_time = time.time()
-  embeddings = await batch_embed_texts(embedding_inputs)
+  embeddings = await embedding_service.batch_embed_texts(embedding_inputs)
   logging.info(f"임베딩 묶음 소요 시간: {time.time() - start_time}")
 
   semaphore = asyncio.Semaphore(5)

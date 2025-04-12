@@ -1,8 +1,6 @@
 from typing import List
 
-import httpx
 import numpy as np
-from openai import AsyncOpenAI
 
 from app.clients.openai_clients import embedding_async_client, \
   embedding_sync_client
@@ -49,7 +47,20 @@ class EmbeddingService:
         model=self.deployment_name,
         encoding_format="float"
     )
-    return [np.array(d.embedding, dtype=np.float32).tolist() for d in response.data]
+    return [np.array(d.embedding, dtype=np.float32).tolist() for d in
+            response.data]
+
+
+  async def batch_embed_texts(self, inputs: List[str]) -> List[List[float]]:
+    all_embeddings = []
+    for i in range(0, len(inputs), MAX_BATCH_SIZE):
+      batch = inputs[i:i + MAX_BATCH_SIZE]
+      try:
+        embeddings = await self.embed_texts(batch)
+        all_embeddings.extend(embeddings)
+      except Exception:
+        raise CommonException(ErrorCode.EMBEDDING_FAILED)
+    return all_embeddings
 
 
   async def embed_texts(self, sentences: List[str]) -> List[List[float]]:
@@ -58,4 +69,5 @@ class EmbeddingService:
         model=self.deployment_name,
         encoding_format="float"
     )
-    return [np.array(d.embedding, dtype=np.float32).tolist() for d in response.data]
+    return [np.array(d.embedding, dtype=np.float32).tolist() for d in
+            response.data]
