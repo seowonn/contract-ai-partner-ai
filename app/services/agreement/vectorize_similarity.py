@@ -20,6 +20,7 @@ from app.schemas.document_request import DocumentRequest
 from app.services.standard.vector_store import ensure_qdrant_collection
 
 SEARCH_COUNT = 3
+VIOLATION_THRESHOLD = 0.9
 LLM_REQUIRED_KEYS = {"clause_content", "correctedText", "proofText",
                      "violation_score"}
 
@@ -71,7 +72,7 @@ async def process_clause(qd_client: AsyncQdrantClient, rag_result: RagResult,
     logging.warning(f"violation_score 추출 실패")
     return None
 
-  if score < 0.9:
+  if score < VIOLATION_THRESHOLD:
     return None
 
   all_positions = \
