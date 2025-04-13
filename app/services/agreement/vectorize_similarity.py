@@ -2,7 +2,7 @@ import asyncio
 import logging
 import time
 from asyncio import Semaphore
-from typing import List, Optional, Any
+from typing import List, Optional, Any, Tuple
 
 import fitz
 from qdrant_client import models, AsyncQdrantClient
@@ -77,36 +77,15 @@ async def process_clause(qd_client: AsyncQdrantClient, rag_result: RagResult,
 
   all_positions = \
     await find_text_positions(rag_result.incorrect_text, byte_type_pdf)
+  positions = await extract_positions_by_page(all_positions)
 
-  positions = [[], []]
-  first_page = None
-
-  # `rag_result.clause_data`에 두 개만 저장
-  for page_num, positions_in_page in all_positions.items():
-    # 첫 번째 문장이 시작되는 페이지를 찾으면 첫 번째 위치에 저장
-    if first_page is None:
-      first_page = page_num
-      positions[0].extend(p['bbox'] for p in positions_in_page)
-    else:
-      # 첫 번째 문장이 시작된 후, 페이지가 변경되면 두 번째 위치에 저장
-      if page_num != first_page:
-        positions[1].extend(p['bbox'] for p in positions_in_page)
-
-  # `rag_result.clause_data`에 위치 정보 저장
-  rag_result.accuracy = float(corrected_result["violation_score"])
-  rag_result.incorrect_text = (
-    rag_result.incorrect_text
-    .split(ARTICLE_CLAUSE_SEPARATOR, 1)[-1]
-    .replace(CLAUSE_TEXT_SEPARATOR, "")
-    .replace("\n", "")
-    .replace("", '"')
-  )
+  rag_result.accuracy = score
+  rag_result.incorrect_text = await clean_incorrect_text(
+    rag_result.incorrect_text)
   rag_result.corrected_text = corrected_result["correctedText"]
   rag_result.proof_text = corrected_result["proofText"]
 
   rag_result.clause_data[0].position = positions[0]
-
-  # 문장이 다음페이지로 넘어가는 경우에만 [1] 에 저장
   if positions[1]:
     rag_result.clause_data[1].position = positions[1]
 
@@ -182,6 +161,15 @@ async def generate_clause_correction(article_content: str,
       await asyncio.sleep(0.5 * attempt)
 
   return None
+
+
+async def clean_incorrect_text(text: str) -> str:
+  return (
+    text.split(ARTICLE_CLAUSE_SEPARATOR, 1)[-1]
+    .replace(CLAUSE_TEXT_SEPARATOR, "")
+    .replace("\n", "")
+    .replace("", '"')
+  )
 
 
 async def find_text_positions(clause_content: str,
@@ -264,3 +252,22 @@ async def find_text_positions(clause_content: str,
       all_positions[page_num + 1] = page_positions
 
   return all_positions
+
+
+async def extract_positions_by_page(all_positions: dict[int, List[dict]]) -> \
+    List[List]:
+  positions = [[], []]
+  first_page = None
+
+  # `rag_result.clause_data`에 두 개만 저장
+  for page_num, positions_in_page in all_positions.items():
+    # 첫 번째 문장이 시작되는 페이지를 찾으면 첫 번째 위치에 저장
+    if first_page is None:
+      first_page = page_num
+      positions[0].extend(p['bbox'] for p in positions_in_page)
+    else:
+      # 첫 번째 문장이 시작된 후, 페이지가 변경되면 두 번째 위치에 저장
+      if page_num != first_page:
+        positions[1].extend(p['bbox'] for p in positions_in_page)
+
+  return positions
