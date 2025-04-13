@@ -1,6 +1,6 @@
 import asyncio
 import logging
-import math
+import time
 import uuid
 from datetime import datetime
 from typing import List
@@ -26,10 +26,25 @@ async def vectorize_and_save(chunks: List[str],
     pdf_request: DocumentRequest) -> None:
   qd_client = get_qdrant_client()
   await ensure_qdrant_collection(qd_client, pdf_request.categoryName)
-  tasks = []
 
-  for article in chunks:
-    tasks.append(process_clause(article, pdf_request))
+  start_time = time.perf_counter()
+  embeddings = await embedding_service.batch_embed_texts(chunks)
+  logging.info(f"임베딩 묶음 소요 시간: {time.perf_counter() - start_time:.4f}초")
+
+  valid_inputs = [
+    (article, vector)
+    for article, vector in zip(chunks, embeddings)
+    if(
+        vector is not None or
+        isinstance(vector, list) or
+        not any(np.isnan(x) for x in vector)
+    )
+  ]
+
+  tasks = [
+    generate_point_from_clause(article, embedding, pdf_request)
+    for article, embedding in valid_inputs
+  ]
 
   # 비동기 실행
   results = await asyncio.gather(*tasks)
@@ -39,36 +54,24 @@ async def vectorize_and_save(chunks: List[str],
   await upload_points_to_qdrant(qd_client, pdf_request.categoryName, points)
 
 
-async def process_clause(article: str, pdf_request: DocumentRequest) -> \
-    PointStruct | None:
+async def generate_point_from_clause(article: str, embedding: List[float],
+    pdf_request: DocumentRequest) -> PointStruct | None:
 
-  try:
-    clause_vector, result = await asyncio.gather(
-        embedding_service.embed_text(article),
-        retry_make_correction(article)
-    )
-  except StandardException:
+  result = await retry_make_correction(article)
+  if not result:
     return None
-
-  if clause_vector is None or not isinstance(clause_vector, list):
-    return None
-
-  if any(math.isnan(x) for x in clause_vector):
-    return None
-
-  clause_vector = np.array(clause_vector, dtype=np.float32).tolist()
 
   payload = VectorPayload(
       standard_id=pdf_request.id,
       incorrect_text=result.get("incorrect_text") or "",
-      proof_text=article or "",
+      proof_text=article,
       corrected_text=result.get("corrected_text") or "",
       created_at=datetime.now().strftime("%Y-%m-%d %H:%M:%S")
   )
 
   return PointStruct(
       id=str(uuid.uuid4()),
-      vector=clause_vector,
+      vector=embedding,
       payload=payload.to_dict()
   )
 
@@ -113,4 +116,3 @@ async def upload_points_to_qdrant(qd_client: AsyncQdrantClient, collection_name,
     await qd_client.upsert(collection_name=collection_name, points=points)
   except (ConnectTimeout, ResponseHandlingException):
     raise CommonException(ErrorCode.QDRANT_CONNECTION_TIMEOUT)
-
