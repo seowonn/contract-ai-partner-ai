@@ -1,10 +1,10 @@
+import asyncio
 import logging
 from http import HTTPStatus
 
 from flask import Blueprint, request
 from pydantic import ValidationError
 
-from app.blueprints.common.async_loop import run_async
 from app.common.exception.custom_exception import CommonException
 from app.common.exception.error_code import ErrorCode
 from app.schemas.analysis_response import AnalysisResponse
@@ -37,7 +37,7 @@ def process_agreements_pdf_from_s3():
   combined_chunks = combine_chunks_by_clause_number(document_chunks)
 
   start_time = time.time()
-  chunks = run_async(
+  chunks = asyncio.run(
       vectorize_and_calculate_similarity(combined_chunks, document_request,
                                          fitz_document))
   end_time = time.time()
