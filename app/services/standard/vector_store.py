@@ -109,7 +109,7 @@ async def create_qdrant_collection(qd_client: AsyncQdrantClient,
 
 async def upload_points_to_qdrant(qd_client: AsyncQdrantClient, collection_name,
     points):
-  if len(points) == 0:
+  if not points:
     raise StandardException(ErrorCode.NO_POINTS_GENERATED)
 
   try:
