@@ -10,6 +10,7 @@ from qdrant_client.http.models import QueryResponse
 
 from app.blueprints.agreement.agreement_exception import AgreementException
 from app.clients.qdrant_client import get_qdrant_client
+from app.common.chunk_status import ChunkProcessResult, ChunkProcessStatus
 from app.common.constants import ARTICLE_CLAUSE_SEPARATOR, \
   CLAUSE_TEXT_SEPARATOR, MAX_RETRIES
 from app.common.exception.custom_exception import CommonException
@@ -51,12 +52,20 @@ async def vectorize_and_calculate_similarity(
 
   # 모든 임베딩 및 유사도 검색 태스크를 병렬로 실행
   results = await asyncio.gather(*tasks)
-  return [result for result in results if result is not None]
+
+  success_results = [r.result for r in results if
+                     r.status == ChunkProcessStatus.SUCCESS]
+  failure_score = sum(r.status == ChunkProcessStatus.FAILURE for r in results)
+
+  if not success_results and failure_score == len(combined_chunks):
+    raise AgreementException(ErrorCode.CHUNK_ANALYSIS_FAILED)
+
+  return success_results
 
 
 async def process_clause(qd_client: AsyncQdrantClient, rag_result: RagResult,
     embedding: List[float], collection_name: str, semaphore: Semaphore,
-    byte_type_pdf: fitz.Document) -> Optional[RagResult]:
+    byte_type_pdf: fitz.Document) -> ChunkProcessResult:
   search_results = \
     await search_qdrant(semaphore, collection_name, embedding, qd_client)
   clause_results = await gather_search_results(search_results)
@@ -64,16 +73,16 @@ async def process_clause(qd_client: AsyncQdrantClient, rag_result: RagResult,
     await generate_clause_correction(rag_result.incorrect_text, clause_results)
 
   if not corrected_result:
-    return None
+    return ChunkProcessResult(status=ChunkProcessStatus.FAILURE)
 
   try:
     score = float(corrected_result["violation_score"])
   except (KeyError, ValueError, TypeError):
     logging.warning(f"violation_score 추출 실패")
-    return None
+    return ChunkProcessResult(status=ChunkProcessStatus.FAILURE)
 
   if score < VIOLATION_THRESHOLD:
-    return None
+    return ChunkProcessResult(status=ChunkProcessStatus.SUCCESS)
 
   all_positions = \
     await find_text_positions(rag_result.incorrect_text, byte_type_pdf)
@@ -81,7 +90,7 @@ async def process_clause(qd_client: AsyncQdrantClient, rag_result: RagResult,
 
   rag_result.accuracy = score
   rag_result.incorrect_text = await clean_incorrect_text(
-    rag_result.incorrect_text)
+      rag_result.incorrect_text)
   rag_result.corrected_text = corrected_result["correctedText"]
   rag_result.proof_text = corrected_result["proofText"]
 
@@ -89,7 +98,8 @@ async def process_clause(qd_client: AsyncQdrantClient, rag_result: RagResult,
   if positions[1]:
     rag_result.clause_data[1].position = positions[1]
 
-  return rag_result
+  return ChunkProcessResult(status=ChunkProcessStatus.SUCCESS,
+                            result=rag_result)
 
 
 async def search_qdrant(semaphore: Semaphore, collection_name: str,
