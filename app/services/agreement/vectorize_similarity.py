@@ -113,7 +113,7 @@ async def search_qdrant(semaphore: Semaphore, collection_name: str,
           f"query_points: Qdrant Search 재요청 발생 {attempt}/{MAX_RETRIES} {e}")
       await asyncio.sleep(1)
 
-  if search_results is None:
+  if search_results is None or len(search_results.points) == 0:
     raise AgreementException(ErrorCode.NO_POINTS_FOUND)
 
   return search_results
