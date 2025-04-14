@@ -11,3 +11,6 @@ ARTICLE_CLAUSE_SEPARATOR = "+"
 
 MAX_RETRIES = 5
 
+ARTICLE_OCR_HEADER_PATTERN = r'(제\s*\d+\s*조[^【\[\n]*[】\]]?)\s*(.*?)(?=제\s*\d+\s*조|$)'
+
+

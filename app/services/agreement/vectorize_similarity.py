@@ -16,11 +16,12 @@ from app.common.exception.custom_exception import CommonException
 from app.common.exception.error_code import ErrorCode
 from app.containers.service_container import embedding_service, prompt_service
 from app.schemas.analysis_response import RagResult, SearchResult
+from app.schemas.chunk_schema import OCRDocumentChunk
 from app.schemas.document_request import DocumentRequest
 from app.services.standard.vector_store import ensure_qdrant_collection
 
 SEARCH_COUNT = 3
-VIOLATION_THRESHOLD = 0.9
+VIOLATION_THRESHOLD = 0.5
 LLM_REQUIRED_KEYS = {"clause_content", "correctedText", "proofText",
                      "violation_score"}
 
@@ -340,77 +341,77 @@ async def find_text_positions_ocr(clause_content: str,
   if len(clause_content_parts) > 1:
     clause_content = clause_content_parts[1].strip()  # `+` 뒤의 내용만 사용
   print(f'clause_content : {clause_content}')
-  # # "!!!"을 기준으로 더 나눠서 각각을 위치 찾기
-  # clause_parts = clause_content.split('!!!')
-  #
-  # # 모든 페이지를 검색
-  # for page_num in range(pdf_document.page_count):
-  #   page = pdf_document.load_page(page_num)  # 페이지 로드
-  #
-  #   # 페이지 크기 얻기 (페이지의 너비와 높이)
-  #   page_width = float(page.rect.width)  # 명시적으로 float로 처리
-  #   page_height = float(page.rect.height)  # 명시적으로 float로 처리
-  #
-  #   page_positions = []  # 현재 페이지에 대한 위치 정보를 담을 리스트
-  #
-  #   # 각 문장에 대해 위치를 찾기
-  #   for part in clause_parts:
-  #     part = part.strip()  # 앞뒤 공백 제거
-  #     if part == "":
-  #       continue
-  #
-  #     # 문장의 위치를 찾기 위해 search_for 사용
-  #     text_instances = page.search_for(part)
-  #
-  #     # y값을 기준으로 묶을 변수
-  #     grouped_positions = {}
-  #
-  #     # 텍스트 인스턴스들에 대해 위치 정보를 추출
-  #     for text_instance in text_instances:
-  #       x0, y0, x1, y1 = text_instance  # 바운딩 박스 좌표
-  #
-  #       # 상대적인 위치로 계산 (픽셀을 페이지 크기로 나누어 상대값 계산)
-  #       rel_x0 = x0 / page_width
-  #       rel_y0 = y0 / page_height
-  #       rel_x1 = x1 / page_width
-  #       rel_y1 = y1 / page_height
-  #
-  #       # y 값을 기준으로 그룹화
-  #       if rel_y0 not in grouped_positions:
-  #         grouped_positions[rel_y0] = []
-  #
-  #       grouped_positions[rel_y0].append((rel_x0, rel_x1, rel_y0, rel_y1))
-  #
-  #     # 그룹화된 바운딩 박스를 하나의 큰 박스로 묶기
-  #     for y_key, group in grouped_positions.items():
-  #       # 하나의 그룹에서 x0, x1의 최솟값과 최댓값을 구하기
-  #       min_x0 = min([x[0] for x in group])  # 최소 x0 값
-  #       max_x1 = max([x[1] for x in group])  # 최대 x1 값
-  #
-  #       # 하나의 그룹에서 y0, y1의 최솟값과 최댓값을 구하기
-  #       min_y0 = min([x[2] for x in group])  # 최소 y0 값
-  #       max_y1 = max([x[3] for x in group])  # 최대 y1 값
-  #
-  #       # 상대적인 값에 100을 곱해줍니다
-  #       min_x0 *= 100
-  #       min_y0 *= 100
-  #       max_x1 *= 100
-  #       max_y1 *= 100
-  #
-  #       width = max_x1 - min_x0
-  #       height = max_y1 - min_y0
-  #
-  #       # 바운딩 박스를 생성 (최소값과 최대값을 사용)
-  #       page_positions.append({
-  #         "page": page_num + 1,
-  #         "bbox": (min_x0, min_y0, width, height)  # 상대적 x, y, 너비, 높이
-  #       })
-  #
-  #   # 페이지별로 위치를 딕셔너리에 추가
-  #   if page_positions:
-  #     all_positions[page_num + 1] = page_positions
-  #
-  # return all_positions
+  # "!!!"을 기준으로 더 나눠서 각각을 위치 찾기
+  clause_parts = clause_content.split('!!!')
+
+  # 모든 페이지를 검색
+  for page_num in range(pdf_document.page_count):
+    page = pdf_document.load_page(page_num)  # 페이지 로드
+
+    # 페이지 크기 얻기 (페이지의 너비와 높이)
+    page_width = float(page.rect.width)  # 명시적으로 float로 처리
+    page_height = float(page.rect.height)  # 명시적으로 float로 처리
+
+    page_positions = []  # 현재 페이지에 대한 위치 정보를 담을 리스트
+
+    # 각 문장에 대해 위치를 찾기
+    for part in clause_parts:
+      part = part.strip()  # 앞뒤 공백 제거
+      if part == "":
+        continue
+
+      # 문장의 위치를 찾기 위해 search_for 사용
+      text_instances = page.search_for(part)
+
+      # y값을 기준으로 묶을 변수
+      grouped_positions = {}
+
+      # 텍스트 인스턴스들에 대해 위치 정보를 추출
+      for text_instance in text_instances:
+        x0, y0, x1, y1 = text_instance  # 바운딩 박스 좌표
+
+        # 상대적인 위치로 계산 (픽셀을 페이지 크기로 나누어 상대값 계산)
+        rel_x0 = x0 / page_width
+        rel_y0 = y0 / page_height
+        rel_x1 = x1 / page_width
+        rel_y1 = y1 / page_height
+
+        # y 값을 기준으로 그룹화
+        if rel_y0 not in grouped_positions:
+          grouped_positions[rel_y0] = []
+
+        grouped_positions[rel_y0].append((rel_x0, rel_x1, rel_y0, rel_y1))
+
+      # 그룹화된 바운딩 박스를 하나의 큰 박스로 묶기
+      for y_key, group in grouped_positions.items():
+        # 하나의 그룹에서 x0, x1의 최솟값과 최댓값을 구하기
+        min_x0 = min([x[0] for x in group])  # 최소 x0 값
+        max_x1 = max([x[1] for x in group])  # 최대 x1 값
+
+        # 하나의 그룹에서 y0, y1의 최솟값과 최댓값을 구하기
+        min_y0 = min([x[2] for x in group])  # 최소 y0 값
+        max_y1 = max([x[3] for x in group])  # 최대 y1 값
+
+        # 상대적인 값에 100을 곱해줍니다
+        min_x0 *= 100
+        min_y0 *= 100
+        max_x1 *= 100
+        max_y1 *= 100
+
+        width = max_x1 - min_x0
+        height = max_y1 - min_y0
+
+        # 바운딩 박스를 생성 (최소값과 최대값을 사용)
+        page_positions.append({
+          "page": page_num + 1,
+          "bbox": (min_x0, min_y0, width, height)  # 상대적 x, y, 너비, 높이
+        })
+
+    # 페이지별로 위치를 딕셔너리에 추가
+    if page_positions:
+      all_positions[page_num + 1] = page_positions
+
+  return all_positions
 
 
 
