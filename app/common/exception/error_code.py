@@ -5,12 +5,14 @@ from http import HTTPStatus
 class ErrorCode(Enum):
   # global 에러
   REQUEST_UNMATCH = (HTTPStatus.BAD_REQUEST, "G001", "요청 json 매핑 불일치")
+  URL_NOT_FOUND = (HTTPStatus.BAD_REQUEST, "G002", "존재하지 않는 url 요청")
 
   # standard 관련 에러
   UPLOAD_FAIL = (HTTPStatus.INTERNAL_SERVER_ERROR, "S001", "기준 문서 저장 과정 중 에러 발생")
   DELETE_FAIL = (HTTPStatus.INTERNAL_SERVER_ERROR, "S002", "삭제 과정 중 에러 발생")
   CHUNKING_FAIL = (HTTPStatus.INTERNAL_SERVER_ERROR, "S003", "청킹된 데이터 없음")
   PROMPT_MAX_TRIAL_FAILED = (HTTPStatus.INTERNAL_SERVER_ERROR, "S004", "프롬프트 응답 재요청 3회 시도 진행 결과 json 불일치")
+  COLLECTION_NOT_FOUND = (HTTPStatus.BAD_REQUEST, "S005", "요청 카테고리에 해당하는 컬렉션 없음")
 
   # common 에러
   DATA_TYPE_NOT_MATCH = (HTTPStatus.BAD_REQUEST, "C001", "데이터의 형식이 맞지 않음")
@@ -30,6 +32,7 @@ class ErrorCode(Enum):
   QDRANT_NOT_STARTED = (HTTPStatus.NOT_FOUND, "C015", "Qdrant 실행 여부 확인 필요")
   UNSUPPORTED_FILE_TYPE = (HTTPStatus.BAD_REQUEST, "C016", "지원되지 않는 타입의 파일")
   NO_TEXTS_EXTRACTED = (HTTPStatus.INTERNAL_SERVER_ERROR, "C017", "해당 파일에서 추출된 텍스트 없음")
+  PDF_LOAD_FAILED = (HTTPStatus.INTERNAL_SERVER_ERROR, "C018", "PDF 로딩 실패")
 
   # agreement 관련 에러
   REVIEW_FAIL = (HTTPStatus.INTERNAL_SERVER_ERROR, "A001", "AI 검토 보고서 생성 작업 중 에러 발생")
