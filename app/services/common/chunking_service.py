@@ -1,12 +1,115 @@
+import os
 import re
-from typing import List, Optional, Tuple
+from typing import List
+from typing import Optional, Tuple
 
+import nltk
+import numpy as np
+import tiktoken
+from nltk import find
+from sklearn.manifold import TSNE
+import matplotlib.pyplot as plt
+
+from app.blueprints.standard.standard_exception import StandardException
 from app.common.constants import ARTICLE_CHUNK_PATTERN, ARTICLE_HEADER_PATTERN, \
   ARTICLE_CLAUSE_SEPARATOR, ARTICLE_HEADER_PARSE_PATTERN, CLAUSE_HEADER_PATTERN
+from app.common.exception.error_code import ErrorCode
+from app.containers.service_container import embedding_service
 from app.schemas.chunk_schema import ArticleChunk, ClauseChunk, DocumentChunk
 from app.schemas.chunk_schema import Document
 
-MIN_CLAUSE_BODY_LENGTH = 5
+MIN_CLAUSE_BODY_LENGTH = 20
+
+
+def semantic_chunk(extracted_text: str, similarity_threshold: float = 0.9,
+    max_tokens: int = 250, visualize: bool = False) -> List[str]:
+  sentences = split_into_sentences(extracted_text)
+  sentences = [s for s in sentences if len(s.strip()) > MIN_CLAUSE_BODY_LENGTH]
+  if not sentences:
+    raise StandardException(ErrorCode.CHUNKING_FAIL)
+
+  embeddings = embedding_service.batch_sync_embed_texts(sentences)
+
+  chunks = []
+  current_chunk = [sentences[0]]
+  prev_embedding = embeddings[0]
+
+  for i in range(1, len(sentences)):
+    similarity = cosine(prev_embedding, embeddings[i])
+    tentative_chunk = current_chunk + [sentences[i]]
+    token_len = count_tokens(" ".join(tentative_chunk))
+
+    if similarity < similarity_threshold or token_len > max_tokens:
+      chunk_text = " ".join(current_chunk)
+      chunks.append(chunk_text)
+      current_chunk = [sentences[i]]
+    else:
+      current_chunk.append(sentences[i])
+
+    prev_embedding = embeddings[i]
+
+  append_chunk_if_valid(chunks, current_chunk)
+
+  if visualize:
+    try:
+      visualize_embeddings_3d(embeddings, sentences, chunks)
+    except Exception as e:
+      print(f"[시각화 오류] {e}")
+
+  return chunks
+
+
+def cosine(a: List[float], b: List[float]) -> float:
+  a = np.array(a).flatten()
+  b = np.array(b).flatten()
+  return np.dot(a, b) / (np.linalg.norm(a) * np.linalg.norm(b))
+
+
+def append_chunk_if_valid(chunks: List[str], current_chunk: List[str]):
+  chunk_text = " ".join(current_chunk)
+  if len(chunk_text.strip()) >= MIN_CLAUSE_BODY_LENGTH:
+    chunks.append(chunk_text)
+
+
+def visualize_embeddings_3d(embeddings: List[List[float]], sentences: List[str],
+    chunks: List[str]):
+  for idx, chunk in enumerate(chunks):
+    print(f"[청크 {idx}] 길이: {len(chunk)} / 토큰 수: {count_tokens(chunk)}")
+
+  plt.rcParams['font.family'] = 'Malgun Gothic'  # 또는 'AppleGothic'
+  plt.rcParams['axes.unicode_minus'] = False
+
+  tsne = TSNE(n_components=3, random_state=0, perplexity=5)
+  reduced = tsne.fit_transform(np.array(embeddings))
+
+  fig = plt.figure(figsize=(10, 8))
+  ax = fig.add_subplot(111, projection='3d')
+
+  for i, text in enumerate(sentences):
+    x, y, z = reduced[i]
+    ax.scatter(x, y, z)
+    ax.text(x, y, z, text[:30] + "...", size=9)
+  ax.set_title("Semantic Embedding 결과")
+  plt.tight_layout()
+  plt.show()
+
+
+def ensure_punkt():
+  try:
+    find('tokenizers/punkt')
+  except LookupError:
+    nltk.download('punkt')
+
+
+def split_into_sentences(extracted_text: str):
+  ensure_punkt()
+  return nltk.sent_tokenize(extracted_text)
+
+
+def count_tokens(text: str) -> int:
+  encoding = tiktoken.encoding_for_model(
+      os.getenv("AZURE_PROMPT_OPENAI_DEPLOYMENT_NAME"))
+  return len(encoding.encode(text))
 
 
 def split_text_by_pattern(text: str, pattern: str) -> List[str]:
@@ -28,21 +131,27 @@ def chunk_by_article_and_clause(extracted_text: str) -> List[ArticleChunk]:
     # ⭐ 항이 ① 또는 1. 로만 시작한다는 전제 (따라서 기준문서도 이에 맞는 문서만 필요)
     first_clause_match = re.search(r'(①|1\.)', article_body)
     if first_clause_match is None:
-      result.append(ArticleChunk(article_title=article_title + article_body, clauses=[]))
+      result.append(
+          ArticleChunk(article_title=article_title + article_body, clauses=[]))
       continue
 
     match_idx = first_clause_match.start()
     article_title += ' ' + article_body[:match_idx]
     if first_clause_match:
-      clause_pattern = r'([\n\s]*[①-⑨])' if first_clause_match.group(1) == '①' else r'(\n\s*\d+\.)'
-      clause_chunks = split_text_by_pattern("\n" + article_body[match_idx:], clause_pattern)
+      clause_pattern = r'([\n\s]*[①-⑨])' if first_clause_match.group(
+          1) == '①' else r'(\n\s*\d+\.)'
+      clause_chunks = split_text_by_pattern("\n" + article_body[match_idx:],
+                                            clause_pattern)
 
       for j in range(1, len(clause_chunks), 2):
         clause_title = clause_chunks[j].strip()
-        clause_body = clause_chunks[j + 1].strip() if j + 1 < len(clause_chunks) else ""
+        clause_body = clause_chunks[j + 1].strip() if j + 1 < len(
+            clause_chunks) else ""
 
         if len(clause_body) >= MIN_CLAUSE_BODY_LENGTH:
-          clauses.append(ClauseChunk(clause_number=clause_title, clause_content=clause_body))
+          clauses.append(
+              ClauseChunk(clause_number=clause_title,
+                          clause_content=clause_body))
       result.append(ArticleChunk(article_title=article_title, clauses=clauses))
 
   return result
@@ -57,7 +166,8 @@ def chunk_by_article_and_clause_with_page(documents: List[Document]) -> List[
     page_text = doc.page_content
     order_index = 1
 
-    preamble_exists = check_if_preamble_exists_except_first_page(page, page_text)
+    preamble_exists = check_if_preamble_exists_except_first_page(page,
+                                                                 page_text)
     if preamble_exists:
       order_index, chunks = (
         chunk_preamble_content(page_text, chunks, page, order_index))
@@ -85,7 +195,8 @@ def chunk_by_article_and_clause_with_page(documents: List[Document]) -> List[
           if clause_number.endswith("."):
             clause_number = clause_number[:-1]
 
-          clause_content = clause_chunks[j + 1].strip() if j + 1 < len(clause_chunks) else ""
+          clause_content = clause_chunks[j + 1].strip() if j + 1 < len(
+              clause_chunks) else ""
 
           if len(clause_content) >= MIN_CLAUSE_BODY_LENGTH:
             chunks.append(DocumentChunk(
@@ -108,7 +219,8 @@ def chunk_by_article_and_clause_with_page(documents: List[Document]) -> List[
   return chunks
 
 
-def check_if_preamble_exists_except_first_page(page: int, page_text: str) -> bool:
+def check_if_preamble_exists_except_first_page(page: int,
+    page_text: str) -> bool:
   return page != 1 and not is_page_text_starting_with_article_heading(
       ARTICLE_HEADER_PATTERN, page_text
   )
@@ -126,7 +238,8 @@ def chunk_preamble_content(page_text: str, chunks: List[DocumentChunk],
   first_article_match = (
     re.search(ARTICLE_HEADER_PATTERN, page_text, flags=re.MULTILINE))
 
-  preamble = page_text[:first_article_match.start()] if first_article_match else page_text
+  preamble = page_text[
+             :first_article_match.start()] if first_article_match else page_text
   return append_preamble(chunks, preamble, page, order_index)
 
 
@@ -161,7 +274,7 @@ def append_preamble(result: List[DocumentChunk], preamble: str, page: int,
   for j in range(1, len(clause_chunks), 2):
     clause_number = clause_chunks[j].strip()
     clause_content = clause_chunks[j + 1].strip() if j + 1 < len(
-      clause_chunks) else ""
+        clause_chunks) else ""
 
     if len(clause_content) >= MIN_CLAUSE_BODY_LENGTH:
       prev_clause_prefix = result[-1].clause_number.split(" ")[0]

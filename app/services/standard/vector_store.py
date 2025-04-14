@@ -1,6 +1,6 @@
 import asyncio
 import logging
-import math
+import time
 import uuid
 from datetime import datetime
 from typing import List
@@ -19,67 +19,59 @@ from app.common.exception.custom_exception import CommonException
 from app.common.exception.error_code import ErrorCode
 from app.containers.service_container import embedding_service, prompt_service
 from app.models.vector import VectorPayload
-from app.schemas.chunk_schema import ArticleChunk, ClauseChunk
 from app.schemas.document_request import DocumentRequest
 
 
-async def vectorize_and_save(chunks: List[ArticleChunk],
-    collection_name: str, pdf_request: DocumentRequest) -> None:
+async def vectorize_and_save(chunks: List[str],
+    pdf_request: DocumentRequest) -> None:
   qd_client = get_qdrant_client()
-  await ensure_qdrant_collection(qd_client, collection_name)
-  tasks = []
+  await ensure_qdrant_collection(qd_client, pdf_request.categoryName)
 
-  for article in chunks:
-    if len(article.clauses) == 0:
-      continue
+  start_time = time.perf_counter()
+  embeddings = await embedding_service.batch_embed_texts(chunks)
+  logging.info(f"임베딩 묶음 소요 시간: {time.perf_counter() - start_time:.4f}초")
 
-    for clause in article.clauses:
-      tasks.append(process_clause(article.article_title, clause, pdf_request))
+  valid_inputs = [
+    (article, vector)
+    for article, vector in zip(chunks, embeddings)
+    if(
+        vector is not None or
+        isinstance(vector, list) or
+        not any(np.isnan(x) for x in vector)
+    )
+  ]
+
+  tasks = [
+    generate_point_from_clause(article, embedding, pdf_request)
+    for article, embedding in valid_inputs
+  ]
 
   # 비동기 실행
   results = await asyncio.gather(*tasks)
 
   # None 제거 후 업로드
   points = [point for point in results if point]
-  await upload_points_to_qdrant(qd_client, collection_name, points)
+  await upload_points_to_qdrant(qd_client, pdf_request.categoryName, points)
 
 
-async def process_clause(article_title: str, clause: ClauseChunk,
+async def generate_point_from_clause(article: str, embedding: List[float],
     pdf_request: DocumentRequest) -> PointStruct | None:
-  if len(clause.clause_content) <= 1:
+
+  result = await retry_make_correction(article)
+  if not result:
     return None
-
-  clause_content = clause.clause_content
-  combined_text = f"조 {article_title}, 항 {clause.clause_number}: {clause_content}"
-
-  try:
-    clause_vector, result = await asyncio.gather(
-        embedding_service.embed_text(combined_text),
-        retry_make_correction(clause_content)
-    )
-  except StandardException:
-    return None
-
-  if clause_vector is None or not isinstance(clause_vector, list):
-    return None
-
-  if any(math.isnan(x) for x in clause_vector):
-    return None
-
-  clause_vector = np.array(clause_vector, dtype=np.float32).tolist()
 
   payload = VectorPayload(
       standard_id=pdf_request.id,
-      category=pdf_request.categoryName,
       incorrect_text=result.get("incorrect_text") or "",
-      proof_text=clause_content or "",
+      proof_text=article,
       corrected_text=result.get("corrected_text") or "",
       created_at=datetime.now().strftime("%Y-%m-%d %H:%M:%S")
   )
 
   return PointStruct(
       id=str(uuid.uuid4()),
-      vector=clause_vector,
+      vector=embedding,
       payload=payload.to_dict()
   )
 
@@ -93,7 +85,8 @@ async def retry_make_correction(clause_content: str) -> dict:
   raise StandardException(ErrorCode.PROMPT_MAX_TRIAL_FAILED)
 
 
-async def ensure_qdrant_collection(qd_client: AsyncQdrantClient, collection_name: str) -> None:
+async def ensure_qdrant_collection(qd_client: AsyncQdrantClient,
+    collection_name: str) -> None:
   try:
     exists = await qd_client.collection_exists(collection_name=collection_name)
     if not exists:
@@ -103,7 +96,8 @@ async def ensure_qdrant_collection(qd_client: AsyncQdrantClient, collection_name
     raise CommonException(ErrorCode.QDRANT_NOT_STARTED)
 
 
-async def create_qdrant_collection(qd_client: AsyncQdrantClient, collection_name: str):
+async def create_qdrant_collection(qd_client: AsyncQdrantClient,
+    collection_name: str):
   try:
     return await qd_client.create_collection(
         collection_name=collection_name,
@@ -113,7 +107,8 @@ async def create_qdrant_collection(qd_client: AsyncQdrantClient, collection_name
     raise CommonException(ErrorCode.QDRANT_CONNECTION_TIMEOUT)
 
 
-async def upload_points_to_qdrant(qd_client: AsyncQdrantClient, collection_name, points):
+async def upload_points_to_qdrant(qd_client: AsyncQdrantClient, collection_name,
+    points):
   if len(points) == 0:
     raise StandardException(ErrorCode.NO_POINTS_GENERATED)
 
@@ -121,4 +116,3 @@ async def upload_points_to_qdrant(qd_client: AsyncQdrantClient, collection_name,
     await qd_client.upsert(collection_name=collection_name, points=points)
   except (ConnectTimeout, ResponseHandlingException):
     raise CommonException(ErrorCode.QDRANT_CONNECTION_TIMEOUT)
-

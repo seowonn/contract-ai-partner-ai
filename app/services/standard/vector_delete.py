@@ -12,6 +12,11 @@ from app.schemas.success_code import SuccessCode
 
 async def delete_by_standard_id(standard_id: int, collection_name: str) -> SuccessCode:
   qd_client = get_qdrant_client()
+  try:
+    await qd_client.get_collection(collection_name)
+  except UnexpectedResponse:
+    raise StandardException(ErrorCode.COLLECTION_NOT_FOUND)
+
   filter_condition = Filter(
       must=[
         FieldCondition(key="standard_id", match=MatchValue(value=standard_id))]
