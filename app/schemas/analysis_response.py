@@ -30,5 +30,6 @@ class AnalysisResponse:
 
 @dataclass
 class StandardResponse:
+  result: str
   contents: List[str] = field(default_factory=list)
 
