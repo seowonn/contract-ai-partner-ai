@@ -8,7 +8,6 @@ import numpy as np
 import tiktoken
 from nltk import find
 from sklearn.manifold import TSNE
-from sklearn.metrics.pairwise import cosine_similarity
 import matplotlib.pyplot as plt
 
 from app.blueprints.standard.standard_exception import StandardException
@@ -19,32 +18,26 @@ from app.containers.service_container import embedding_service
 from app.schemas.chunk_schema import ArticleChunk, ClauseChunk, DocumentChunk
 from app.schemas.chunk_schema import Document
 
-
 MIN_CLAUSE_BODY_LENGTH = 20
+
+
 def semantic_chunk(extracted_text: str, similarity_threshold: float = 0.9,
-    max_tokens: int = 250, visualize: bool = False) -> \
-    List[str]:
+    max_tokens: int = 250, visualize: bool = False) -> List[str]:
   sentences = split_into_sentences(extracted_text)
+  sentences = [s for s in sentences if len(s.strip()) > MIN_CLAUSE_BODY_LENGTH]
   if not sentences:
     raise StandardException(ErrorCode.CHUNKING_FAIL)
 
-  sentences = [s for s in sentences if len(s.strip()) > MIN_CLAUSE_BODY_LENGTH]
-  embeddings = embedding_service.get_embeddings(sentences)
-
-  if visualize:
-    try:
-        visualize_embeddings_3d(embeddings, sentences)
-    except Exception as e:
-        print(f"[시각화 오류] {e}")
+  embeddings = embedding_service.batch_sync_embed_texts(sentences)
 
   chunks = []
   current_chunk = [sentences[0]]
   prev_embedding = embeddings[0]
 
   for i in range(1, len(sentences)):
-    similarity = cosine_similarity([prev_embedding], [embeddings[i]])[0][0]
-    tentative_chunk = " ".join(current_chunk + [sentences[i]])
-    token_len = count_tokens(tentative_chunk)
+    similarity = cosine(prev_embedding, embeddings[i])
+    tentative_chunk = current_chunk + [sentences[i]]
+    token_len = count_tokens(" ".join(tentative_chunk))
 
     if similarity < similarity_threshold or token_len > max_tokens:
       chunk_text = " ".join(current_chunk)
@@ -55,14 +48,34 @@ def semantic_chunk(extracted_text: str, similarity_threshold: float = 0.9,
 
     prev_embedding = embeddings[i]
 
-  chunk_text = " ".join(current_chunk)
-  if len(chunk_text.strip()) >= MIN_CLAUSE_BODY_LENGTH:
-    chunks.append(chunk_text)
+  append_chunk_if_valid(chunks, current_chunk)
+
+  if visualize:
+    try:
+      visualize_embeddings_3d(embeddings, sentences, chunks)
+    except Exception as e:
+      print(f"[시각화 오류] {e}")
 
   return chunks
 
 
-def visualize_embeddings_3d(embeddings: List[List[float]], sentences: List[str]):
+def cosine(a: List[float], b: List[float]) -> float:
+  a = np.array(a).flatten()
+  b = np.array(b).flatten()
+  return np.dot(a, b) / (np.linalg.norm(a) * np.linalg.norm(b))
+
+
+def append_chunk_if_valid(chunks: List[str], current_chunk: List[str]):
+  chunk_text = " ".join(current_chunk)
+  if len(chunk_text.strip()) >= MIN_CLAUSE_BODY_LENGTH:
+    chunks.append(chunk_text)
+
+
+def visualize_embeddings_3d(embeddings: List[List[float]], sentences: List[str],
+    chunks: List[str]):
+  for idx, chunk in enumerate(chunks):
+    print(f"[청크 {idx}] 길이: {len(chunk)} / 토큰 수: {count_tokens(chunk)}")
+
   plt.rcParams['font.family'] = 'Malgun Gothic'  # 또는 'AppleGothic'
   plt.rcParams['axes.unicode_minus'] = False
 

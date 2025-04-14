@@ -1,5 +1,5 @@
+import asyncio
 import logging
-import re
 import time
 from http import HTTPStatus
 
@@ -7,7 +7,6 @@ from flask import Blueprint, request
 from pydantic import ValidationError
 
 from app.blueprints.agreement.agreement_exception import AgreementException
-from app.blueprints.common.async_loop import run_async
 from app.common.constants import SUCCESS
 from app.common.exception.custom_exception import CommonException
 from app.common.exception.error_code import ErrorCode
@@ -40,7 +39,7 @@ def process_standards_pdf_from_s3():
 
   # 5️⃣ 벡터화 + Qdrant 저장
   start_time = time.time()
-  run_async(vectorize_and_save(chunks, document_request))
+  asyncio.run(vectorize_and_save(chunks, document_request))
   end_time = time.time()
   logging.info(f"vectorize_and_save 소요 시간: {end_time - start_time}")
 
@@ -58,5 +57,5 @@ def delete_standard(categoryName: str, standardId: str):
     raise AgreementException(ErrorCode.CANNOT_CONVERT_TO_NUM)
 
   success_code = (
-    run_async(delete_by_standard_id(int(standardId), categoryName)))
+    asyncio.run(delete_by_standard_id(int(standardId), categoryName)))
   return SuccessResponse(success_code, SUCCESS).of(), HTTPStatus.OK
