@@ -7,12 +7,15 @@ from typing import List
 
 import numpy as np
 from httpx import ConnectTimeout
+from openai import AsyncAzureOpenAI
 from qdrant_client import AsyncQdrantClient
 from qdrant_client.http.exceptions import ResponseHandlingException
 
 from qdrant_client.models import Distance, VectorParams, PointStruct
 
 from app.blueprints.standard.standard_exception import StandardException
+from app.clients.openai_clients import get_prompt_async_client, \
+  get_embedding_async_client
 from app.clients.qdrant_client import get_qdrant_client
 from app.common.constants import MAX_RETRIES, LLM_TIMEOUT
 from app.common.exception.custom_exception import CommonException
@@ -30,7 +33,8 @@ async def vectorize_and_save(chunks: List[str],
   await ensure_qdrant_collection(qd_client, pdf_request.categoryName)
 
   start_time = time.perf_counter()
-  embeddings = await embedding_service.batch_embed_texts(chunks)
+  embedding_client = get_embedding_async_client()
+  embeddings = await embedding_service.batch_embed_texts(embedding_client, chunks)
   logging.info(f"임베딩 묶음 소요 시간: {time.perf_counter() - start_time:.4f}초")
 
   valid_inputs = [
@@ -43,8 +47,9 @@ async def vectorize_and_save(chunks: List[str],
     )
   ]
 
+  prompt_client = get_prompt_async_client()
   tasks = [
-    generate_point_from_clause(article, embedding, pdf_request)
+    generate_point_from_clause(prompt_client, article, embedding, pdf_request)
     for article, embedding in valid_inputs
   ]
 
@@ -56,10 +61,10 @@ async def vectorize_and_save(chunks: List[str],
   await upload_points_to_qdrant(qd_client, pdf_request.categoryName, points)
 
 
-async def generate_point_from_clause(article: str, embedding: List[float],
+async def generate_point_from_clause(prompt_client: AsyncAzureOpenAI,
+    article: str, embedding: List[float],
     pdf_request: DocumentRequest) -> PointStruct | None:
-
-  result = await retry_make_correction(article)
+  result = await retry_make_correction(prompt_client, article)
   if not result:
     return None
 
@@ -78,20 +83,19 @@ async def generate_point_from_clause(article: str, embedding: List[float],
   )
 
 
-async def retry_make_correction(clause_content: str) -> dict:
+async def retry_make_correction(prompt_client: AsyncAzureOpenAI,
+    clause_content: str) -> dict:
   for attempt in range(1, MAX_RETRIES + 1):
+    start = time.time()
     try:
       result = await asyncio.wait_for(
-          prompt_service.make_correction_data(clause_content),
-          timeout=15.0
+          prompt_service.make_correction_data(prompt_client, clause_content),
           timeout=LLM_TIMEOUT
       )
-      if isinstance(result, dict) and STANDARD_LLM_REQUIRED_KEYS.issubset(result.keys()):
+      if isinstance(result, dict) and STANDARD_LLM_REQUIRED_KEYS.issubset(
+          result.keys()):
         return result
       logging.warning(f"[retry_make_correction]: llm 응답 필수 키 누락됨")
-
-    except asyncio.TimeoutError:
-      raise CommonException(ErrorCode.LLM_RESPONSE_TIMEOUT)
 
     except Exception as e:
       if isinstance(e, asyncio.TimeoutError):
