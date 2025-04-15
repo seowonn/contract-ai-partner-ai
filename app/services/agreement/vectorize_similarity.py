@@ -32,6 +32,7 @@ LLM_REQUIRED_KEYS = {"clause_content", "correctedText", "proofText",
 async def vectorize_and_calculate_similarity(
     combined_chunks: List[RagResult], document_request: DocumentRequest,
     byte_type_pdf: fitz.Document) -> List[RagResult]:
+
   qd_client = get_qdrant_client()
   await ensure_qdrant_collection(qd_client, document_request.categoryName)
 
@@ -43,20 +44,19 @@ async def vectorize_and_calculate_similarity(
     embedding_inputs.append(f"{title} {content}")
 
   start_time = time.time()
-  embeddings = await embedding_service.batch_embed_texts(
-      get_embedding_async_client(), embedding_inputs)
+  async with get_embedding_async_client() as embedding_client:
+    embeddings = await embedding_service.batch_embed_texts(
+        embedding_client, embedding_inputs)
   logging.info(f"임베딩 묶음 소요 시간: {time.time() - start_time}")
 
   semaphore = asyncio.Semaphore(5)
-  prompt_client = get_prompt_async_client()
-  tasks = [
-    process_clause(qd_client, prompt_client, chunk, embedding,
-                   document_request.categoryName, semaphore, byte_type_pdf)
-    for chunk, embedding in zip(combined_chunks, embeddings)
-  ]
-
-  # 모든 임베딩 및 유사도 검색 태스크를 병렬로 실행
-  results = await asyncio.gather(*tasks)
+  async with get_prompt_async_client() as prompt_client:
+    tasks = [
+      process_clause(qd_client, prompt_client, chunk, embedding,
+                     document_request.categoryName, semaphore, byte_type_pdf)
+      for chunk, embedding in zip(combined_chunks, embeddings)
+    ]
+    results = await asyncio.gather(*tasks)
 
   success_results = [r.result for r in results if
                      r.status == ChunkProcessStatus.SUCCESS and r.result is not None]

@@ -2,6 +2,7 @@ import asyncio
 import logging
 import time
 import uuid
+from asyncio import Semaphore
 from datetime import datetime
 from typing import List
 
@@ -29,12 +30,13 @@ STANDARD_LLM_REQUIRED_KEYS = {"incorrect_text", "corrected_text"}
 
 async def vectorize_and_save(chunks: List[str],
     pdf_request: DocumentRequest) -> None:
+
   qd_client = get_qdrant_client()
   await ensure_qdrant_collection(qd_client, pdf_request.categoryName)
 
   start_time = time.perf_counter()
-  embedding_client = get_embedding_async_client()
-  embeddings = await embedding_service.batch_embed_texts(embedding_client, chunks)
+  async with get_embedding_async_client() as embedding_client:
+    embeddings = await embedding_service.batch_embed_texts(embedding_client, chunks)
   logging.info(f"임베딩 묶음 소요 시간: {time.perf_counter() - start_time:.4f}초")
 
   valid_inputs = [
@@ -47,14 +49,13 @@ async def vectorize_and_save(chunks: List[str],
     )
   ]
 
-  prompt_client = get_prompt_async_client()
-  tasks = [
-    generate_point_from_clause(prompt_client, article, embedding, pdf_request)
-    for article, embedding in valid_inputs
-  ]
-
-  # 비동기 실행
-  results = await asyncio.gather(*tasks)
+  semaphore = asyncio.Semaphore(5)
+  async with get_prompt_async_client() as prompt_client:
+    tasks = [
+      generate_point_from_clause(prompt_client, article, embedding, pdf_request, semaphore)
+      for article, embedding in valid_inputs
+    ]
+    results = await asyncio.gather(*tasks)
 
   # None 제거 후 업로드
   points = [point for point in results if point]
@@ -63,10 +64,11 @@ async def vectorize_and_save(chunks: List[str],
 
 async def generate_point_from_clause(prompt_client: AsyncAzureOpenAI,
     article: str, embedding: List[float],
-    pdf_request: DocumentRequest) -> PointStruct | None:
-  result = await retry_make_correction(prompt_client, article)
-  if not result:
-    return None
+    pdf_request: DocumentRequest, semaphore: Semaphore) -> PointStruct | None:
+  async with semaphore:
+    result = await retry_make_correction(prompt_client, article)
+    if not result:
+      return None
 
   payload = VectorPayload(
       standard_id=pdf_request.id,
