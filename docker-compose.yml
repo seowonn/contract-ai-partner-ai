@@ -6,6 +6,7 @@ services:
     ports:
       - "5000:5000" # Flask (Gunicorn) 외부 연셜
     environment:
+      - APP_ENV=prod
       - FLASK_ENV=production # 운영 모드
       - OPENAI_API_KEY=${OPENAI_API_KEY}
     depends_on:
