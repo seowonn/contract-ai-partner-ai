@@ -2,16 +2,20 @@ import asyncio
 import logging
 import time
 from asyncio import Semaphore
-from typing import List, Optional, Any, Tuple
+from typing import List, Optional, Any
 
 import fitz
+from openai import AsyncAzureOpenAI
 from qdrant_client import models, AsyncQdrantClient
 from qdrant_client.http.models import QueryResponse
 
 from app.blueprints.agreement.agreement_exception import AgreementException
+from app.clients.openai_clients import get_prompt_async_client, \
+  get_embedding_async_client
 from app.clients.qdrant_client import get_qdrant_client
+from app.common.chunk_status import ChunkProcessResult, ChunkProcessStatus
 from app.common.constants import ARTICLE_CLAUSE_SEPARATOR, \
-  CLAUSE_TEXT_SEPARATOR, MAX_RETRIES
+  CLAUSE_TEXT_SEPARATOR, MAX_RETRIES, LLM_TIMEOUT
 from app.common.exception.custom_exception import CommonException
 from app.common.exception.error_code import ErrorCode
 from app.containers.service_container import embedding_service, prompt_service
@@ -39,41 +43,53 @@ async def vectorize_and_calculate_similarity(
     embedding_inputs.append(f"{title} {content}")
 
   start_time = time.time()
-  embeddings = await embedding_service.batch_embed_texts(embedding_inputs)
+  embeddings = await embedding_service.batch_embed_texts(
+      get_embedding_async_client(), embedding_inputs)
   logging.info(f"임베딩 묶음 소요 시간: {time.time() - start_time}")
 
   semaphore = asyncio.Semaphore(5)
+  prompt_client = get_prompt_async_client()
   tasks = [
-    process_clause(qd_client, chunk, embedding, document_request.categoryName,
-                   semaphore, byte_type_pdf)
+    process_clause(qd_client, prompt_client, chunk, embedding,
+                   document_request.categoryName, semaphore, byte_type_pdf)
     for chunk, embedding in zip(combined_chunks, embeddings)
   ]
 
   # 모든 임베딩 및 유사도 검색 태스크를 병렬로 실행
   results = await asyncio.gather(*tasks)
-  return [result for result in results if result is not None]
+
+  success_results = [r.result for r in results if
+                     r.status == ChunkProcessStatus.SUCCESS and r.result is not None]
+  failure_score = sum(r.status == ChunkProcessStatus.FAILURE for r in results)
+
+  if not success_results and failure_score == len(combined_chunks):
+    raise AgreementException(ErrorCode.CHUNK_ANALYSIS_FAILED)
+
+  return success_results
 
 
-async def process_clause(qd_client: AsyncQdrantClient, rag_result: RagResult,
+async def process_clause(qd_client: AsyncQdrantClient,
+    prompt_client: AsyncAzureOpenAI, rag_result: RagResult,
     embedding: List[float], collection_name: str, semaphore: Semaphore,
-    byte_type_pdf: fitz.Document) -> Optional[RagResult]:
+    byte_type_pdf: fitz.Document) -> ChunkProcessResult:
   search_results = \
     await search_qdrant(semaphore, collection_name, embedding, qd_client)
   clause_results = await gather_search_results(search_results)
-  corrected_result = \
-    await generate_clause_correction(rag_result.incorrect_text, clause_results)
+  corrected_result = await generate_clause_correction(prompt_client,
+                                                      rag_result.incorrect_text,
+                                                      clause_results)
 
   if not corrected_result:
-    return None
+    return ChunkProcessResult(status=ChunkProcessStatus.FAILURE)
 
   try:
     score = float(corrected_result["violation_score"])
   except (KeyError, ValueError, TypeError):
     logging.warning(f"violation_score 추출 실패")
-    return None
+    return ChunkProcessResult(status=ChunkProcessStatus.FAILURE)
 
   if score < VIOLATION_THRESHOLD:
-    return None
+    return ChunkProcessResult(status=ChunkProcessStatus.SUCCESS)
 
   all_positions = \
     await find_text_positions(rag_result.incorrect_text, byte_type_pdf)
@@ -81,7 +97,7 @@ async def process_clause(qd_client: AsyncQdrantClient, rag_result: RagResult,
 
   rag_result.accuracy = score
   rag_result.incorrect_text = await clean_incorrect_text(
-    rag_result.incorrect_text)
+      rag_result.incorrect_text)
   rag_result.corrected_text = corrected_result["correctedText"]
   rag_result.proof_text = corrected_result["proofText"]
 
@@ -89,7 +105,8 @@ async def process_clause(qd_client: AsyncQdrantClient, rag_result: RagResult,
   if positions[1]:
     rag_result.clause_data[1].position = positions[1]
 
-  return rag_result
+  return ChunkProcessResult(status=ChunkProcessStatus.SUCCESS,
+                            result=rag_result)
 
 
 async def search_qdrant(semaphore: Semaphore, collection_name: str,
@@ -113,7 +130,7 @@ async def search_qdrant(semaphore: Semaphore, collection_name: str,
           f"query_points: Qdrant Search 재요청 발생 {attempt}/{MAX_RETRIES} {e}")
       await asyncio.sleep(1)
 
-  if search_results is None or len(search_results.points) == 0:
+  if search_results is None or not search_results.points:
     raise AgreementException(ErrorCode.NO_POINTS_FOUND)
 
   return search_results
@@ -139,26 +156,35 @@ async def gather_search_results(search_results: QueryResponse) -> List[
   return clause_results
 
 
-async def generate_clause_correction(article_content: str,
-    clause_results: List[SearchResult]) -> Optional[dict[str, Any]]:
+async def generate_clause_correction(prompt_client: AsyncAzureOpenAI,
+    article_content: str, clause_results: List[SearchResult]) -> Optional[
+  dict[str, Any]]:
   for attempt in range(1, MAX_RETRIES + 1):
     try:
-      result = await prompt_service.correct_contract(
-          clause_content=article_content,
-          proof_text=[item.proof_text for item in clause_results],  # 기준 문서들
-          incorrect_text=[item.incorrect_text for item in clause_results],
-          corrected_text=[item.corrected_text for item in clause_results]
+      result = await asyncio.wait_for(
+          prompt_service.correct_contract(
+              prompt_client,
+              clause_content=article_content,
+              proof_text=[item.proof_text for item in clause_results],  # 기준 문서들
+              incorrect_text=[item.incorrect_text for item in clause_results],
+              corrected_text=[item.corrected_text for item in clause_results]
+          ),
+          timeout=LLM_TIMEOUT
       )
       if isinstance(result, dict) and LLM_REQUIRED_KEYS.issubset(result.keys()):
         return result
       logging.warning(f"[generate_clause_correction]: llm 응답 필수 키 누락됨")
 
     except Exception as e:
-      if attempt == MAX_RETRIES:
-        raise AgreementException(ErrorCode.REVIEW_FAIL)
-      logging.warning(
-          f"query_points: 계약서 LLM 재요청 발생 {attempt}/{MAX_RETRIES} {e}")
-      await asyncio.sleep(0.5 * attempt)
+      if isinstance(e, asyncio.TimeoutError):
+        if attempt == MAX_RETRIES:
+          raise CommonException(ErrorCode.LLM_RESPONSE_TIMEOUT)
+      else:
+        if attempt == MAX_RETRIES:
+          raise AgreementException(ErrorCode.AGREEMENT_REVIEW_FAIL)
+        logging.warning(
+            f"query_points: 계약서 LLM 재요청 발생 {attempt}/{MAX_RETRIES} {e}")
+        await asyncio.sleep(0.5 * attempt)
 
   return None
 
