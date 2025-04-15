@@ -118,4 +118,4 @@ def extract_ocr(image_url: str):
   # 결과 출력
   # print(full_text)
 
-  return full_text, all_texts_with_bounding_boxes
+  return full_text, all_texts_with_bounding_boxes, height, width

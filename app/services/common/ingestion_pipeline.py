@@ -7,7 +7,7 @@ from app.common.constants import CLAUSE_TEXT_SEPARATOR
 from app.common.exception.custom_exception import CommonException
 from app.common.exception.error_code import ErrorCode
 from app.common.file_type import FileType
-from app.schemas.analysis_response import RagResult, ClauseData
+from app.schemas.analysis_response import RagResult, ClauseData, OCRRagResult, OCRClauseData
 from app.schemas.chunk_schema import DocumentChunk, OCRDocumentChunk
 from app.schemas.chunk_schema import Document, OCRDocument
 from app.schemas.document_request import DocumentRequest
@@ -52,7 +52,7 @@ def preprocess_data_ocr(document_request: DocumentRequest) -> Tuple[
   all_texts_with_bounding_boxes = None
   file_type = extract_file_type(document_request.url)
   if file_type in (FileType.PNG, FileType.JPG, FileType.JPEG):
-    full_text, all_texts_with_bounding_boxes = extract_ocr(document_request.url)
+    full_text, all_texts_with_bounding_boxes, height, width = extract_ocr(document_request.url)
 
     # 각 텍스트를 OCRDocument 객체로 감싸서 documents 리스트에 추가
     # for item in all_texts_with_bounding_boxes:
@@ -68,7 +68,7 @@ def preprocess_data_ocr(document_request: DocumentRequest) -> Tuple[
 
   if len(documents) == 0:
     raise CommonException(ErrorCode.NO_TEXTS_EXTRACTED)
-  return documents, all_texts_with_bounding_boxes
+  return documents, all_texts_with_bounding_boxes, height, width
 
 
 
@@ -140,13 +140,14 @@ List[RagResult]:
 
 
 def combine_chunks_by_clause_number_ocr(document_chunks: List[OCRDocumentChunk]) -> \
-List[RagResult]:
-  combined_chunks: List[RagResult] = []
+List[OCRRagResult]:
+  combined_chunks: List[OCRRagResult] = []
 
   for doc in document_chunks:
     combined_chunks.append(
-      RagResult(
-          incorrect_text=doc.clause_content
+      OCRRagResult(
+          incorrect_text=doc.clause_content,
+          clause_data = [OCRClauseData()]
       )
     )
 

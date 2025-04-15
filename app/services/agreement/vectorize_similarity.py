@@ -3,7 +3,7 @@ import logging
 import time
 from asyncio import Semaphore
 from typing import List, Optional, Any, Tuple
-
+import numpy as np
 import fitz
 from qdrant_client import models, AsyncQdrantClient
 from qdrant_client.http.models import QueryResponse
@@ -15,10 +15,11 @@ from app.common.constants import ARTICLE_CLAUSE_SEPARATOR, \
 from app.common.exception.custom_exception import CommonException
 from app.common.exception.error_code import ErrorCode
 from app.containers.service_container import embedding_service, prompt_service
-from app.schemas.analysis_response import RagResult, SearchResult
+from app.schemas.analysis_response import RagResult, SearchResult, OCRRagResult
 from app.schemas.chunk_schema import OCRDocumentChunk
 from app.schemas.document_request import DocumentRequest
 from app.services.standard.vector_store import ensure_qdrant_collection
+from app.schemas.analysis_response import OCRClauseData
 
 SEARCH_COUNT = 3
 VIOLATION_THRESHOLD = 0.5
@@ -57,8 +58,8 @@ async def vectorize_and_calculate_similarity(
 
 
 async def vectorize_and_calculate_similarity_ocr(
-    combined_chunks: List[RagResult], document_request: DocumentRequest,
-    all_texts_with_bounding_boxes: List[dict]) -> List[RagResult]:
+    combined_chunks: List[OCRRagResult], document_request: DocumentRequest,
+    all_texts_with_bounding_boxes: List[dict], height, width) -> List[RagResult]:
 
   print(f'combined chunk {combined_chunks}')
 
@@ -79,7 +80,7 @@ async def vectorize_and_calculate_similarity_ocr(
   semaphore = asyncio.Semaphore(5)
   tasks = [
     process_clause_ocr(qd_client, chunk, embedding, document_request.categoryName,
-                   semaphore, all_texts_with_bounding_boxes)
+                   semaphore, all_texts_with_bounding_boxes, height, width)
     for chunk, embedding in zip(combined_chunks, embeddings)
   ]
 
@@ -127,9 +128,9 @@ async def process_clause(qd_client: AsyncQdrantClient, rag_result: RagResult,
   return rag_result
 
 
-async def process_clause_ocr(qd_client: AsyncQdrantClient, rag_result: RagResult,
+async def process_clause_ocr(qd_client: AsyncQdrantClient, rag_result: OCRRagResult,
     embedding: List[float], collection_name: str, semaphore: Semaphore,
-    all_texts_with_bounding_boxes: List[dict]) -> Optional[RagResult]:
+    all_texts_with_bounding_boxes: List[dict], height, width) -> Optional[OCRRagResult]:
 
   search_results = \
     await search_qdrant(semaphore, collection_name, embedding, qd_client)
@@ -150,19 +151,21 @@ async def process_clause_ocr(qd_client: AsyncQdrantClient, rag_result: RagResult
     return None
 
   all_positions = \
-    await find_text_positions_ocr(rag_result.incorrect_text, all_texts_with_bounding_boxes)
-  positions = await extract_positions_by_page(all_positions)
+    await find_text_positions_ocr(rag_result.incorrect_text, all_texts_with_bounding_boxes, height, width)
 
   rag_result.accuracy = score
-  rag_result.incorrect_text = await clean_incorrect_text(
-    rag_result.incorrect_text)
+  rag_result.incorrect_text = await clean_incorrect_text(rag_result.incorrect_text)
   rag_result.corrected_text = corrected_result["correctedText"]
   rag_result.proof_text = corrected_result["proofText"]
 
-  rag_result.clause_data[0].position = positions[0]
-  if positions[1]:
-    rag_result.clause_data[1].position = positions[1]
+  print(f'Length of clause_data: {len(rag_result.clause_data)}')
+  print(f'all_positions : {all_positions}')
+  print(f'type all_positions : {type(all_positions)}')
 
+  rag_result.clause_data[0].position.extend(all_positions)
+
+
+  print(f"Updated rag_result: {rag_result}")
   return rag_result
 
 
@@ -332,8 +335,9 @@ async def find_text_positions(clause_content: str,
 
 
 async def find_text_positions_ocr(clause_content: str,
-    all_texts_with_bounding_boxes: List[dict]) -> dict[int, List[dict]]:
+    all_texts_with_bounding_boxes: List[dict], height, width) -> dict[int, List[dict]]:
 
+  epsilon = 0.01
   all_positions = {}  # 페이지별로 위치 정보를 저장할 딕셔너리
 
   # +를 기준으로 문장을 나누고 뒤에 있는 부분만 사용
@@ -341,81 +345,176 @@ async def find_text_positions_ocr(clause_content: str,
   if len(clause_content_parts) > 1:
     clause_content = clause_content_parts[1].strip()  # `+` 뒤의 내용만 사용
   print(f'clause_content : {clause_content}')
-  # "!!!"을 기준으로 더 나눠서 각각을 위치 찾기
-  clause_parts = clause_content.split('!!!')
 
-  # 모든 페이지를 검색
-  for page_num in range(pdf_document.page_count):
-    page = pdf_document.load_page(page_num)  # 페이지 로드
+  full_text = " ".join([item['text'] for item in all_texts_with_bounding_boxes])
 
-    # 페이지 크기 얻기 (페이지의 너비와 높이)
-    page_width = float(page.rect.width)  # 명시적으로 float로 처리
-    page_height = float(page.rect.height)  # 명시적으로 float로 처리
+  if clause_content in full_text:  # 해당 문장이 전체 텍스트에 포함되어 있는지 확인
 
-    page_positions = []  # 현재 페이지에 대한 위치 정보를 담을 리스트
+    # 검색 범위의 시작과 끝 인덱스를 찾음
+    search_start_idx = full_text.find(clause_content)
+    search_end_idx = search_start_idx + len(clause_content)
+    print(
+      f'Search text "{clause_content}" is located from index {search_start_idx} to {search_end_idx} in full text.')
 
-    # 각 문장에 대해 위치를 찾기
-    for part in clause_parts:
-      part = part.strip()  # 앞뒤 공백 제거
-      if part == "":
-        continue
+    search_text_parts = clause_content.split()  # 텍스트 조각을 분리 (공백 기준)
 
-      # 문장의 위치를 찾기 위해 search_for 사용
-      text_instances = page.search_for(part)
+    # y값 기준으로 텍스트를 그룹화
+    grouped_texts = {}
 
-      # y값을 기준으로 묶을 변수
-      grouped_positions = {}
+    # 검색 시작 인덱스
+    start_idx = search_start_idx  # 처음에는 전체 검색 범위의 시작 인덱스로 시작
+    last_end_idx = -1  # 이전 끝 인덱스를 저장할 변수 초기화
 
-      # 텍스트 인스턴스들에 대해 위치 정보를 추출
-      for text_instance in text_instances:
-        x0, y0, x1, y1 = text_instance  # 바운딩 박스 좌표
+    # 전체 바운딩 박스 변수 초기화
+    max_x_total = float('-inf')
+    max_y_total = float('-inf')
+    min_x_total = float('inf')
+    min_y_total = float('inf')
 
-        # 상대적인 위치로 계산 (픽셀을 페이지 크기로 나누어 상대값 계산)
-        rel_x0 = x0 / page_width
-        rel_y0 = y0 / page_height
-        rel_x1 = x1 / page_width
-        rel_y1 = y1 / page_height
+    # 검색 시작
+    for item in all_texts_with_bounding_boxes:
+      print(f'item : {item}')
 
-        # y 값을 기준으로 그룹화
-        if rel_y0 not in grouped_positions:
-          grouped_positions[rel_y0] = []
+      for part in search_text_parts:
+        if part == item['text']:  # 부분 텍스트 일치
+          print(f'item["text"] {item["text"]}')
 
-        grouped_positions[rel_y0].append((rel_x0, rel_x1, rel_y0, rel_y1))
+          # 첫 번째 단어는 처음부터 검색
+          if last_end_idx == -1:  # 처음에는 0부터 검색
+            start_idx = 0
+          else:
+            # 중복되는 단어는 이전 검색에서 찾은 끝 인덱스 이후부터 시작
+            start_idx = last_end_idx
 
-      # 그룹화된 바운딩 박스를 하나의 큰 박스로 묶기
-      for y_key, group in grouped_positions.items():
-        # 하나의 그룹에서 x0, x1의 최솟값과 최댓값을 구하기
-        min_x0 = min([x[0] for x in group])  # 최소 x0 값
-        max_x1 = max([x[1] for x in group])  # 최대 x1 값
+          item_text_start_idx = full_text.find(part,
+                                               start_idx)  # 각 단어의 시작 인덱스를 찾음
+          if item_text_start_idx == -1:
+            break  # 더 이상 찾을 것이 없으면 종료
+          item_text_end_idx = item_text_start_idx + len(part)
 
-        # 하나의 그룹에서 y0, y1의 최솟값과 최댓값을 구하기
-        min_y0 = min([x[2] for x in group])  # 최소 y0 값
-        max_y1 = max([x[3] for x in group])  # 최대 y1 값
+          print(
+              f'start_idx {start_idx} item_text_start_idx {item_text_start_idx}')
+          print(f'start_idx : {start_idx}')
+          print(f'search_end_idx : {search_end_idx}')
+          print(f'item_text_start_idx : {item_text_start_idx}')
+          print(f'item_text_end_idx : {item_text_end_idx}')
 
-        # 상대적인 값에 100을 곱해줍니다
-        min_x0 *= 100
-        min_y0 *= 100
-        max_x1 *= 100
-        max_y1 *= 100
+          # 텍스트가 정확히 검색 범위 내에 있을 경우만 처리
+          if search_start_idx <= item_text_start_idx and search_end_idx >= item_text_end_idx:
+            print(f'Found "{part}" in the search text range.')
 
-        width = max_x1 - min_x0
-        height = max_y1 - min_y0
+            bounding_box = item['bounding_box']
+            print(f'bounding_box: {bounding_box}')
 
-        # 바운딩 박스를 생성 (최소값과 최대값을 사용)
-        page_positions.append({
-          "page": page_num + 1,
-          "bbox": (min_x0, min_y0, width, height)  # 상대적 x, y, 너비, 높이
-        })
+            for vertex in bounding_box:
+              abs_x = vertex['x'] * width  # x값을 절대 좌표로 변환
+              abs_y = vertex['y'] * height  # y값을 절대 좌표로 변환
 
-    # 페이지별로 위치를 딕셔너리에 추가
-    if page_positions:
-      all_positions[page_num + 1] = page_positions
+              max_x_total = max(max_x_total, abs_x)
+              max_y_total = max(max_y_total, abs_y)
 
-  return all_positions
+              # 그룹화된 텍스트에 대해 바운딩 박스를 계산
+
+              # y값 기준으로 그룹화 (epsilon 값으로 오차 범위 설정)
+              group_found = False
+              for y_group in grouped_texts:
+                if abs_y > y_group - (
+                    epsilon * height) and abs_y < y_group + (
+                    epsilon * height):
+                  grouped_texts[y_group].append(item)
+                  group_found = True
+                  break
+
+              if not group_found:
+                grouped_texts[abs_y] = [item]
+
+            # 한 번 단어를 찾고 나면, 다음 검색을 위해 item_text_start_idx를 이동시킴
+            item_text_start_idx += len(part)
+
+            last_end_idx = item_text_end_idx
+            start_idx = last_end_idx  # 시작 인덱스를 갱신
+            print(f"Updated start_idx: {start_idx}")
+
+            # 찾은 단어가 범위 내에 있을 때 바로 루프 종료
+            break
+
+          # 다음 인덱스부터 검색을 계속 진행
+          last_end_idx = item_text_end_idx  # 이전 시작 인덱스부터 새로운 시작 위치로 갱신
+          start_idx = last_end_idx  # 시작 인덱스를 갱신
+          print(f"Updated start_idx: {start_idx}")
+          break
+
+    relative_points_list = []
+    unique_relative_points = set()
+    # 그룹화된 텍스트에 대해 바운딩 박스를 계산
+    for y_group in grouped_texts:
+      min_x_group = float('inf')
+      min_y_group = float('inf')
+      max_x_group = float('-inf')
+      max_y_group = float('-inf')
+
+      # 그룹에 속한 텍스트들의 바운딩 박스를 계산
+      for item in grouped_texts[y_group]:
+        bounding_box = item['bounding_box']
+        for vertex in bounding_box:
+          abs_x = vertex['x'] * width  # x 좌표를 절대 좌표로 변환
+          abs_y = vertex['y'] * height  # y 좌표를 절대 좌표로 변환
+          min_x_group = min(min_x_group, abs_x)
+          min_y_group = min(min_y_group, abs_y)
+          max_x_group = max(max_x_group, abs_x)
+          max_y_group = max(max_y_group, abs_y)
+
+      # # 가장 큰 바운딩 박스를 제외하기 위한 조건 (전체 텍스트 바운딩 박스와 비교)
+      # if max_x_group == max_x_total and max_y_group == max_y_total:
+      #     continue  # 가장 큰 바운딩 박스는 제외
+
+      # 그룹의 전체 바운딩 박스를 생성
+      points = np.array([
+        [min_x_group, min_y_group],  # 왼쪽 위
+        [max_x_group, min_y_group],  # 오른쪽 위
+        [max_x_group, max_y_group],  # 오른쪽 아래
+        [min_x_group, max_y_group]  # 왼쪽 아래
+      ], np.int32)
+
+      points = points.reshape((-1, 1, 2))
+
+      # 절대값을 상대 비율로 변환
+      relative_points = points / [width, height]
+
+      # 상대 비율 포인트를 reshape하여 2D 배열로 변환
+      relative_points = relative_points.reshape((-1, 2))  # 2D로 변환
+
+      # 상대 비율 포인트를 튜플로 변환하여 중복 검사
+      relative_points_tuple = tuple(map(tuple, relative_points))
+
+      # 중복되지 않으면 리스트에 추가
+      if relative_points_tuple not in unique_relative_points:
+        unique_relative_points.add(relative_points_tuple)  # 집합에 추가하여 중복 제거
+        relative_points_list.append(relative_points.tolist())  # 리스트로 변환하여 추가
+
+  return relative_points_list
 
 
 
 async def extract_positions_by_page(all_positions: dict[int, List[dict]]) -> \
+    List[List]:
+  positions = [[], []]
+  first_page = None
+
+  # `rag_result.clause_data`에 두 개만 저장
+  for page_num, positions_in_page in all_positions.items():
+    # 첫 번째 문장이 시작되는 페이지를 찾으면 첫 번째 위치에 저장
+    if first_page is None:
+      first_page = page_num
+      positions[0].extend(p['bbox'] for p in positions_in_page)
+    else:
+      # 첫 번째 문장이 시작된 후, 페이지가 변경되면 두 번째 위치에 저장
+      if page_num != first_page:
+        positions[1].extend(p['bbox'] for p in positions_in_page)
+
+  return positions
+
+async def extract_positions_ocr(all_positions: dict[int, List[dict]]) -> \
     List[List]:
   positions = [[], []]
   first_page = None
