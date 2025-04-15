@@ -45,28 +45,26 @@ jobs:
       run: docker compose down
 
   deploy:
-    name: CD via Bastion Host
     runs-on: ubuntu-latest
     needs: build
     steps:
-    - name: Save bastion key
-      run: |
-        echo "${{ secrets.BASTION_KEY }}" > bastion.pem
-#          읽기만 허용
-        chmod 600 bastion.pem
+      - name: Save bastion key
+        run: |
+          echo "${{ secrets.BASTION_KEY }}" > bastion.pem
+          chmod 600 bastion.pem
 
-    - name: Deploy via Bastion
-      run: |
-        ssh -i bastion.pem -o StrictHostKeyChecking=no ${{ secrets.BASTION_HOST }} << 'EOF'
-          echo "Connected to Bastion"
-        
-          ssh -i /var/lib/jenkins/.ssh/rising-star-private-flask-a.pem -o StrictHostKeyChecking=no ${{ secrets.FLASK_HOST }} << 'EOC'
-            echo "Flask 서버 접속 완료"
-            cd /home/ec2-user/contract-ai-partner-ai
-            git fetch origin
-            git checkout ${{ github.ref_name }}
-            git pull origin ${{ github.ref_name }}
-            docker-compose up -d --build
-            echo "[✅ Flask 서버 배포 완료]"
-          EOC
-        EOF
+      - name: Deploy via Bastion
+        run: |
+          ssh -i bastion.pem -o StrictHostKeyChecking=no ${{ secrets.BASTION_HOST }} << 'EOF'
+            echo "Connected to Bastion"
+          
+            ssh -i /var/lib/jenkins/.ssh/rising-star-private-flask-a.pem -o StrictHostKeyChecking=no ${{ secrets.FLASK_HOST }} << 'EOC'
+              echo "Flask 서버 접속 완료"
+              cd /home/ec2-user/contract-ai-partner-ai
+              git fetch origin
+              git checkout ${{ github.ref_name }}
+              git pull origin ${{ github.ref_name }}
+              docker-compose up -d --build
+              echo "[✅ Flask 서버 배포 완료]"
+            EOC
+          EOF
