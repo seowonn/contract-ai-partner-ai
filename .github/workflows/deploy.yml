@@ -15,6 +15,10 @@ jobs:
       run: docker compose up -d --build
       env:
         OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        AZURE_EMBEDDING_API_KEY: ${{ secrets.AZURE_EMBEDDING_API_KEY }}
+        AZURE_EMBEDDING_OPENAI_ENDPOINT: ${{ secrets.AZURE_EMBEDDING_OPENAI_ENDPOINT }}
+        AZURE_PROMPT_API_KEY: ${{ secrets.AZURE_PROMPT_API_KEY }}
+        AZURE_PROMPT_OPENAI_ENDPOINT: ${{ secrets.AZURE_PROMPT_OPENAI_ENDPOINT }}
 
 
     # ✅ Flask health check (실패할 수 있음)
