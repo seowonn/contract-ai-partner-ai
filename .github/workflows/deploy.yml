@@ -1,9 +1,13 @@
-name: GitHub Actions Demo
-run-name: ${{ github.actor }} is testing out GitHub Actions 🚀
-on: [push]
+on:
+   push:
+     branches: [main, develop, deploy_test]
+   pull_request:
+     branches: [main, develop]
+
 jobs:
-  Explore-GitHub-Actions:
+  build:
     runs-on: ubuntu-latest
+
     steps:
     - uses: actions/checkout@v4
 
@@ -25,3 +29,11 @@ jobs:
           echo "Flask not ready yet... retrying in 3s"
           sleep 3
         done
+
+    - name: Show Flask logs (for debugging)
+      if: always()
+      run: docker compose logs flask-app
+
+    - name: Tear down containers
+      if: always()
+      run: docker compose down
