@@ -335,7 +335,7 @@ async def find_text_positions(clause_content: str,
 
 
 async def find_text_positions_ocr(clause_content: str,
-    all_texts_with_bounding_boxes: List[dict]) -> dict[int, List[dict]]:
+    all_texts_with_bounding_boxes: List[dict]) -> List[dict]:
 
   epsilon = 0.01
   all_positions = {}  # 페이지별로 위치 정보를 저장할 딕셔너리
@@ -465,21 +465,19 @@ async def find_text_positions_ocr(clause_content: str,
           max_x_group = max(max_x_group, abs_x)
           max_y_group = max(max_y_group, abs_y)
 
-      # 그룹의 전체 바운딩 박스를 생성
-      points = np.array([
-        [min_x_group, min_y_group],  # 왼쪽 위
-        [max_x_group, min_y_group],  # 오른쪽 위
-        [max_x_group, max_y_group],  # 오른쪽 아래
-        [min_x_group, max_y_group]  # 왼쪽 아래
-      ], np.float64)
+      # 바운딩 박스 계산
+      min_x = min_x_group * 100
+      min_y = min_y_group * 100
+      width = (max_x_group - min_x_group) * 100
+      height = (max_y_group - min_y_group) * 100
 
-      # reshape → 중복 검사 → 추가
-      points = points.reshape((-1, 2))
-      points_tuple = tuple(map(tuple, points))
+      points = np.array([[min_x, min_y, width, height]], np.float64)
+
+      points_tuple = tuple(points[0])
 
       if points_tuple not in unique_relative_points:
         unique_relative_points.add(points_tuple)
-        points_list.append(points.tolist())
+        points_list.append(points[0].tolist())
 
   return points_list
 

@@ -148,7 +148,7 @@ List[OCRRagResult]:
     combined_chunks.append(
       OCRRagResult(
           incorrect_text=doc.clause_content,
-          clause_data = [OCRClauseData()]
+          clause_data=[OCRClauseData(order_index=doc.order_index)]
       )
     )
 
