@@ -55,16 +55,18 @@ jobs:
 
       - name: Deploy via Bastion
         run: |
+          sudo -i
+          cd /var/lib/jenkins/.ssh
           ssh -i bastion.pem -o StrictHostKeyChecking=no ${{ secrets.BASTION_HOST_IP }} << EOF
-            echo "Connected to Bastion"
-          
-            ssh -i /var/lib/jenkins/.ssh/rising-star-private-flask-a.pem -o StrictHostKeyChecking=no ${{ secrets.FLASK_HOST_IP }} << EOC
-              echo "Flask 서버 접속 완료"
-              cd /home/ec2-user/contract-ai-partner-ai
-              git fetch origin
-              git checkout ${{ github.ref_name }}
-              git pull origin ${{ github.ref_name }}
-              docker-compose up -d --build
-              echo "[✅ Flask 서버 배포 완료]"
-            EOC
+          echo "Connected to Bastion"
+          ssh -i /var/lib/jenkins/.ssh/rising-star-private-flask-a.pem -o StrictHostKeyChecking=no ${{ secrets.FLASK_HOST_IP }} << EOC
+          echo "Flask 서버 접속 완료"
+          cd /home/ec2-user/contract-ai-partner-ai
+          git fetch origin
+          git checkout ${{ github.ref_name }}
+          git pull origin ${{ github.ref_name }}
+          docker-compose up -d --build
+          echo "[✅ Flask 서버 배포 완료]"
+          EOC
           EOF
+
