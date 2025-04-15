@@ -49,13 +49,14 @@ def preprocess_data_ocr(document_request: DocumentRequest) -> Tuple[
 
   documents: List[OCRDocument] = []
 
+  height = 0
+  width = 0
   all_texts_with_bounding_boxes = None
+
   file_type = extract_file_type(document_request.url)
   if file_type in (FileType.PNG, FileType.JPG, FileType.JPEG):
-    full_text, all_texts_with_bounding_boxes, height, width = extract_ocr(document_request.url)
+    full_text, all_texts_with_bounding_boxes = extract_ocr(document_request.url)
 
-    # 각 텍스트를 OCRDocument 객체로 감싸서 documents 리스트에 추가
-    # for item in all_texts_with_bounding_boxes:
     documents.append(OCRDocument(content=full_text))
 
   elif file_type == FileType.PDF:
@@ -68,7 +69,7 @@ def preprocess_data_ocr(document_request: DocumentRequest) -> Tuple[
 
   if len(documents) == 0:
     raise CommonException(ErrorCode.NO_TEXTS_EXTRACTED)
-  return documents, all_texts_with_bounding_boxes, height, width
+  return documents, all_texts_with_bounding_boxes
 
 
 

@@ -12,8 +12,6 @@ def chunk_by_article_and_clause_without_page_ocr(
     documents: List[OCRDocument]) -> List[OCRDocumentChunk]:
   chunks: List[OCRDocumentChunk] = []
 
-  print(f'documents : {documents}')
-
   for doc in documents:
     page_text = doc.content
     order_index = 1

@@ -33,7 +33,7 @@ def process_agreements_pdf_from_s3():
     raise CommonException(ErrorCode.FIELD_MISSING)
 
   # documents, fitz_document = preprocess_data(document_request)
-  documents, all_texts_with_bounding_boxes,height, width = preprocess_data_ocr(document_request)
+  documents, all_texts_with_bounding_boxes = preprocess_data_ocr(document_request)
 
   # document_chunks = chunk_agreement_documents(documents)
   document_chunks = chunk_agreement_documents_ocr(documents)
@@ -47,7 +47,7 @@ def process_agreements_pdf_from_s3():
   #                                        fitz_document))
   chunks = asyncio.run(
       vectorize_and_calculate_similarity_ocr(combined_chunks, document_request,
-                                         all_texts_with_bounding_boxes,height, width))
+                                         all_texts_with_bounding_boxes))
   end_time = time.time()
   logging.info(
       f"Time vectorize and prompt texts: {end_time - start_time:.4f} seconds")

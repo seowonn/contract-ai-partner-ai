@@ -59,7 +59,7 @@ async def vectorize_and_calculate_similarity(
 
 async def vectorize_and_calculate_similarity_ocr(
     combined_chunks: List[OCRRagResult], document_request: DocumentRequest,
-    all_texts_with_bounding_boxes: List[dict], height, width) -> List[RagResult]:
+    all_texts_with_bounding_boxes: List[dict]) -> List[RagResult]:
 
   print(f'combined chunk {combined_chunks}')
 
@@ -80,7 +80,7 @@ async def vectorize_and_calculate_similarity_ocr(
   semaphore = asyncio.Semaphore(5)
   tasks = [
     process_clause_ocr(qd_client, chunk, embedding, document_request.categoryName,
-                   semaphore, all_texts_with_bounding_boxes, height, width)
+                   semaphore, all_texts_with_bounding_boxes)
     for chunk, embedding in zip(combined_chunks, embeddings)
   ]
 
@@ -130,7 +130,7 @@ async def process_clause(qd_client: AsyncQdrantClient, rag_result: RagResult,
 
 async def process_clause_ocr(qd_client: AsyncQdrantClient, rag_result: OCRRagResult,
     embedding: List[float], collection_name: str, semaphore: Semaphore,
-    all_texts_with_bounding_boxes: List[dict], height, width) -> Optional[OCRRagResult]:
+    all_texts_with_bounding_boxes: List[dict]) -> Optional[OCRRagResult]:
 
   search_results = \
     await search_qdrant(semaphore, collection_name, embedding, qd_client)
@@ -151,7 +151,7 @@ async def process_clause_ocr(qd_client: AsyncQdrantClient, rag_result: OCRRagRes
     return None
 
   all_positions = \
-    await find_text_positions_ocr(rag_result.incorrect_text, all_texts_with_bounding_boxes, height, width)
+    await find_text_positions_ocr(rag_result.incorrect_text, all_texts_with_bounding_boxes)
 
   rag_result.accuracy = score
   rag_result.incorrect_text = await clean_incorrect_text(rag_result.incorrect_text)
@@ -335,7 +335,7 @@ async def find_text_positions(clause_content: str,
 
 
 async def find_text_positions_ocr(clause_content: str,
-    all_texts_with_bounding_boxes: List[dict], height, width) -> dict[int, List[dict]]:
+    all_texts_with_bounding_boxes: List[dict]) -> dict[int, List[dict]]:
 
   epsilon = 0.01
   all_positions = {}  # 페이지별로 위치 정보를 저장할 딕셔너리
@@ -407,8 +407,8 @@ async def find_text_positions_ocr(clause_content: str,
             print(f'bounding_box: {bounding_box}')
 
             for vertex in bounding_box:
-              abs_x = vertex['x'] * width  # x값을 절대 좌표로 변환
-              abs_y = vertex['y'] * height  # y값을 절대 좌표로 변환
+              abs_x = vertex['x']
+              abs_y = vertex['y']
 
               max_x_total = max(max_x_total, abs_x)
               max_y_total = max(max_y_total, abs_y)
@@ -419,8 +419,8 @@ async def find_text_positions_ocr(clause_content: str,
               group_found = False
               for y_group in grouped_texts:
                 if abs_y > y_group - (
-                    epsilon * height) and abs_y < y_group + (
-                    epsilon * height):
+                    epsilon ) and abs_y < y_group + (
+                    epsilon ):
                   grouped_texts[y_group].append(item)
                   group_found = True
                   break
@@ -444,7 +444,7 @@ async def find_text_positions_ocr(clause_content: str,
           print(f"Updated start_idx: {start_idx}")
           break
 
-    relative_points_list = []
+    points_list = []
     unique_relative_points = set()
     # 그룹화된 텍스트에 대해 바운딩 박스를 계산
     for y_group in grouped_texts:
@@ -457,16 +457,13 @@ async def find_text_positions_ocr(clause_content: str,
       for item in grouped_texts[y_group]:
         bounding_box = item['bounding_box']
         for vertex in bounding_box:
-          abs_x = vertex['x'] * width  # x 좌표를 절대 좌표로 변환
-          abs_y = vertex['y'] * height  # y 좌표를 절대 좌표로 변환
+          abs_x = vertex['x']
+          abs_y = vertex['y']
+
           min_x_group = min(min_x_group, abs_x)
           min_y_group = min(min_y_group, abs_y)
           max_x_group = max(max_x_group, abs_x)
           max_y_group = max(max_y_group, abs_y)
-
-      # # 가장 큰 바운딩 박스를 제외하기 위한 조건 (전체 텍스트 바운딩 박스와 비교)
-      # if max_x_group == max_x_total and max_y_group == max_y_total:
-      #     continue  # 가장 큰 바운딩 박스는 제외
 
       # 그룹의 전체 바운딩 박스를 생성
       points = np.array([
@@ -474,25 +471,17 @@ async def find_text_positions_ocr(clause_content: str,
         [max_x_group, min_y_group],  # 오른쪽 위
         [max_x_group, max_y_group],  # 오른쪽 아래
         [min_x_group, max_y_group]  # 왼쪽 아래
-      ], np.int32)
+      ], np.float64)
 
-      points = points.reshape((-1, 1, 2))
+      # reshape → 중복 검사 → 추가
+      points = points.reshape((-1, 2))
+      points_tuple = tuple(map(tuple, points))
 
-      # 절대값을 상대 비율로 변환
-      relative_points = points / [width, height]
+      if points_tuple not in unique_relative_points:
+        unique_relative_points.add(points_tuple)
+        points_list.append(points.tolist())
 
-      # 상대 비율 포인트를 reshape하여 2D 배열로 변환
-      relative_points = relative_points.reshape((-1, 2))  # 2D로 변환
-
-      # 상대 비율 포인트를 튜플로 변환하여 중복 검사
-      relative_points_tuple = tuple(map(tuple, relative_points))
-
-      # 중복되지 않으면 리스트에 추가
-      if relative_points_tuple not in unique_relative_points:
-        unique_relative_points.add(relative_points_tuple)  # 집합에 추가하여 중복 제거
-        relative_points_list.append(relative_points.tolist())  # 리스트로 변환하여 추가
-
-  return relative_points_list
+  return points_list
 
 
 
