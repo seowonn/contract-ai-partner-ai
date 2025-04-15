@@ -12,7 +12,7 @@ from app.blueprints.agreement.agreement_exception import AgreementException
 from app.clients.qdrant_client import get_qdrant_client
 from app.common.chunk_status import ChunkProcessResult, ChunkProcessStatus
 from app.common.constants import ARTICLE_CLAUSE_SEPARATOR, \
-  CLAUSE_TEXT_SEPARATOR, MAX_RETRIES
+  CLAUSE_TEXT_SEPARATOR, MAX_RETRIES, LLM_TIMEOUT
 from app.common.exception.custom_exception import CommonException
 from app.common.exception.error_code import ErrorCode
 from app.containers.service_container import embedding_service, prompt_service
@@ -160,7 +160,7 @@ async def generate_clause_correction(article_content: str,
             incorrect_text=[item.incorrect_text for item in clause_results],
             corrected_text=[item.corrected_text for item in clause_results]
           ),
-        timeout=15.0
+          timeout=LLM_TIMEOUT
       )
       if isinstance(result, dict) and LLM_REQUIRED_KEYS.issubset(result.keys()):
         return result

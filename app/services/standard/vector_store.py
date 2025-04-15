@@ -14,7 +14,7 @@ from qdrant_client.models import Distance, VectorParams, PointStruct
 
 from app.blueprints.standard.standard_exception import StandardException
 from app.clients.qdrant_client import get_qdrant_client
-from app.common.constants import MAX_RETRIES
+from app.common.constants import MAX_RETRIES, LLM_TIMEOUT
 from app.common.exception.custom_exception import CommonException
 from app.common.exception.error_code import ErrorCode
 from app.containers.service_container import embedding_service, prompt_service
@@ -84,6 +84,7 @@ async def retry_make_correction(clause_content: str) -> dict:
       result = await asyncio.wait_for(
           prompt_service.make_correction_data(clause_content),
           timeout=15.0
+          timeout=LLM_TIMEOUT
       )
       if isinstance(result, dict) and STANDARD_LLM_REQUIRED_KEYS.issubset(result.keys()):
         return result
