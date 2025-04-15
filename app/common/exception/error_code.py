@@ -34,15 +34,15 @@ class ErrorCode(Enum):
   UNSUPPORTED_FILE_TYPE = (HTTPStatus.BAD_REQUEST, "C016", "지원되지 않는 타입의 파일")
   NO_TEXTS_EXTRACTED = (HTTPStatus.INTERNAL_SERVER_ERROR, "C017", "해당 파일에서 추출된 텍스트 없음")
   PDF_LOAD_FAILED = (HTTPStatus.INTERNAL_SERVER_ERROR, "C018", "PDF 로딩 실패")
+  LLM_RESPONSE_TIMEOUT = (HTTPStatus.INTERNAL_SERVER_ERROR, "C019", "LLM 응답 시간 초과")
 
   # agreement 관련 에러
-  REVIEW_FAIL = (HTTPStatus.INTERNAL_SERVER_ERROR, "A001", "AI 검토 보고서 생성 작업 중 에러 발생")
+  AGREEMENT_REVIEW_FAIL = (HTTPStatus.INTERNAL_SERVER_ERROR, "A001", "AI 검토 보고서 생성 작업 중 에러 발생")
   INVALID_S3_PATH = (HTTPStatus.BAD_REQUEST, "A002", "openai 파싱에 적합하지 않은 s3 경로")
   NO_SEARCH_RESULT = (HTTPStatus.INTERNAL_SERVER_ERROR, "A003", "Qdrant 내 검색된 데이터 없음")
   QDRANT_SEARCH_FAILED = (HTTPStatus.INTERNAL_SERVER_ERROR, "A004", "Qdrant 검색 결과 반환 실패")
   NO_POINTS_FOUND = (HTTPStatus.INTERNAL_SERVER_ERROR, "A005", "Qdrant 내 조회 가능한 포인트 없음")
   CHUNK_ANALYSIS_FAILED = (HTTPStatus.INTERNAL_SERVER_ERROR, "A006", "계약서 분석 내 누락건으로 인해 분석 실패")
-
 
   def __init__(self, status: HTTPStatus, code: str, message: str):
     self.status = status

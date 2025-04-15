@@ -81,10 +81,16 @@ async def generate_point_from_clause(article: str, embedding: List[float],
 async def retry_make_correction(clause_content: str) -> dict:
   for attempt in range(1, MAX_RETRIES + 1):
     try:
-      result = await prompt_service.make_correction_data(clause_content)
+      result = await asyncio.wait_for(
+          prompt_service.make_correction_data(clause_content),
+          timeout=15.0
+      )
       if isinstance(result, dict) and STANDARD_LLM_REQUIRED_KEYS.issubset(result.keys()):
         return result
       logging.warning(f"[retry_make_correction]: llm 응답 필수 키 누락됨")
+
+    except asyncio.TimeoutError:
+      raise CommonException(ErrorCode.LLM_RESPONSE_TIMEOUT)
 
     except Exception as e:
       if attempt == MAX_RETRIES:

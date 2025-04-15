@@ -153,19 +153,25 @@ async def generate_clause_correction(article_content: str,
     clause_results: List[SearchResult]) -> Optional[dict[str, Any]]:
   for attempt in range(1, MAX_RETRIES + 1):
     try:
-      result = await prompt_service.correct_contract(
-          clause_content=article_content,
-          proof_text=[item.proof_text for item in clause_results],  # 기준 문서들
-          incorrect_text=[item.incorrect_text for item in clause_results],
-          corrected_text=[item.corrected_text for item in clause_results]
+      result = await asyncio.wait_for(
+          prompt_service.correct_contract(
+            clause_content=article_content,
+            proof_text=[item.proof_text for item in clause_results],  # 기준 문서들
+            incorrect_text=[item.incorrect_text for item in clause_results],
+            corrected_text=[item.corrected_text for item in clause_results]
+          ),
+        timeout=15.0
       )
       if isinstance(result, dict) and LLM_REQUIRED_KEYS.issubset(result.keys()):
         return result
       logging.warning(f"[generate_clause_correction]: llm 응답 필수 키 누락됨")
 
+    except asyncio.TimeoutError:
+      raise CommonException(ErrorCode.LLM_RESPONSE_TIMEOUT)
+
     except Exception as e:
       if attempt == MAX_RETRIES:
-        raise AgreementException(ErrorCode.REVIEW_FAIL)
+        raise AgreementException(ErrorCode.AGREEMENT_REVIEW_FAIL)
       logging.warning(
           f"query_points: 계약서 LLM 재요청 발생 {attempt}/{MAX_RETRIES} {e}")
       await asyncio.sleep(0.5 * attempt)
