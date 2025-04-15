@@ -48,7 +48,6 @@ jobs:
     name: CD via Bastion Host
     runs-on: ubuntu-latest
     needs: build
-
     steps:
     - name: Save bastion key
       run: |
