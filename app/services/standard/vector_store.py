@@ -43,8 +43,8 @@ async def vectorize_and_save(chunks: List[str],
     (article, vector)
     for article, vector in zip(chunks, embeddings)
     if(
-        vector is not None or
-        isinstance(vector, list) or
+        vector is not None and
+        isinstance(vector, list) and
         not any(np.isnan(x) for x in vector)
     )
   ]
@@ -110,7 +110,9 @@ async def retry_make_correction(prompt_client: AsyncAzureOpenAI,
         logging.warning(
             f"[retry_make_correction]: 기준 문서 LLM 재요청 발생 {attempt}/{MAX_RETRIES} {e}"
         )
-      await asyncio.sleep(0.5 * attempt)
+
+      if attempt < MAX_RETRIES:
+        await asyncio.sleep(0.5 * attempt)
 
   raise StandardException(ErrorCode.PROMPT_MAX_TRIAL_FAILED)
 

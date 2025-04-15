@@ -36,12 +36,7 @@ async def vectorize_and_calculate_similarity(
   qd_client = get_qdrant_client()
   await ensure_qdrant_collection(qd_client, document_request.categoryName)
 
-  embedding_inputs = []
-  for chunk in combined_chunks:
-    parts = chunk.incorrect_text.split(ARTICLE_CLAUSE_SEPARATOR, 1)
-    title = parts[0].strip() if len(parts) == 2 else ""
-    content = parts[1].strip() if len(parts) == 2 else parts[0].strip()
-    embedding_inputs.append(f"{title} {content}")
+  embedding_inputs = await prepare_embedding_inputs(combined_chunks)
 
   start_time = time.time()
   async with get_embedding_async_client() as embedding_client:
@@ -58,7 +53,7 @@ async def vectorize_and_calculate_similarity(
     ]
     results = await asyncio.gather(*tasks)
 
-  success_results = [r.result for r in results if
+  success_results: List[RagResult] = [r.result for r in results if
                      r.status == ChunkProcessStatus.SUCCESS and r.result is not None]
   failure_score = sum(r.status == ChunkProcessStatus.FAILURE for r in results)
 
@@ -66,6 +61,16 @@ async def vectorize_and_calculate_similarity(
     raise AgreementException(ErrorCode.CHUNK_ANALYSIS_FAILED)
 
   return success_results
+
+
+async def prepare_embedding_inputs(chunks: List[RagResult]) -> List[str]:
+  inputs = []
+  for chunk in chunks:
+    parts = chunk.incorrect_text.split(ARTICLE_CLAUSE_SEPARATOR, 1)
+    title = parts[0].strip() if len(parts) == 2 else ""
+    content = parts[1].strip() if len(parts) == 2 else parts[0].strip()
+    inputs.append(f"{title} {content}")
+  return inputs
 
 
 async def process_clause(qd_client: AsyncQdrantClient,
