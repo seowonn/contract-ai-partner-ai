@@ -94,10 +94,16 @@ async def retry_make_correction(clause_content: str) -> dict:
       raise CommonException(ErrorCode.LLM_RESPONSE_TIMEOUT)
 
     except Exception as e:
-      if attempt == MAX_RETRIES:
-        raise StandardException(ErrorCode.STANDARD_REVIEW_FAIL)
-      logging.warning(
-          f"[retry_make_correction]: 기준 문서 LLM 재요청 발생 {attempt}/{MAX_RETRIES} {e}")
+      if isinstance(e, asyncio.TimeoutError):
+        if attempt == MAX_RETRIES:
+          raise CommonException(ErrorCode.LLM_RESPONSE_TIMEOUT)
+
+      else:
+        if attempt == MAX_RETRIES:
+          raise StandardException(ErrorCode.STANDARD_REVIEW_FAIL)
+        logging.warning(
+            f"[retry_make_correction]: 기준 문서 LLM 재요청 발생 {attempt}/{MAX_RETRIES} {e}"
+        )
       await asyncio.sleep(0.5 * attempt)
 
   raise StandardException(ErrorCode.PROMPT_MAX_TRIAL_FAILED)
