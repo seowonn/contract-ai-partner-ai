@@ -16,3 +16,15 @@ jobs:
         실행: |
           ls ${{ github.workspace }}
       - 실행: echo "🍏 이 작업의 상태는 ${{ job.status }}입니다."
+    # ✅ Flask health check (실패할 수 있음)
+    - name: Check Flask health
+      run: |
+        echo "Waiting for Flask to become ready..."
+        for i in {1..10}; do
+          if curl --fail http://localhost:5000/health-check; then
+            echo "Flask is healthy"
+            break
+          fi
+          echo "Flask not ready yet... retrying in 3s"
+          sleep 3
+        done

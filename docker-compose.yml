@@ -10,6 +10,11 @@ services:
     depends_on:
       - qdrant # Qdrant 먼저 시작
     restart: always # 서버 재시작 시 자동 복구
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000/health-check"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
 
   qdrant:
     image: qdrant/qdrant
