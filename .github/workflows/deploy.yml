@@ -1,6 +1,6 @@
 on:
    push:
-     branches: [main, develop, deploy-test]
+     branches: [main, develop, deploy/cicd]
    pull_request:
      branches: [main, develop]
 
