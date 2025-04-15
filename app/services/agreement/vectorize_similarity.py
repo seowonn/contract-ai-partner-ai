@@ -54,7 +54,7 @@ async def vectorize_and_calculate_similarity(
   results = await asyncio.gather(*tasks)
 
   success_results = [r.result for r in results if
-                     r.status == ChunkProcessStatus.SUCCESS]
+                     r.status == ChunkProcessStatus.SUCCESS and r.result is not None]
   failure_score = sum(r.status == ChunkProcessStatus.FAILURE for r in results)
 
   if not success_results and failure_score == len(combined_chunks):
