@@ -21,6 +21,8 @@ from app.containers.service_container import embedding_service, prompt_service
 from app.models.vector import VectorPayload
 from app.schemas.document_request import DocumentRequest
 
+STANDARD_LLM_REQUIRED_KEYS = {"incorrect_text", "corrected_text"}
+
 
 async def vectorize_and_save(chunks: List[str],
     pdf_request: DocumentRequest) -> None:
@@ -78,10 +80,19 @@ async def generate_point_from_clause(article: str, embedding: List[float],
 
 async def retry_make_correction(clause_content: str) -> dict:
   for attempt in range(1, MAX_RETRIES + 1):
-    result = await prompt_service.make_correction_data(clause_content)
-    if result is not None:
-      return result
-    logging.warning(f"교정 응답 실패. 재시도 {attempt}/{MAX_RETRIES}")
+    try:
+      result = await prompt_service.make_correction_data(clause_content)
+      if isinstance(result, dict) and STANDARD_LLM_REQUIRED_KEYS.issubset(result.keys()):
+        return result
+      logging.warning(f"[retry_make_correction]: llm 응답 필수 키 누락됨")
+
+    except Exception as e:
+      if attempt == MAX_RETRIES:
+        raise StandardException(ErrorCode.STANDARD_REVIEW_FAIL)
+      logging.warning(
+          f"[retry_make_correction]: 기준 문서 LLM 재요청 발생 {attempt}/{MAX_RETRIES} {e}")
+      await asyncio.sleep(0.5 * attempt)
+
   raise StandardException(ErrorCode.PROMPT_MAX_TRIAL_FAILED)
 
 
