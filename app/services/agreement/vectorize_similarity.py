@@ -337,7 +337,7 @@ async def find_text_positions(clause_content: str,
 async def find_text_positions_ocr(clause_content: str,
     all_texts_with_bounding_boxes: List[dict]) -> List[dict]:
 
-  epsilon = 0.01
+  epsilon = None
   all_positions = {}  # 페이지별로 위치 정보를 저장할 딕셔너리
 
   # +를 기준으로 문장을 나누고 뒤에 있는 부분만 사용
@@ -407,26 +407,34 @@ async def find_text_positions_ocr(clause_content: str,
             print(f'bounding_box: {bounding_box}')
 
             for vertex in bounding_box:
-              abs_x = vertex['x']
-              abs_y = vertex['y']
+              center_y = (sum(vertex['y'] for vertex in bounding_box)
+                          / len(bounding_box))
 
-              max_x_total = max(max_x_total, abs_x)
-              max_y_total = max(max_y_total, abs_y)
+              # 첫 단어일 때만 높이 비율 기반 동적 epsilon 설정
+              if epsilon is None:
+                y_values = [vertex['y'] for vertex in bounding_box]
+                height_ratio = max(y_values) - min(y_values)
+                epsilon = height_ratio / 2
+                print(f"[✔] dynamic_epsilon 설정됨 (비율): {epsilon:.4f}")
 
-              # 그룹화된 텍스트에 대해 바운딩 박스를 계산
+
+
+
+
+
 
               # y값 기준으로 그룹화 (epsilon 값으로 오차 범위 설정)
               group_found = False
               for y_group in grouped_texts:
-                if abs_y > y_group - (
-                    epsilon ) and abs_y < y_group + (
+                if center_y > y_group - (
+                    epsilon ) and center_y < y_group + (
                     epsilon ):
                   grouped_texts[y_group].append(item)
                   group_found = True
                   break
 
               if not group_found:
-                grouped_texts[abs_y] = [item]
+                grouped_texts[center_y] = [item]
 
             # 한 번 단어를 찾고 나면, 다음 검색을 위해 item_text_start_idx를 이동시킴
             item_text_start_idx += len(part)
