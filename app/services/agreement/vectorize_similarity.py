@@ -184,8 +184,11 @@ async def process_clause_ocr(qd_client: AsyncQdrantClient,
 
   rag_result.clause_data[0].position.extend(all_positions)
 
-  return ChunkProcessResult(status=ChunkProcessStatus.SUCCESS,
-                            result=rag_result)
+  # 왜 해당 코드 에러
+  # return ChunkProcessResult(status=ChunkProcessStatus.SUCCESS,
+  #                           result=rag_result)
+
+  return rag_result
 
 
 async def search_qdrant(semaphore: Semaphore, collection_name: str,
