@@ -2,7 +2,7 @@ import asyncio
 import logging
 import time
 from asyncio import Semaphore
-from typing import List, Optional, Any, Tuple
+from typing import List, Optional, Any
 
 import fitz
 from qdrant_client import models, AsyncQdrantClient
@@ -20,7 +20,7 @@ from app.schemas.document_request import DocumentRequest
 from app.services.standard.vector_store import ensure_qdrant_collection
 
 SEARCH_COUNT = 3
-VIOLATION_THRESHOLD = 0.6
+VIOLATION_THRESHOLD = 0.75
 LLM_REQUIRED_KEYS = {"clause_content", "correctedText", "proofText",
                      "violation_score"}
 
