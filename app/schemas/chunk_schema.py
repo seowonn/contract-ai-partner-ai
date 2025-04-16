@@ -34,8 +34,3 @@ class Document:
 class OCRDocument:
   content: str
 
-@dataclass
-class OCRDocumentChunk:
-  clause_content: str = ''
-  order_index: int = 0
-  clause_number: Optional[str] = None

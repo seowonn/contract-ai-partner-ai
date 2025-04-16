@@ -5,8 +5,7 @@ import fitz
 
 from app.common.exception.custom_exception import CommonException
 from app.common.exception.error_code import ErrorCode
-from app.schemas.chunk_schema import Document, DocumentMetadata, \
-  OCRDocumentChunk, OCRDocument
+from app.schemas.chunk_schema import Document, DocumentMetadata
 
 
 def convert_to_bytes_io(s3_stream: bytes) -> io.BytesIO:
@@ -36,24 +35,6 @@ def parse_pdf_to_documents(doc: fitz.Document) -> List[Document]:
         documents.append(Document(
             page_content=text,
             metadata=meta
-        ))
-
-  except Exception:
-    raise CommonException(ErrorCode.PDF_LOAD_FAILED)
-
-  return documents
-
-
-def parse_pdf_to_documents_ocr(doc: fitz.Document) -> List[OCRDocument]:
-  documents: List[OCRDocument] = []
-
-  try:
-    for page in doc:
-      text = page.get_text("text").strip()
-
-      if text:
-        documents.append(OCRDocument(
-            content=text
         ))
 
   except Exception:

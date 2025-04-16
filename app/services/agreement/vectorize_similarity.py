@@ -2,9 +2,10 @@ import asyncio
 import logging
 import time
 from asyncio import Semaphore
-from typing import List, Optional, Any, Tuple
-import numpy as np
+from typing import List, Optional, Any
+
 import fitz
+import numpy as np
 from qdrant_client import models, AsyncQdrantClient
 from qdrant_client.http.models import QueryResponse
 
@@ -15,11 +16,9 @@ from app.common.constants import ARTICLE_CLAUSE_SEPARATOR, \
 from app.common.exception.custom_exception import CommonException
 from app.common.exception.error_code import ErrorCode
 from app.containers.service_container import embedding_service, prompt_service
-from app.schemas.analysis_response import RagResult, SearchResult, OCRRagResult
-from app.schemas.chunk_schema import OCRDocumentChunk
+from app.schemas.analysis_response import RagResult, SearchResult
 from app.schemas.document_request import DocumentRequest
 from app.services.standard.vector_store import ensure_qdrant_collection
-from app.schemas.analysis_response import OCRClauseData
 
 SEARCH_COUNT = 3
 VIOLATION_THRESHOLD = 0.5
@@ -56,11 +55,9 @@ async def vectorize_and_calculate_similarity(
   return [result for result in results if result is not None]
 
 
-
 async def vectorize_and_calculate_similarity_ocr(
-    combined_chunks: List[OCRRagResult], document_request: DocumentRequest,
+    combined_chunks: List[RagResult], document_request: DocumentRequest,
     all_texts_with_bounding_boxes: List[dict]) -> List[RagResult]:
-
   print(f'combined chunk {combined_chunks}')
 
   qd_client = get_qdrant_client()
@@ -79,8 +76,9 @@ async def vectorize_and_calculate_similarity_ocr(
 
   semaphore = asyncio.Semaphore(5)
   tasks = [
-    process_clause_ocr(qd_client, chunk, embedding, document_request.categoryName,
-                   semaphore, all_texts_with_bounding_boxes)
+    process_clause_ocr(qd_client, chunk, embedding,
+                       document_request.categoryName,
+                       semaphore, all_texts_with_bounding_boxes)
     for chunk, embedding in zip(combined_chunks, embeddings)
   ]
 
@@ -111,13 +109,13 @@ async def process_clause(qd_client: AsyncQdrantClient, rag_result: RagResult,
     return None
 
   all_positions = \
-    await find_text_positions(rag_result.incorrect_text, byte_type_pdf)
-    # await find_text_positions(rag_result.incorrect_text, byte_type_pdf)
+    await find_text_positions(rag_result, byte_type_pdf)
+  # await find_text_positions(rag_result.incorrect_text, byte_type_pdf)
   positions = await extract_positions_by_page(all_positions)
 
   rag_result.accuracy = score
   rag_result.incorrect_text = await clean_incorrect_text(
-    rag_result.incorrect_text)
+      rag_result.incorrect_text)
   rag_result.corrected_text = corrected_result["correctedText"]
   rag_result.proof_text = corrected_result["proofText"]
 
@@ -128,10 +126,10 @@ async def process_clause(qd_client: AsyncQdrantClient, rag_result: RagResult,
   return rag_result
 
 
-async def process_clause_ocr(qd_client: AsyncQdrantClient, rag_result: OCRRagResult,
+async def process_clause_ocr(qd_client: AsyncQdrantClient,
+    rag_result: RagResult,
     embedding: List[float], collection_name: str, semaphore: Semaphore,
-    all_texts_with_bounding_boxes: List[dict]) -> Optional[OCRRagResult]:
-
+    all_texts_with_bounding_boxes: List[dict]) -> Optional[RagResult]:
   search_results = \
     await search_qdrant(semaphore, collection_name, embedding, qd_client)
   clause_results = await gather_search_results(search_results)
@@ -151,10 +149,12 @@ async def process_clause_ocr(qd_client: AsyncQdrantClient, rag_result: OCRRagRes
     return None
 
   all_positions = \
-    await find_text_positions_ocr(rag_result.incorrect_text, all_texts_with_bounding_boxes)
+    await find_text_positions_ocr(rag_result.incorrect_text,
+                                  all_texts_with_bounding_boxes)
 
   rag_result.accuracy = score
-  rag_result.incorrect_text = await clean_incorrect_text(rag_result.incorrect_text)
+  rag_result.incorrect_text = await clean_incorrect_text(
+    rag_result.incorrect_text)
   rag_result.corrected_text = corrected_result["correctedText"]
   rag_result.proof_text = corrected_result["proofText"]
 
@@ -164,12 +164,8 @@ async def process_clause_ocr(qd_client: AsyncQdrantClient, rag_result: OCRRagRes
 
   rag_result.clause_data[0].position.extend(all_positions)
 
-
   print(f"Updated rag_result: {rag_result}")
   return rag_result
-
-
-
 
 
 async def search_qdrant(semaphore: Semaphore, collection_name: str,
@@ -252,21 +248,21 @@ async def clean_incorrect_text(text: str) -> str:
   )
 
 
-async def find_text_positions(clause_content: str,
+async def find_text_positions(rag_result: RagResult,
     pdf_document: fitz.Document) -> dict[int, List[dict]]:
   all_positions = {}  # 페이지별로 위치 정보를 저장할 딕셔너리
 
   # +를 기준으로 문장을 나누고 뒤에 있는 부분만 사용
-  clause_content_parts = clause_content.split('+', 1)
+  clause_content_parts = rag_result.incorrect_text.split('+', 1)
   if len(clause_content_parts) > 1:
-    clause_content = clause_content_parts[1].strip()  # `+` 뒤의 내용만 사용
+    rag_result.incorrect_text = clause_content_parts[1].strip()  # `+` 뒤의 내용만 사용
 
   # "!!!"을 기준으로 더 나눠서 각각을 위치 찾기
-  clause_parts = clause_content.split('!!!')
+  clause_parts = rag_result.incorrect_text.split('!!!')
 
   # 모든 페이지를 검색
-  for page_num in range(pdf_document.page_count):
-    page = pdf_document.load_page(page_num)  # 페이지 로드
+  for clause_part in rag_result.clause_data:
+    page = pdf_document.load_page(clause_part.page - 1)  # 페이지 로드
 
     # 페이지 크기 얻기 (페이지의 너비와 높이)
     page_width = float(page.rect.width)  # 명시적으로 float로 처리
@@ -323,20 +319,19 @@ async def find_text_positions(clause_content: str,
 
         # 바운딩 박스를 생성 (최소값과 최대값을 사용)
         page_positions.append({
-          "page": page_num + 1,
+          "page": clause_part.page,
           "bbox": (min_x0, min_y0, width, height)  # 상대적 x, y, 너비, 높이
         })
 
     # 페이지별로 위치를 딕셔너리에 추가
     if page_positions:
-      all_positions[page_num + 1] = page_positions
+      all_positions[clause_part.page] = page_positions
 
   return all_positions
 
 
 async def find_text_positions_ocr(clause_content: str,
     all_texts_with_bounding_boxes: List[dict]) -> List[dict]:
-
   epsilon = None
   all_positions = {}  # 페이지별로 위치 정보를 저장할 딕셔너리
 
@@ -354,7 +349,7 @@ async def find_text_positions_ocr(clause_content: str,
     search_start_idx = full_text.find(clause_content)
     search_end_idx = search_start_idx + len(clause_content)
     print(
-      f'Search text "{clause_content}" is located from index {search_start_idx} to {search_end_idx} in full text.')
+        f'Search text "{clause_content}" is located from index {search_start_idx} to {search_end_idx} in full text.')
 
     search_text_parts = clause_content.split()  # 텍스트 조각을 분리 (공백 기준)
 
@@ -417,18 +412,12 @@ async def find_text_positions_ocr(clause_content: str,
                 epsilon = height_ratio / 2
                 print(f"[✔] dynamic_epsilon 설정됨 (비율): {epsilon:.4f}")
 
-
-
-
-
-
-
               # y값 기준으로 그룹화 (epsilon 값으로 오차 범위 설정)
               group_found = False
               for y_group in grouped_texts:
                 if center_y > y_group - (
-                    epsilon ) and center_y < y_group + (
-                    epsilon ):
+                    epsilon) and center_y < y_group + (
+                    epsilon):
                   grouped_texts[y_group].append(item)
                   group_found = True
                   break
@@ -490,7 +479,6 @@ async def find_text_positions_ocr(clause_content: str,
   return points_list
 
 
-
 async def extract_positions_by_page(all_positions: dict[int, List[dict]]) -> \
     List[List]:
   positions = [[], []]
@@ -508,6 +496,7 @@ async def extract_positions_by_page(all_positions: dict[int, List[dict]]) -> \
         positions[1].extend(p['bbox'] for p in positions_in_page)
 
   return positions
+
 
 async def extract_positions_ocr(all_positions: dict[int, List[dict]]) -> \
     List[List]:

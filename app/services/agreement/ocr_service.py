@@ -3,17 +3,17 @@ from typing import List, Tuple
 
 from app.common.constants import ARTICLE_OCR_HEADER_PATTERN, \
   CLAUSE_HEADER_PATTERN, ARTICLE_CLAUSE_SEPARATOR
-from app.schemas.chunk_schema import OCRDocument, OCRDocumentChunk
+from app.schemas.chunk_schema import Document, DocumentChunk
 from app.services.common.chunking_service import split_by_clause_header_pattern, \
   MIN_CLAUSE_BODY_LENGTH, get_clause_pattern, split_text_by_pattern
 
 
 def chunk_by_article_and_clause_without_page_ocr(
-    documents: List[OCRDocument]) -> List[OCRDocumentChunk]:
-  chunks: List[OCRDocumentChunk] = []
+    documents: List[Document]) -> List[DocumentChunk]:
+  chunks: List[DocumentChunk] = []
 
   for doc in documents:
-    page_text = doc.content
+    page_text = doc.page_content
     order_index = 1
 
     matches = re.findall(ARTICLE_OCR_HEADER_PATTERN, page_text, flags=re.DOTALL)
@@ -35,7 +35,7 @@ def chunk_by_article_and_clause_without_page_ocr(
               clause_chunks) else ""
 
           if len(clause_content) >= MIN_CLAUSE_BODY_LENGTH:
-            chunks.append(OCRDocumentChunk(
+            chunks.append(DocumentChunk(
                 clause_content=f"{header}{ARTICLE_CLAUSE_SEPARATOR}\n{clause_content}",
                 order_index=order_index,
                 clause_number=f"제{header}조 {clause_number}항"
@@ -43,7 +43,7 @@ def chunk_by_article_and_clause_without_page_ocr(
             order_index += 1
       else:
         if len(body) >= MIN_CLAUSE_BODY_LENGTH:
-          chunks.append(OCRDocumentChunk(
+          chunks.append(DocumentChunk(
               clause_content=f"{header}{ARTICLE_CLAUSE_SEPARATOR}\n{body}",
               order_index=order_index,
               clause_number=f"제{header}조 1항"
@@ -53,8 +53,8 @@ def chunk_by_article_and_clause_without_page_ocr(
   return chunks
 
 
-def chunk_preamble_content_ocr(page_text: str, chunks: List[OCRDocumentChunk],
-    order_index: int) -> Tuple[int, List[OCRDocumentChunk]]:
+def chunk_preamble_content_ocr(page_text: str, chunks: List[DocumentChunk],
+    order_index: int) -> Tuple[int, List[DocumentChunk]]:
   first_article_match = (
     re.search(ARTICLE_OCR_HEADER_PATTERN, page_text, flags=re.MULTILINE))
 
@@ -63,12 +63,12 @@ def chunk_preamble_content_ocr(page_text: str, chunks: List[OCRDocumentChunk],
   return append_preamble_ocr(chunks, preamble, order_index)
 
 
-def append_preamble_ocr(result: List[OCRDocumentChunk], preamble: str,
-    order_index: int) -> Tuple[int, List[OCRDocumentChunk]]:
+def append_preamble_ocr(result: List[DocumentChunk], preamble: str,
+    order_index: int) -> Tuple[int, List[DocumentChunk]]:
   pattern = get_clause_pattern(result[-1].clause_number)
 
   if not pattern:
-    result.append(OCRDocumentChunk(
+    result.append(DocumentChunk(
         clause_content=preamble,
         order_index=order_index,
         clause_number=result[-1].clause_number
@@ -79,7 +79,7 @@ def append_preamble_ocr(result: List[OCRDocumentChunk], preamble: str,
   lines = clause_chunks[0].strip().splitlines()
   content_lines = [line for line in lines if not line.strip().startswith("페이지")]
 
-  result.append(OCRDocumentChunk(
+  result.append(DocumentChunk(
       clause_content="\n".join(content_lines),
       order_index=order_index,
       clause_number=result[-1].clause_number
@@ -93,7 +93,7 @@ def append_preamble_ocr(result: List[OCRDocumentChunk], preamble: str,
 
     if len(clause_content) >= MIN_CLAUSE_BODY_LENGTH:
       prev_clause_prefix = result[-1].clause_number.split(" ")[0]
-      result.append(OCRDocumentChunk(
+      result.append(DocumentChunk(
           clause_content=clause_content,
           order_index=order_index,
           clause_number=f"{prev_clause_prefix} {clause_number}항"
