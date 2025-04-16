@@ -3,7 +3,7 @@ from typing import List, Tuple
 
 from app.common.constants import ARTICLE_OCR_HEADER_PATTERN, \
   CLAUSE_HEADER_PATTERN, ARTICLE_CLAUSE_SEPARATOR
-from app.schemas.chunk_schema import Document, DocumentChunk
+from app.schemas.chunk_schema import Document, DocumentChunk, DocumentMetadata
 from app.services.common.chunking_service import split_by_clause_header_pattern, \
   MIN_CLAUSE_BODY_LENGTH, get_clause_pattern, split_text_by_pattern
 
@@ -58,3 +58,14 @@ def append_preamble_ocr(result: List[DocumentChunk], preamble: str,
       order_index += 1
 
   return order_index, result
+
+def parse_ocr_to_documents(full_text :str) -> List[Document]:
+  documents: List[Document] = []
+
+  meta = DocumentMetadata(page = 1)
+  documents.append(Document(
+      page_content=full_text,
+      metadata=meta
+  ))
+
+  return documents
