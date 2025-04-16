@@ -56,16 +56,10 @@ def preprocess_data(document_request: DocumentRequest) -> Tuple[
   documents: List[Document] = []
   fitz_document = None
 
-  file_type = extract_file_type(document_request.url)
-  if file_type in (FileType.PNG, FileType.JPG, FileType.JPEG):
-    pre_signed_url = generate_pre_signed_url(document_request.url)
-  elif file_type == FileType.PDF:
-    s3_stream = s3_get_object(document_request.url)
-    pdf_bytes_io = convert_to_bytes_io(s3_stream)
-    fitz_document = extract_fitz_document_from_pdf_io(pdf_bytes_io)
-    documents = parse_pdf_to_documents(fitz_document)
-  else:
-    raise CommonException(ErrorCode.UNSUPPORTED_FILE_TYPE)
+  s3_stream = s3_get_object(document_request.url)
+  pdf_bytes_io = convert_to_bytes_io(s3_stream)
+  fitz_document = extract_fitz_document_from_pdf_io(pdf_bytes_io)
+  documents = parse_pdf_to_documents(fitz_document)
 
   if not documents:
     raise CommonException(ErrorCode.NO_TEXTS_EXTRACTED)
