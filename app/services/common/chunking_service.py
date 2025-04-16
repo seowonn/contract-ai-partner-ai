@@ -11,6 +11,7 @@ from nltk import find
 from sklearn.manifold import TSNE
 
 from app.blueprints.standard.standard_exception import StandardException
+from app.clients.openai_clients import get_embedding_sync_client
 from app.common.constants import ARTICLE_CHUNK_PATTERN, ARTICLE_HEADER_PATTERN, \
   ARTICLE_CLAUSE_SEPARATOR, ARTICLE_HEADER_PARSE_PATTERN, CLAUSE_HEADER_PATTERN
 from app.common.exception.error_code import ErrorCode
@@ -28,7 +29,8 @@ def semantic_chunk(extracted_text: str, similarity_threshold: float = 0.9,
   if not sentences:
     raise StandardException(ErrorCode.CHUNKING_FAIL)
 
-  embeddings = embedding_service.batch_sync_embed_texts(sentences)
+  embedding_client = get_embedding_sync_client()
+  embeddings = embedding_service.batch_sync_embed_texts(embedding_client, sentences)
 
   chunks = []
   current_chunk = [sentences[0]]

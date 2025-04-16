@@ -1,13 +1,8 @@
 import json
 import logging
-import re
 from typing import List, Any, Optional
 
-import httpx
-from openai import AsyncOpenAI
-
-from app.clients.openai_clients import sync_openai_client, prompt_async_client, \
-  openai_client
+from openai import AsyncAzureOpenAI
 
 
 def clean_markdown_block(response_text: str) -> str:
@@ -27,10 +22,9 @@ class PromptService:
   def __init__(self, deployment_name):
     self.deployment_name = deployment_name
 
-  async def make_correction_data(self, clause_content: str) -> Any | None:
-    # async with httpx.AsyncClient() as httpx_client:
-    #   async with AsyncOpenAI(http_client=httpx_client) as client:
-    response = await prompt_async_client.chat.completions.create(
+  async def make_correction_data(self, prompt_client: AsyncAzureOpenAI,
+      clause_content: str) -> Any | None:
+    response = await prompt_client.chat.completions.create(
         model=self.deployment_name,
         messages=[
           {
@@ -83,7 +77,9 @@ class PromptService:
 
     return parsed_response
 
-  async def correct_contract(self, clause_content: str, proof_text: List[str],
+
+  async def correct_contract(self, prompt_client: AsyncAzureOpenAI,
+      clause_content: str, proof_text: List[str],
       incorrect_text: List[str], corrected_text: List[str]) -> Optional[
     dict[str, Any]]:
 
@@ -99,9 +95,7 @@ class PromptService:
       "corrected_text": corrected_text
     }
 
-    # async with httpx.AsyncClient() as httpx_client:
-    #   async with AsyncOpenAI(http_client=httpx_client) as client:
-    response = await prompt_async_client.chat.completions.create(
+    response = await prompt_client.chat.completions.create(
         model=self.deployment_name,
         messages=[
           {
@@ -148,10 +142,10 @@ class PromptService:
             violation_score는 0~1 범위의 소수점 셋째자리까지 반환해 주세요. 
 
           """
-        }
-      ],
-      temperature=0.1,
-      max_tokens=512,
+          }
+        ],
+        temperature=0.1,
+        max_tokens=512,
     )
 
     response_text = response.choices[0].message.content

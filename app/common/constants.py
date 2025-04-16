@@ -10,6 +10,7 @@ CLAUSE_TEXT_SEPARATOR = "!!!"
 ARTICLE_CLAUSE_SEPARATOR = "+"
 
 MAX_RETRIES = 5
+LLM_TIMEOUT = 30.0
 
 ARTICLE_OCR_HEADER_PATTERN = r'(제\s*\d+\s*조[^【\[\n]*[】\]]?)\s*(.*?)(?=제\s*\d+\s*조|$)'
 

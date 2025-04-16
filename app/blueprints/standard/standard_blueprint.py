@@ -45,7 +45,7 @@ def process_standards_pdf_from_s3():
 
   contents = [normalize_spacing(doc.page_content) for doc in documents]
   return SuccessResponse(SuccessCode.ANALYSIS_COMPLETE,
-                         StandardResponse(contents=contents)).of(), HTTPStatus.OK
+                         StandardResponse(result=SUCCESS, contents=contents)).of(), HTTPStatus.OK
 
 
 @standards.route('<categoryName>/<standardId>', methods=["DELETE"])

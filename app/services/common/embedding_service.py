@@ -1,9 +1,8 @@
 from typing import List
 
 import numpy as np
+from openai import AsyncAzureOpenAI, AzureOpenAI
 
-from app.clients.openai_clients import embedding_async_client, \
-  embedding_sync_client
 from app.common.exception.custom_exception import CommonException
 from app.common.exception.error_code import ErrorCode
 
@@ -15,22 +14,23 @@ class EmbeddingService:
     self.deployment_name = deployment_name
 
 
-  async def batch_embed_texts(self, inputs: List[str]) -> List[List[float]]:
+  async def batch_embed_texts(self, embedding_client: AsyncAzureOpenAI,
+      inputs: List[str]) -> List[List[float]]:
+
     all_embeddings = []
     for i in range(0, len(inputs), MAX_BATCH_SIZE):
       batch = inputs[i:i + MAX_BATCH_SIZE]
       try:
-        embeddings = await self.embed_texts(batch)
+        embeddings = await self.embed_texts(embedding_client, batch)
         all_embeddings.extend(embeddings)
       except Exception:
         raise CommonException(ErrorCode.EMBEDDING_FAILED)
     return all_embeddings
 
 
-  async def embed_texts(self, sentences: List[str]) -> List[List[float]]:
-    # async with httpx.AsyncClient() as httpx_client:
-    #   async with AsyncOpenAI(http_client=httpx_client) as client:
-    response = await embedding_async_client.embeddings.create(
+  async def embed_texts(self, embedding_client: AsyncAzureOpenAI,
+      sentences: List[str]) -> List[List[float]]:
+    response = await embedding_client.embeddings.create(
         input=sentences,
         model=self.deployment_name,
         encoding_format="float"
@@ -43,20 +43,22 @@ class EmbeddingService:
             response.data]
 
 
-  def batch_sync_embed_texts(self, inputs: List[str]) -> List[List[float]]:
+  def batch_sync_embed_texts(self, embedding_client: AzureOpenAI,
+      inputs: List[str]) -> List[List[float]]:
     all_embeddings = []
     for i in range(0, len(inputs), MAX_BATCH_SIZE):
       batch = inputs[i:i + MAX_BATCH_SIZE]
       try:
-        embeddings = self.get_embeddings(batch)
+        embeddings = self.get_embeddings(embedding_client, batch)
         all_embeddings.extend(embeddings)
       except Exception:
         raise CommonException(ErrorCode.EMBEDDING_FAILED)
     return all_embeddings
 
 
-  def get_embeddings(self, sentences: List[str]) -> List[List[float]]:
-    response = embedding_sync_client.embeddings.create(
+  def get_embeddings(self, embedding_client: AzureOpenAI,
+      sentences: List[str]) -> List[List[float]]:
+    response = embedding_client.embeddings.create(
         input=sentences,
         model=self.deployment_name,
         encoding_format="float"

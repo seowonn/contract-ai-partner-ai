@@ -66,7 +66,7 @@ def preprocess_data(document_request: DocumentRequest) -> Tuple[
   else:
     raise CommonException(ErrorCode.UNSUPPORTED_FILE_TYPE)
 
-  if len(documents) == 0:
+  if not documents:
     raise CommonException(ErrorCode.NO_TEXTS_EXTRACTED)
   return documents, fitz_document
 
@@ -104,7 +104,7 @@ def chunk_standard_texts(extracted_text: str) -> List[str]:
       extracted_text,
       similarity_threshold=0.6
   )
-  if len(chunks) == 0:
+  if not chunks:
     raise CommonException(ErrorCode.CHUNKING_FAIL)
   return chunks
 
@@ -117,7 +117,7 @@ def chunk_agreement_documents(documents: List[Document]) -> List[DocumentChunk]:
   chunks[-2].clause_content = keep_text.strip()
   del chunks[-1]
 
-  if len(chunks) == 0:
+  if not chunks:
     raise CommonException(ErrorCode.CHUNKING_FAIL)
   return chunks
 
