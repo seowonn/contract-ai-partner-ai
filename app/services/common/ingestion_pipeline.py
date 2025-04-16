@@ -12,8 +12,7 @@ from app.schemas.analysis_response import RagResult, ClauseData
 from app.schemas.chunk_schema import Document
 from app.schemas.chunk_schema import DocumentChunk, DocumentMetadata
 from app.schemas.document_request import DocumentRequest
-from app.services.agreement.ocr_service import \
-  chunk_by_article_and_clause_without_page_ocr
+
 from app.services.agreement.vectorize_similarity import \
   vectorize_and_calculate_similarity_ocr, vectorize_and_calculate_similarity
 from app.services.agreement.vision_service import extract_ocr
@@ -33,6 +32,7 @@ def ocr_service(document_request: DocumentRequest):
   chunks = asyncio.run(
       vectorize_and_calculate_similarity_ocr(combined_chunks, document_request,
                                              all_texts_with_bounding_boxes))
+  print(f'chunks : {chunks}')
   return chunks, len(combined_chunks), len(documents)
 
 
@@ -47,6 +47,7 @@ def pdf_agreement_service(document_request: DocumentRequest) -> Tuple[
   chunks = asyncio.run(
       vectorize_and_calculate_similarity(combined_chunks, document_request,
                                          fitz_document))
+  print(f'chunks : {chunks}')
   return chunks, len(combined_chunks), len(documents)
 
 
@@ -76,16 +77,14 @@ def preprocess_data_ocr(document_request: DocumentRequest) -> Tuple[
   documents: List[Document] = []
   all_texts_with_bounding_boxes = None
 
-  file_type = extract_file_type(document_request.url)
-  if file_type in (FileType.PNG, FileType.JPG, FileType.JPEG):
-    full_text, all_texts_with_bounding_boxes = extract_ocr(document_request.url)
 
-    documents.append(Document(
-        page_content=full_text
-    ))
+  full_text, all_texts_with_bounding_boxes = extract_ocr(document_request.url)
 
-  else:
-    raise CommonException(ErrorCode.UNSUPPORTED_FILE_TYPE)
+  meta = DocumentMetadata(page=1)
+  documents.append(Document(
+      page_content=full_text,
+      metadata=meta
+  ))
 
   if len(documents) == 0:
     raise CommonException(ErrorCode.NO_TEXTS_EXTRACTED)
@@ -125,7 +124,7 @@ def chunk_agreement_documents(documents: List[Document]) -> List[DocumentChunk]:
 
 def chunk_agreement_documents_ocr(documents: List[Document]) -> List[
   DocumentChunk]:
-  chunks = chunk_by_article_and_clause_without_page_ocr(documents)
+  chunks = chunk_by_article_and_clause_with_page(documents)
 
   if len(chunks) == 0:
     raise CommonException(ErrorCode.CHUNKING_FAIL)
