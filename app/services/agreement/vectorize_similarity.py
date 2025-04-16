@@ -80,10 +80,12 @@ async def process_clause(qd_client: AsyncQdrantClient,
   search_results = \
     await search_qdrant(semaphore, collection_name, embedding, qd_client)
   clause_results = await gather_search_results(search_results)
-  corrected_result = await generate_clause_correction(prompt_client,
-                                                      rag_result.incorrect_text,
-                                                      clause_results)
 
+  clause_content = await extract_incorrect_text(rag_result)
+
+  corrected_result = await generate_clause_correction(prompt_client,
+                                                      clause_content,
+                                                      clause_results)
   if not corrected_result:
     return ChunkProcessResult(status=ChunkProcessStatus.FAILURE)
 
@@ -112,6 +114,10 @@ async def process_clause(qd_client: AsyncQdrantClient,
 
   return ChunkProcessResult(status=ChunkProcessStatus.SUCCESS,
                             result=rag_result)
+
+async def extract_incorrect_text(rag_result: RagResult) -> str:
+  clause_content_parts = rag_result.incorrect_text.split(ARTICLE_CLAUSE_SEPARATOR, 1)
+  return clause_content_parts[1].strip() if len(clause_content_parts) > 1 else ""
 
 
 async def search_qdrant(semaphore: Semaphore, collection_name: str,
@@ -206,12 +212,6 @@ async def clean_incorrect_text(text: str) -> str:
 async def find_text_positions(clause_content: str,
     pdf_document: fitz.Document) -> dict[int, List[dict]]:
   all_positions = {}  # 페이지별로 위치 정보를 저장할 딕셔너리
-
-  # +를 기준으로 문장을 나누고 뒤에 있는 부분만 사용
-  clause_content_parts = clause_content.split('+', 1)
-  if len(clause_content_parts) > 1:
-    clause_content = clause_content_parts[1].strip()  # `+` 뒤의 내용만 사용
-
   # "!!!"을 기준으로 더 나눠서 각각을 위치 찾기
   clause_parts = clause_content.split('!!!')
 

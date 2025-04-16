@@ -176,12 +176,11 @@ def chunk_by_article_and_clause_with_page(documents: List[Document]) -> List[
 
     matches = re.findall(ARTICLE_CHUNK_PATTERN, page_text, flags=re.DOTALL)
     for header, body in matches:
-      header_match = re.match(ARTICLE_HEADER_PARSE_PATTERN, header)
+      header_match = parse_article_header(header)
       if not header_match:
         continue
 
-      article_number = header_match.group(1)
-      article_title = header_match.group(2) or header_match.group(3)
+      article_number, article_title = header_match
       article_body = body.strip()
 
       first_clause_match = re.search(CLAUSE_HEADER_PATTERN, article_body)
@@ -219,6 +218,26 @@ def chunk_by_article_and_clause_with_page(documents: List[Document]) -> List[
           order_index += 1
 
   return chunks
+
+
+def parse_article_header(header: str) -> Tuple[int, str] | None:
+  header = header.replace(" ", "")  # 공백 제거
+
+  if not header.startswith("제") or "조" not in header:
+    return None
+
+  try:
+    num_part = header.split("조")[0].replace("제", "")
+    title_part = header.split("조")[1]
+
+    article_number = int(num_part)
+
+    # 제목 괄호 제거
+    article_title = title_part.strip("【】()[]")
+    return article_number, article_title
+
+  except Exception:
+    return None
 
 
 def check_if_preamble_exists_except_first_page(page: int,

@@ -80,6 +80,9 @@ List[RagResult]:
   for doc in document_chunks:
     rag_result = clause_map.setdefault(doc.clause_number, RagResult())
 
+    if not doc.clause_content.strip():
+      continue
+
     if rag_result.incorrect_text:
       rag_result.incorrect_text += (
         CLAUSE_TEXT_SEPARATOR + doc.clause_content)
