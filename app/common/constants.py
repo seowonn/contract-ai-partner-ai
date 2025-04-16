@@ -12,3 +12,6 @@ ARTICLE_CLAUSE_SEPARATOR = "+"
 MAX_RETRIES = 5
 LLM_TIMEOUT = 30.0
 
+PROMPT_MODEL = "gpt-4o-mini"
+EMBEDDING_MODEL = "text-embedding-3-small"
+
