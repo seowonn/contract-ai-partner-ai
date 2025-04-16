@@ -30,13 +30,14 @@ def process_agreements_pdf_from_s3():
 
   file_type = extract_file_type(document_request.url)
   if file_type in (FileType.PNG, FileType.JPG, FileType.JPEG):
-    chunks, total_chunks = ocr_service(document_request)
+    chunks, total_chunks, total_page = ocr_service(document_request)
   elif file_type == FileType.PDF:
-    chunks, total_chunks = pdf_agreement_service(document_request)
+    chunks, total_chunks, total_page = pdf_agreement_service(document_request)
   else:
     raise CommonException(ErrorCode.UNSUPPORTED_FILE_TYPE)
 
   return SuccessResponse(SuccessCode.REVIEW_SUCCESS,
-                         AnalysisResponse(chunks=chunks,
+                         AnalysisResponse(total_page=total_page,
+                                          chunks=chunks,
                                           total_chunks=total_chunks)
                          ).of(), HTTPStatus.OK

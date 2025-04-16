@@ -33,11 +33,11 @@ def ocr_service(document_request: DocumentRequest):
   chunks = asyncio.run(
       vectorize_and_calculate_similarity_ocr(combined_chunks, document_request,
                                              all_texts_with_bounding_boxes))
-  return chunks, len(combined_chunks)
+  return chunks, len(combined_chunks), len(documents)
 
 
 def pdf_agreement_service(document_request: DocumentRequest) -> Tuple[
-  List[RagResult], int]:
+  List[RagResult], int, int]:
   s3_stream = s3_get_object(document_request.url)
   pdf_bytes_io = convert_to_bytes_io(s3_stream)
   fitz_document = extract_fitz_document_from_pdf_io(pdf_bytes_io)
@@ -47,7 +47,7 @@ def pdf_agreement_service(document_request: DocumentRequest) -> Tuple[
   chunks = asyncio.run(
       vectorize_and_calculate_similarity(combined_chunks, document_request,
                                          fitz_document))
-  return chunks, len(combined_chunks)
+  return chunks, len(combined_chunks), len(documents)
 
 
 def preprocess_data(document_request: DocumentRequest) -> Tuple[
@@ -80,8 +80,9 @@ def preprocess_data_ocr(document_request: DocumentRequest) -> Tuple[
   if file_type in (FileType.PNG, FileType.JPG, FileType.JPEG):
     full_text, all_texts_with_bounding_boxes = extract_ocr(document_request.url)
 
-    documents.append(
-        Document(page_content=full_text, metadata=DocumentMetadata(page=1)))
+    documents.append(Document(
+        page_content=full_text
+    ))
 
   else:
     raise CommonException(ErrorCode.UNSUPPORTED_FILE_TYPE)
@@ -163,7 +164,7 @@ def combine_chunks_by_clause_number_ocr(
     combined_chunks.append(
         RagResult(
             incorrect_text=doc.clause_content,
-            clause_data=[ClauseData(order_index=doc.order_index)]
+            clause_data=[ClauseData(order_index=doc.order_index, page=doc.page)]
         )
     )
 
