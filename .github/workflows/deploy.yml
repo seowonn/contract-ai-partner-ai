@@ -1,0 +1,69 @@
+name: Flask App Docker CI/CD
+
+on:
+   push:
+     branches: main
+   pull_request:
+     branches: main
+
+jobs:
+  build:
+    runs-on: ubuntu-latest #이거 ec2 서버 환경하고 맞추기
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Build and start containers
+      run: docker compose up -d --build
+      env:
+        OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        AZURE_EMBEDDING_API_KEY: ${{ secrets.AZURE_EMBEDDING_API_KEY }}
+        AZURE_EMBEDDING_OPENAI_ENDPOINT: ${{ secrets.AZURE_EMBEDDING_OPENAI_ENDPOINT }}
+        AZURE_PROMPT_API_KEY: ${{ secrets.AZURE_PROMPT_API_KEY }}
+        AZURE_PROMPT_OPENAI_ENDPOINT: ${{ secrets.AZURE_PROMPT_OPENAI_ENDPOINT }}
+
+
+    # ✅ Flask health check (실패할 수 있음)
+    - name: Check Flask health
+      run: |
+        echo "Waiting for Flask to become ready..."
+        for i in {1..10}; do
+          if curl --fail http://localhost:5000/health-check; then
+            echo "Flask is healthy"
+            break
+          fi
+          echo "Flask not ready yet... retrying in 3s"
+          sleep 3
+        done
+
+    - name: Show Flask logs (for debugging)
+      if: always()
+      run: docker compose logs flask-app
+
+    - name: Tear down containers
+      if: always()
+      run: docker compose down
+
+  deploy:
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+      - name: Save bastion key
+        run: |
+          echo "${{ secrets.BASTION_KEY }}" > bastion.pem
+          chmod 600 bastion.pem
+
+      - name: Deploy via Bastion
+        run: |
+          ssh -i bastion.pem -o StrictHostKeyChecking=no ${{ secrets.BASTION_HOST_IP }} << EOF
+          sudo ssh -i /var/lib/jenkins/.ssh/rising-star-private-flask-a.pem -o StrictHostKeyChecking=no ${{ secrets.FLASK_HOST_IP }} << EOC
+          echo "Flask 서버 접속 완료"
+          cd /home/ec2-user/contract-ai-partner-ai
+          git fetch origin
+          git checkout ${{ github.ref_name }}
+          git pull origin ${{ github.ref_name }}
+          docker-compose up -d --build
+          echo "[✅ Flask 서버 배포 완료]"
+          EOC
+          EOF
+

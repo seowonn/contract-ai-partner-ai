@@ -4,6 +4,8 @@ import httpx
 from dotenv import load_dotenv
 from openai import AsyncOpenAI, OpenAI, AsyncAzureOpenAI, AzureOpenAI
 
+from app.common.constants import EMBEDDING_MODEL, PROMPT_MODEL
+
 load_dotenv() # 루트로 고정
 
 openai_client = AsyncOpenAI(api_key=os.getenv("OPENAI_API_KEY"))
@@ -27,7 +29,7 @@ def get_embedding_sync_client() -> AzureOpenAI:
       azure_endpoint=os.getenv("AZURE_EMBEDDING_OPENAI_ENDPOINT")
   )
 
-embedding_deployment_name = "text-embedding-3-small"
+embedding_deployment_name = EMBEDDING_MODEL
 
 
 def get_prompt_async_client() -> AsyncAzureOpenAI:
@@ -43,4 +45,4 @@ def get_prompt_async_client() -> AsyncAzureOpenAI:
       http_client=httpx_client
   )
 
-prompt_deployment_name = "gpt-4o-mini"
+prompt_deployment_name = PROMPT_MODEL

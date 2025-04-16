@@ -25,7 +25,7 @@ from app.schemas.document_request import DocumentRequest
 from app.services.standard.vector_store import ensure_qdrant_collection
 
 SEARCH_COUNT = 3
-VIOLATION_THRESHOLD = 0.9
+VIOLATION_THRESHOLD = 0.6
 LLM_REQUIRED_KEYS = {"clause_content", "correctedText", "proofText",
                      "violation_score"}
 
@@ -67,33 +67,28 @@ async def vectorize_and_calculate_similarity_ocr(
 async def vectorize_and_calculate_similarity(
     combined_chunks: List[RagResult], document_request: DocumentRequest,
     byte_type_pdf: fitz.Document) -> List[RagResult]:
+
   qd_client = get_qdrant_client()
   await ensure_qdrant_collection(qd_client, document_request.categoryName)
 
-  embedding_inputs = []
-  for chunk in combined_chunks:
-    parts = chunk.incorrect_text.split(ARTICLE_CLAUSE_SEPARATOR, 1)
-    title = parts[0].strip() if len(parts) == 2 else ""
-    content = parts[1].strip() if len(parts) == 2 else parts[0].strip()
-    embedding_inputs.append(f"{title} {content}")
+  embedding_inputs = await prepare_embedding_inputs(combined_chunks)
 
   start_time = time.time()
-  embeddings = await embedding_service.batch_embed_texts(
-      get_embedding_async_client(), embedding_inputs)
+  async with get_embedding_async_client() as embedding_client:
+    embeddings = await embedding_service.batch_embed_texts(
+        embedding_client, embedding_inputs)
   logging.info(f"임베딩 묶음 소요 시간: {time.time() - start_time}")
 
   semaphore = asyncio.Semaphore(5)
-  prompt_client = get_prompt_async_client()
-  tasks = [
-    process_clause(qd_client, prompt_client, chunk, embedding,
-                   document_request.categoryName, semaphore, byte_type_pdf)
-    for chunk, embedding in zip(combined_chunks, embeddings)
-  ]
+  async with get_prompt_async_client() as prompt_client:
+    tasks = [
+      process_clause(qd_client, prompt_client, chunk, embedding,
+                     document_request.categoryName, semaphore, byte_type_pdf)
+      for chunk, embedding in zip(combined_chunks, embeddings)
+    ]
+    results = await asyncio.gather(*tasks)
 
-  # 모든 임베딩 및 유사도 검색 태스크를 병렬로 실행
-  results = await asyncio.gather(*tasks)
-
-  success_results = [r.result for r in results if
+  success_results: List[RagResult] = [r.result for r in results if
                      r.status == ChunkProcessStatus.SUCCESS and r.result is not None]
   failure_score = sum(r.status == ChunkProcessStatus.FAILURE for r in results)
 
@@ -101,6 +96,16 @@ async def vectorize_and_calculate_similarity(
     raise AgreementException(ErrorCode.CHUNK_ANALYSIS_FAILED)
 
   return success_results
+
+
+async def prepare_embedding_inputs(chunks: List[RagResult]) -> List[str]:
+  inputs = []
+  for chunk in chunks:
+    parts = chunk.incorrect_text.split(ARTICLE_CLAUSE_SEPARATOR, 1)
+    title = parts[0].strip() if len(parts) == 2 else ""
+    content = parts[1].strip() if len(parts) == 2 else parts[0].strip()
+    inputs.append(f"{title} {content}")
+  return inputs
 
 
 async def process_clause(qd_client: AsyncQdrantClient,
