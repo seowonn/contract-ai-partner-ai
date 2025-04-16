@@ -33,7 +33,6 @@ LLM_REQUIRED_KEYS = {"clause_content", "correctedText", "proofText",
 async def vectorize_and_calculate_similarity_ocr(
     combined_chunks: List[RagResult], document_request: DocumentRequest,
     all_texts_with_bounding_boxes: List[dict]) -> List[RagResult]:
-  print(f'combined chunk {combined_chunks}')
 
   qd_client = get_qdrant_client()
   await ensure_qdrant_collection(qd_client, document_request.categoryName)
@@ -128,12 +127,12 @@ async def process_clause(qd_client: AsyncQdrantClient,
     logging.warning(f"violation_score 추출 실패")
     return ChunkProcessResult(status=ChunkProcessStatus.FAILURE)
 
+  # chunk는 성공했다는건가?
   if score < VIOLATION_THRESHOLD:
     return ChunkProcessResult(status=ChunkProcessStatus.SUCCESS)
 
   all_positions = \
     await find_text_positions(rag_result, byte_type_pdf)
-  # await find_text_positions(rag_result.incorrect_text, byte_type_pdf)
   positions = await extract_positions_by_page(all_positions)
 
   rag_result.accuracy = score
@@ -154,7 +153,7 @@ async def process_clause_ocr(qd_client: AsyncQdrantClient,
     prompt_client: AsyncAzureOpenAI,
     rag_result: RagResult,
     embedding: List[float], collection_name: str, semaphore: Semaphore,
-    all_texts_with_bounding_boxes: List[dict]) -> Optional[RagResult]:
+    all_texts_with_bounding_boxes: List[dict]) -> ChunkProcessResult:
   search_results = \
     await search_qdrant(semaphore, collection_name, embedding, qd_client)
   clause_results = await gather_search_results(search_results)
@@ -162,16 +161,16 @@ async def process_clause_ocr(qd_client: AsyncQdrantClient,
     await generate_clause_correction(prompt_client, rag_result.incorrect_text, clause_results)
 
   if not corrected_result:
-    return None
+    return ChunkProcessResult(status=ChunkProcessStatus.FAILURE)
 
   try:
     score = float(corrected_result["violation_score"])
   except (KeyError, ValueError, TypeError):
     logging.warning(f"violation_score 추출 실패")
-    return None
+    return ChunkProcessResult(status=ChunkProcessStatus.FAILURE)
 
   if score < VIOLATION_THRESHOLD:
-    return None
+    return ChunkProcessResult(status=ChunkProcessStatus.SUCCESS)
 
   all_positions = \
     await find_text_positions_ocr(rag_result.incorrect_text,
@@ -183,14 +182,10 @@ async def process_clause_ocr(qd_client: AsyncQdrantClient,
   rag_result.corrected_text = corrected_result["correctedText"]
   rag_result.proof_text = corrected_result["proofText"]
 
-  print(f'Length of clause_data: {len(rag_result.clause_data)}')
-  print(f'all_positions : {all_positions}')
-  print(f'type all_positions : {type(all_positions)}')
-
   rag_result.clause_data[0].position.extend(all_positions)
 
-  print(f"Updated rag_result: {rag_result}")
-  return rag_result
+  return ChunkProcessResult(status=ChunkProcessStatus.SUCCESS,
+                            result=rag_result)
 
 
 async def search_qdrant(semaphore: Semaphore, collection_name: str,
@@ -373,7 +368,6 @@ async def find_text_positions_ocr(clause_content: str,
   clause_content_parts = clause_content.split('+', 1)
   if len(clause_content_parts) > 1:
     clause_content = clause_content_parts[1].strip()  # `+` 뒤의 내용만 사용
-  print(f'clause_content : {clause_content}')
 
   full_text = " ".join([item['text'] for item in all_texts_with_bounding_boxes])
 
@@ -382,8 +376,6 @@ async def find_text_positions_ocr(clause_content: str,
     # 검색 범위의 시작과 끝 인덱스를 찾음
     search_start_idx = full_text.find(clause_content)
     search_end_idx = search_start_idx + len(clause_content)
-    print(
-        f'Search text "{clause_content}" is located from index {search_start_idx} to {search_end_idx} in full text.')
 
     search_text_parts = clause_content.split()  # 텍스트 조각을 분리 (공백 기준)
 
@@ -402,12 +394,9 @@ async def find_text_positions_ocr(clause_content: str,
 
     # 검색 시작
     for item in all_texts_with_bounding_boxes:
-      print(f'item : {item}')
 
       for part in search_text_parts:
         if part == item['text']:  # 부분 텍스트 일치
-          print(f'item["text"] {item["text"]}')
-
           # 첫 번째 단어는 처음부터 검색
           if last_end_idx == -1:  # 처음에는 0부터 검색
             start_idx = 0
@@ -421,19 +410,10 @@ async def find_text_positions_ocr(clause_content: str,
             break  # 더 이상 찾을 것이 없으면 종료
           item_text_end_idx = item_text_start_idx + len(part)
 
-          print(
-              f'start_idx {start_idx} item_text_start_idx {item_text_start_idx}')
-          print(f'start_idx : {start_idx}')
-          print(f'search_end_idx : {search_end_idx}')
-          print(f'item_text_start_idx : {item_text_start_idx}')
-          print(f'item_text_end_idx : {item_text_end_idx}')
-
           # 텍스트가 정확히 검색 범위 내에 있을 경우만 처리
           if search_start_idx <= item_text_start_idx and search_end_idx >= item_text_end_idx:
-            print(f'Found "{part}" in the search text range.')
 
             bounding_box = item['bounding_box']
-            print(f'bounding_box: {bounding_box}')
 
             for vertex in bounding_box:
               center_y = (sum(vertex['y'] for vertex in bounding_box)
@@ -444,7 +424,6 @@ async def find_text_positions_ocr(clause_content: str,
                 y_values = [vertex['y'] for vertex in bounding_box]
                 height_ratio = max(y_values) - min(y_values)
                 epsilon = height_ratio / 2
-                print(f"[✔] dynamic_epsilon 설정됨 (비율): {epsilon:.4f}")
 
               # y값 기준으로 그룹화 (epsilon 값으로 오차 범위 설정)
               group_found = False
@@ -461,19 +440,11 @@ async def find_text_positions_ocr(clause_content: str,
 
             # 한 번 단어를 찾고 나면, 다음 검색을 위해 item_text_start_idx를 이동시킴
             item_text_start_idx += len(part)
-
             last_end_idx = item_text_end_idx
-            start_idx = last_end_idx  # 시작 인덱스를 갱신
-            print(f"Updated start_idx: {start_idx}")
 
             # 찾은 단어가 범위 내에 있을 때 바로 루프 종료
             break
 
-          # 다음 인덱스부터 검색을 계속 진행
-          last_end_idx = item_text_end_idx  # 이전 시작 인덱스부터 새로운 시작 위치로 갱신
-          start_idx = last_end_idx  # 시작 인덱스를 갱신
-          print(f"Updated start_idx: {start_idx}")
-          break
 
     points_list = []
     unique_relative_points = set()
