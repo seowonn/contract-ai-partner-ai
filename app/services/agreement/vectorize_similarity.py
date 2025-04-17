@@ -181,9 +181,9 @@ async def generate_clause_correction(prompt_client: AsyncAzureOpenAI,
           ),
           timeout=LLM_TIMEOUT
       )
-      if isinstance(result, dict) and LLM_REQUIRED_KEYS.issubset(result.keys()):
+      if is_correct_response_format(result):
         return result
-      logging.warning(f"[generate_clause_correction]: llm 응답 필수 키 누락됨")
+      logging.warning(f"[generate_clause_correction]: llm 응답 필수 키 누락 / str형 반환 안됨")
 
     except Exception as e:
       if isinstance(e, asyncio.TimeoutError):
@@ -197,6 +197,14 @@ async def generate_clause_correction(prompt_client: AsyncAzureOpenAI,
         await asyncio.sleep(0.5 * attempt)
 
   return None
+
+
+def is_correct_response_format(result: dict[str, str]) -> bool:
+  return (
+      isinstance(result, dict)
+      and LLM_REQUIRED_KEYS.issubset(result.keys())
+      and all(isinstance(result[key], str) for key in LLM_REQUIRED_KEYS)
+  )
 
 
 async def set_result_data(corrected_result: Optional[
