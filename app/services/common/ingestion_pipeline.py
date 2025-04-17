@@ -12,9 +12,7 @@ from app.schemas.analysis_response import RagResult, ClauseData
 from app.schemas.chunk_schema import Document
 from app.schemas.chunk_schema import DocumentChunk, DocumentMetadata
 from app.schemas.document_request import DocumentRequest
-from app.services.agreement.ocr_service import parse_ocr_to_documents, \
-  chunk_by_article_and_clause_without_page_ocr, \
-  combine_chunks_by_clause_number_ocr, extract_ocr
+from app.services.agreement.ocr_service import extract_ocr
 
 from app.services.agreement.vectorize_similarity import \
   vectorize_and_calculate_similarity_ocr, vectorize_and_calculate_similarity
@@ -26,20 +24,14 @@ from app.services.common.s3_service import s3_get_object
 
 
 def ocr_service(document_request: DocumentRequest):
-
   full_text, all_texts_with_bounding_boxes = extract_ocr(document_request.url)
-  # 의미없어 보이는데 pdf와 구조를 맞추기 위한 함수인건가?
-  documents = parse_ocr_to_documents(full_text)
 
-  if not documents:
-    raise CommonException(ErrorCode.NO_TEXTS_EXTRACTED)
+  documents: List[Document] = [
+    Document(page_content=full_text, metadata=DocumentMetadata(page=1))]
 
-  # 청킹 방식이 pdf, ocr 다름
-  document_chunks = chunk_agreement_documents_ocr(documents)
-  
-  # 여기는 반환값도 같기 때문에 어떻게 잘 할수 있을지도?
-  combined_chunks = combine_chunks_by_clause_number_ocr(document_chunks)
-  
+  document_chunks = chunk_agreement_documents(documents)
+  combined_chunks = combine_chunks_by_clause_number(document_chunks)
+
   # 입력값이 다르기에 함수가 분리되어야 함
   chunks = asyncio.run(
       vectorize_and_calculate_similarity_ocr(combined_chunks, document_request,
@@ -50,7 +42,6 @@ def ocr_service(document_request: DocumentRequest):
 
 def pdf_agreement_service(document_request: DocumentRequest) -> Tuple[
   List[RagResult], int, int]:
-
   s3_stream = s3_get_object(document_request.url)
   pdf_bytes_io = convert_to_bytes_io(s3_stream)
   fitz_document = extract_fitz_document_from_pdf_io(pdf_bytes_io)
@@ -66,6 +57,7 @@ def pdf_agreement_service(document_request: DocumentRequest) -> Tuple[
                                          fitz_document))
 
   return chunks, len(combined_chunks), len(documents)
+
 
 # fitz_document 이거 가져오려고 함수 쪼갬 - 근데 standard에서 쓰여서 삭제 못함
 def preprocess_data(document_request: DocumentRequest) -> Tuple[
@@ -102,29 +94,7 @@ def chunk_standard_texts(extracted_text: str) -> List[str]:
 
 def chunk_agreement_documents(documents: List[Document]) -> List[DocumentChunk]:
   chunks = chunk_by_article_and_clause_with_page(documents)
-  # keep_text, _ = chunks[0].clause_content.split("1.", 1)
-  # chunks[0].clause_content = keep_text
-  # keep_text, _ = chunks[-2].clause_content.split("날짜 :", 1)
-  # chunks[-2].clause_content = keep_text.strip()
-  # del chunks[-1]
-
   if not chunks:
-    raise CommonException(ErrorCode.CHUNKING_FAIL)
-  return chunks
-
-
-def chunk_agreement_documents_ocr(documents: List[Document]) -> List[
-  DocumentChunk]:
-  chunks = chunk_by_article_and_clause_without_page_ocr(documents)
-
-  # # 여기부분은 같아질듯
-  # keep_text, _ = chunks[0].clause_content.split("1.", 1)
-  # chunks[0].clause_content = keep_text
-  # keep_text, _ = chunks[-2].clause_content.split("날짜 :", 1)
-  # chunks[-2].clause_content = keep_text.strip()
-  # del chunks[-1]
-
-  if len(chunks) == 0:
     raise CommonException(ErrorCode.CHUNKING_FAIL)
   return chunks
 
@@ -153,8 +123,6 @@ def combine_chunks_by_clause_number(document_chunks: List[DocumentChunk]) -> \
     ))
 
   return combined_chunks
-
-
 
 
 def normalize_spacing(text: str) -> str:

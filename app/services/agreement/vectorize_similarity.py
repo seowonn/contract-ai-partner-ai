@@ -202,8 +202,6 @@ async def process_clause_ocr(qd_client: AsyncQdrantClient,
   return ChunkProcessResult(status=ChunkProcessStatus.SUCCESS,
                             result=rag_result)
 
-  # return rag_result
-
 
 async def search_qdrant(semaphore: Semaphore, collection_name: str,
     embedding: List[float],
