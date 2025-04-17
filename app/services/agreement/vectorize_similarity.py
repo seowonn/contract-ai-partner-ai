@@ -25,7 +25,7 @@ from app.schemas.document_request import DocumentRequest
 from app.services.standard.vector_store import ensure_qdrant_collection
 
 SEARCH_COUNT = 3
-VIOLATION_THRESHOLD = 0.75
+VIOLATION_THRESHOLD = 0.0
 LLM_REQUIRED_KEYS = {"clause_content", "correctedText", "proofText",
                      "violation_score"}
 
@@ -60,7 +60,15 @@ async def vectorize_and_calculate_similarity_ocr(
 
   # 모든 임베딩 및 유사도 검색 태스크를 병렬로 실행
   results = await asyncio.gather(*tasks)
-  return [result for result in results if result is not None]
+
+  success_results: List[RagResult] = [r.result for r in results if
+                     r.status == ChunkProcessStatus.SUCCESS and r.result is not None]
+  failure_score = sum(r.status == ChunkProcessStatus.FAILURE for r in results)
+
+  if not success_results and failure_score == len(combined_chunks):
+    raise AgreementException(ErrorCode.CHUNK_ANALYSIS_FAILED)
+
+  return success_results
 
 
 async def vectorize_and_calculate_similarity(
@@ -191,10 +199,10 @@ async def process_clause_ocr(qd_client: AsyncQdrantClient,
   rag_result.clause_data[0].position.extend(all_positions)
 
   # 왜 해당 코드 에러
-  # return ChunkProcessResult(status=ChunkProcessStatus.SUCCESS,
-  #                           result=rag_result)
+  return ChunkProcessResult(status=ChunkProcessStatus.SUCCESS,
+                            result=rag_result)
 
-  return rag_result
+  # return rag_result
 
 
 async def search_qdrant(semaphore: Semaphore, collection_name: str,
