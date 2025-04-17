@@ -131,6 +131,7 @@ class PromptService:
             {json.dumps(input_data, ensure_ascii=False, indent=2)}
 
             [출력 형식]
+            각 항목은 반드시 문자열(string) 형태로 출력할 것:
             {{
                 "correctedText": "계약서의 문장을 올바르게 교정한 문장",
                 "proofText": 입력데이터를 참조해 잘못된 포인트와 이유"

@@ -100,7 +100,7 @@ async def process_clause(qd_client: AsyncQdrantClient,
     await find_text_positions(rag_result.incorrect_text, byte_type_pdf)
   positions = await extract_positions_by_page(all_positions)
 
-  rag_result = await set_result_data(corrected_result, rag_result, positions)
+  await set_result_data(corrected_result, rag_result, positions)
   if any(not clause.position for clause in rag_result.clause_data):
     logging.warning(f"원문 일치 position값 불러오지 못함")
     return ChunkProcessResult(status=ChunkProcessStatus.SUCCESS)
@@ -200,7 +200,7 @@ async def generate_clause_correction(prompt_client: AsyncAzureOpenAI,
 
 
 async def set_result_data(corrected_result: Optional[
-  dict[str, Any]], rag_result: RagResult, positions: List[List]) -> RagResult:
+  dict[str, Any]], rag_result: RagResult, positions: List[List]):
   rag_result.incorrect_text = (
     rag_result.incorrect_text.split(ARTICLE_CLAUSE_SEPARATOR, 1)[-1]
     .replace(CLAUSE_TEXT_SEPARATOR, "")
@@ -208,15 +208,14 @@ async def set_result_data(corrected_result: Optional[
     .replace("", '"')
   )
 
-  # if isinstance(corrected_result["correctedText"])
-  rag_result.corrected_text = corrected_result["correctedText"]
-  rag_result.proof_text = corrected_result["proofText"]
+  value = corrected_result["correctedText"]
+  rag_result.corrected_text = " ".join(value) if isinstance(value, list) else value
+  value = corrected_result["proofText"]
+  rag_result.proof_text = " ".join(value) if isinstance(value, list) else value
 
   rag_result.clause_data[0].position = positions[0]
   if positions[1]:
     rag_result.clause_data[1].position = positions[1]
-
-  return rag_result
 
 
 async def find_text_positions(clause_content: str,
