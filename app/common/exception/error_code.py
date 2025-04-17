@@ -43,6 +43,7 @@ class ErrorCode(Enum):
   QDRANT_SEARCH_FAILED = (HTTPStatus.INTERNAL_SERVER_ERROR, "A004", "Qdrant 검색 결과 반환 실패")
   NO_POINTS_FOUND = (HTTPStatus.INTERNAL_SERVER_ERROR, "A005", "Qdrant 내 조회 가능한 포인트 없음")
   CHUNK_ANALYSIS_FAILED = (HTTPStatus.INTERNAL_SERVER_ERROR, "A006", "계약서 분석 내 누락건으로 인해 분석 실패")
+  NO_SEPARATOR_FOUND = (HTTPStatus.INTERNAL_SERVER_ERROR, "A007", "원문 분리 인자 발견 못함")
 
   def __init__(self, status: HTTPStatus, code: str, message: str):
     self.status = status

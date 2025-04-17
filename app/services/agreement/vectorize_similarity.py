@@ -75,14 +75,13 @@ async def process_clause(qd_client: AsyncQdrantClient,
     prompt_client: AsyncAzureOpenAI, rag_result: RagResult,
     embedding: List[float], collection_name: str, semaphore: Semaphore,
     byte_type_pdf: fitz.Document) -> ChunkProcessResult:
-  search_results = \
-    await search_qdrant(semaphore, collection_name, embedding, qd_client)
+
+  search_results = await search_qdrant(semaphore, collection_name, embedding,
+                                       qd_client)
   clause_results = await gather_search_results(search_results)
-
-  clause_content = await extract_incorrect_text(rag_result)
-
+  await parse_incorrect_text(rag_result)
   corrected_result = await generate_clause_correction(prompt_client,
-                                                      clause_content,
+                                                      rag_result.incorrect_text,
                                                       clause_results)
   if not corrected_result:
     return ChunkProcessResult(status=ChunkProcessStatus.FAILURE)
@@ -96,20 +95,12 @@ async def process_clause(qd_client: AsyncQdrantClient,
   if score < VIOLATION_THRESHOLD:
     return ChunkProcessResult(status=ChunkProcessStatus.SUCCESS)
 
+  rag_result.accuracy = score
   all_positions = \
     await find_text_positions(rag_result.incorrect_text, byte_type_pdf)
   positions = await extract_positions_by_page(all_positions)
 
-  rag_result.accuracy = score
-  rag_result.incorrect_text = await clean_incorrect_text(
-      rag_result.incorrect_text)
-  rag_result.corrected_text = corrected_result["correctedText"]
-  rag_result.proof_text = corrected_result["proofText"]
-
-  rag_result.clause_data[0].position = positions[0]
-  if positions[1]:
-    rag_result.clause_data[1].position = positions[1]
-
+  rag_result = await set_result_data(corrected_result, rag_result, positions)
   if any(not clause.position for clause in rag_result.clause_data):
     logging.warning(f"원문 일치 position값 불러오지 못함")
     return ChunkProcessResult(status=ChunkProcessStatus.SUCCESS)
@@ -118,11 +109,14 @@ async def process_clause(qd_client: AsyncQdrantClient,
                             result=rag_result)
 
 
-async def extract_incorrect_text(rag_result: RagResult) -> str:
-  clause_content_parts = rag_result.incorrect_text.split(
-    ARTICLE_CLAUSE_SEPARATOR, 1)
-  return clause_content_parts[1].strip() if len(
-    clause_content_parts) > 1 else ""
+async def parse_incorrect_text(rag_result: RagResult) -> None:
+  try:
+    clause_parts = rag_result.incorrect_text.split(
+        ARTICLE_CLAUSE_SEPARATOR, 1)
+  except Exception:
+    raise AgreementException(ErrorCode.NO_SEPARATOR_FOUND)
+
+  rag_result.incorrect_text = clause_parts[-1]
 
 
 async def search_qdrant(semaphore: Semaphore, collection_name: str,
@@ -205,23 +199,29 @@ async def generate_clause_correction(prompt_client: AsyncAzureOpenAI,
   return None
 
 
-async def clean_incorrect_text(text: str) -> str:
-  return (
-    text.split(ARTICLE_CLAUSE_SEPARATOR, 1)[-1]
+async def set_result_data(corrected_result: Optional[
+  dict[str, Any]], rag_result: RagResult, positions: List[List]) -> RagResult:
+  rag_result.incorrect_text = (
+    rag_result.incorrect_text.split(ARTICLE_CLAUSE_SEPARATOR, 1)[-1]
     .replace(CLAUSE_TEXT_SEPARATOR, "")
     .replace("\n", "")
     .replace("", '"')
   )
 
+  # if isinstance(corrected_result["correctedText"])
+  rag_result.corrected_text = corrected_result["correctedText"]
+  rag_result.proof_text = corrected_result["proofText"]
+
+  rag_result.clause_data[0].position = positions[0]
+  if positions[1]:
+    rag_result.clause_data[1].position = positions[1]
+
+  return rag_result
+
 
 async def find_text_positions(clause_content: str,
     pdf_document: fitz.Document) -> dict[int, List[dict]]:
   all_positions = {}  # 페이지별로 위치 정보를 저장할 딕셔너리
-
-  # +를 기준으로 문장을 나누고 뒤에 있는 부분만 사용
-  clause_content_parts = clause_content.split('+', 1)
-  if len(clause_content_parts) > 1:
-    clause_content = clause_content_parts[1].strip()  # `+` 뒤의 내용만 사용
 
   # "!!!"을 기준으로 더 나눠서 각각을 위치 찾기
   clause_parts = clause_content.split('!!!')
