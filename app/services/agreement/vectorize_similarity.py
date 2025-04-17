@@ -78,8 +78,8 @@ async def process_clause(qd_client: AsyncQdrantClient,
 
   search_results = await search_qdrant(semaphore, collection_name, embedding,
                                        qd_client)
-  clause_results = await gather_search_results(search_results)
-  await parse_incorrect_text(rag_result)
+  clause_results = gather_search_results(search_results)
+  parse_incorrect_text(rag_result)
   corrected_result = await generate_clause_correction(prompt_client,
                                                       rag_result.incorrect_text,
                                                       clause_results)
@@ -100,7 +100,7 @@ async def process_clause(qd_client: AsyncQdrantClient,
     await find_text_positions(rag_result.incorrect_text, byte_type_pdf)
   positions = await extract_positions_by_page(all_positions)
 
-  await set_result_data(corrected_result, rag_result, positions)
+  set_result_data(corrected_result, rag_result, positions)
   if any(not clause.position for clause in rag_result.clause_data):
     logging.warning(f"원문 일치 position값 불러오지 못함")
     return ChunkProcessResult(status=ChunkProcessStatus.SUCCESS)
@@ -109,7 +109,7 @@ async def process_clause(qd_client: AsyncQdrantClient,
                             result=rag_result)
 
 
-async def parse_incorrect_text(rag_result: RagResult) -> None:
+def parse_incorrect_text(rag_result: RagResult) -> None:
   try:
     clause_parts = rag_result.incorrect_text.split(
         ARTICLE_CLAUSE_SEPARATOR, 1)
@@ -146,7 +146,7 @@ async def search_qdrant(semaphore: Semaphore, collection_name: str,
   return search_results
 
 
-async def gather_search_results(search_results: QueryResponse) -> List[
+def gather_search_results(search_results: QueryResponse) -> List[
   SearchResult]:
   clause_results = []
   for match in search_results.points:
@@ -207,7 +207,7 @@ def is_correct_response_format(result: dict[str, str]) -> bool:
   )
 
 
-async def set_result_data(corrected_result: Optional[
+def set_result_data(corrected_result: Optional[
   dict[str, Any]], rag_result: RagResult, positions: List[List]):
   rag_result.incorrect_text = (
     rag_result.incorrect_text.split(ARTICLE_CLAUSE_SEPARATOR, 1)[-1]
