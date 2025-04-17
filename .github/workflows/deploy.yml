@@ -30,11 +30,14 @@ jobs:
         for i in {1..10}; do
           if curl --fail http://localhost:5000/health-check; then
             echo "Flask is healthy"
-            break
+            exit 0
           fi
           echo "Flask not ready yet... retrying in 3s"
           sleep 3
         done
+        echo "❌ Flask health check failed after 10 attempts"
+        exit 1
+
 
     - name: Show Flask logs (for debugging)
       if: always()
