@@ -257,11 +257,20 @@ async def find_text_positions(clause_content: str,
         rel_x1 = x1 / page_width
         rel_y1 = y1 / page_height
 
-        # y 값을 기준으로 그룹화
-        if rel_y0 not in grouped_positions:
-          grouped_positions[rel_y0] = []
+        # 바운딩 박스 높이 계산 (상대값 기준)
+        box_height = rel_y1 - rel_y0
+        epsilon = box_height / 4
 
-        grouped_positions[rel_y0].append((rel_x0, rel_x1, rel_y0, rel_y1))
+        # y 값을 기준으로 그룹화
+        group_found = False
+        for y_key in grouped_positions:
+          if abs(rel_y0 - y_key) <= epsilon:
+            grouped_positions[y_key].append((rel_x0, rel_x1, rel_y0, rel_y1))
+            group_found = True
+            break
+
+        if not group_found:
+          grouped_positions[rel_y0] = [(rel_x0, rel_x1, rel_y0, rel_y1)]
 
       # 그룹화된 바운딩 박스를 하나의 큰 박스로 묶기
       for y_key, group in grouped_positions.items():
