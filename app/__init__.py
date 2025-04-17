@@ -1,16 +1,12 @@
-import logging
-
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s - %(levelname)s - %(filename)s:%(lineno)d - %(message)s",
-    datefmt="%Y-%m-%d %H:%M:%S",
-    force=True
-)
-
+import datetime
 import os
+import logging
+import sys
 
-from dotenv import load_dotenv
+import pytz
 from flask import Flask
+from dotenv import load_dotenv
+
 from app.common.exception.error_handler import register_error_handlers
 from app.blueprints.standard import standard_blueprint
 from app.blueprints.agreement import agreement_blueprint
@@ -18,23 +14,41 @@ from app.blueprints.common import healthcheck_blueprint
 
 load_dotenv()
 
+class KSTFormatter(logging.Formatter):
+  def formatTime(self, record, datefmt = None):
+    dt = datetime.datetime.fromtimestamp(record.created, pytz.timezone("Asia/Seoul"))
+    return dt.strftime(datefmt or "%Y-%m-%d %H:%M:%S")
+
+def configure_logging():
+  handler = logging.StreamHandler(sys.stdout)
+  handler.setFormatter(KSTFormatter(
+      fmt="%(asctime)s - %(levelname)s - %(filename)s:%(lineno)d - %(message)s",
+      datefmt="%Y-%m-%d %H:%M:%S"
+  ))
+
+  logging.basicConfig(
+      level=logging.INFO,
+      handlers=[handler],
+      force=True
+  )
+  logging.getLogger('werkzeug').disabled = True
+
+
 def create_app():
-  app = Flask(__name__)
+    configure_logging()
 
-  # 환경 구분
-  app_env = os.getenv("APP_ENV", "dev")
-  app.config["APP_ENV"] = app_env
+    app = Flask(__name__)
 
-  # 로깅 설정
-  werkzeug_logger = logging.getLogger('werkzeug')
-  werkzeug_logger.disabled = True
+    # 환경 구분
+    app_env = os.getenv("APP_ENV", "dev")
+    app.config["APP_ENV"] = app_env
 
-  # 예외 핸들러 등록
-  register_error_handlers(app)
+    # 예외 핸들러 등록
+    register_error_handlers(app)
 
-  # 블루 프린트 등록
-  app.register_blueprint(healthcheck_blueprint.health)
-  app.register_blueprint(standard_blueprint.standards)
-  app.register_blueprint(agreement_blueprint.agreements)
+    # 블루프린트 등록
+    app.register_blueprint(healthcheck_blueprint.health)
+    app.register_blueprint(standard_blueprint.standards)
+    app.register_blueprint(agreement_blueprint.agreements)
 
-  return app
+    return app
