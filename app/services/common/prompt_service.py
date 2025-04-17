@@ -145,7 +145,7 @@ class PromptService:
           }
         ],
         temperature=0.1,
-        max_tokens=512,
+        max_tokens=1024,
     )
 
     response_text = response.choices[0].message.content

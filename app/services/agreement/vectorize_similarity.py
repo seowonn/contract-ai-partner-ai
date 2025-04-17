@@ -25,7 +25,7 @@ from app.schemas.document_request import DocumentRequest
 from app.services.standard.vector_store import ensure_qdrant_collection
 
 SEARCH_COUNT = 3
-VIOLATION_THRESHOLD = 0.6
+VIOLATION_THRESHOLD = 0.75
 LLM_REQUIRED_KEYS = {"clause_content", "correctedText", "proofText",
                      "violation_score"}
 
@@ -114,10 +114,12 @@ async def process_clause(qd_client: AsyncQdrantClient,
   search_results = \
     await search_qdrant(semaphore, collection_name, embedding, qd_client)
   clause_results = await gather_search_results(search_results)
-  corrected_result = await generate_clause_correction(prompt_client,
-                                                      rag_result.incorrect_text,
-                                                      clause_results)
 
+  clause_content = await extract_incorrect_text(rag_result)
+
+  corrected_result = await generate_clause_correction(prompt_client,
+                                                      clause_content,
+                                                      clause_results)
   if not corrected_result:
     return ChunkProcessResult(status=ChunkProcessStatus.FAILURE)
 
@@ -132,7 +134,7 @@ async def process_clause(qd_client: AsyncQdrantClient,
     return ChunkProcessResult(status=ChunkProcessStatus.SUCCESS)
 
   all_positions = \
-    await find_text_positions(rag_result, byte_type_pdf)
+    await find_text_positions(rag_result.incorrect_text, byte_type_pdf)
   positions = await extract_positions_by_page(all_positions)
 
   rag_result.accuracy = score
@@ -147,6 +149,10 @@ async def process_clause(qd_client: AsyncQdrantClient,
 
   return ChunkProcessResult(status=ChunkProcessStatus.SUCCESS,
                             result=rag_result)
+
+async def extract_incorrect_text(rag_result: RagResult) -> str:
+  clause_content_parts = rag_result.incorrect_text.split(ARTICLE_CLAUSE_SEPARATOR, 1)
+  return clause_content_parts[1].strip() if len(clause_content_parts) > 1 else ""
 
 
 async def process_clause_ocr(qd_client: AsyncQdrantClient,
@@ -212,7 +218,7 @@ async def search_qdrant(semaphore: Semaphore, collection_name: str,
           f"query_points: Qdrant Search 재요청 발생 {attempt}/{MAX_RETRIES} {e}")
       await asyncio.sleep(1)
 
-  if search_results is None:
+  if search_results is None or not search_results.points:
     raise AgreementException(ErrorCode.NO_POINTS_FOUND)
 
   return search_results
