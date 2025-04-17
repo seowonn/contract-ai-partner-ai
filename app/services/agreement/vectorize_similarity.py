@@ -25,8 +25,7 @@ from app.services.standard.vector_store import ensure_qdrant_collection
 
 SEARCH_COUNT = 3
 VIOLATION_THRESHOLD = 0.75
-LLM_REQUIRED_KEYS = {"clause_content", "correctedText", "proofText",
-                     "violation_score"}
+LLM_REQUIRED_KEYS = {"correctedText", "proofText", "violation_score"}
 
 
 async def vectorize_and_calculate_similarity(

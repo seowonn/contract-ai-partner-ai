@@ -132,7 +132,6 @@ class PromptService:
 
             [출력 형식]
             {{
-                "clause_content": 계약서 원문
                 "correctedText": "계약서의 문장을 올바르게 교정한 문장",
                 "proofText": 입력데이터를 참조해 잘못된 포인트와 이유"
                 "violation_score": "문장이 틀리거나 법률을 위배할 확률 "
