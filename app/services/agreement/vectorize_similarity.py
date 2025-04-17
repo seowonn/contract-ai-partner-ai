@@ -31,7 +31,6 @@ LLM_REQUIRED_KEYS = {"correctedText", "proofText", "violation_score"}
 async def vectorize_and_calculate_similarity(
     combined_chunks: List[RagResult], document_request: DocumentRequest,
     byte_type_pdf: fitz.Document) -> List[RagResult]:
-
   qd_client = get_qdrant_client()
   await ensure_qdrant_collection(qd_client, document_request.categoryName)
 
@@ -53,7 +52,7 @@ async def vectorize_and_calculate_similarity(
     results = await asyncio.gather(*tasks)
 
   success_results: List[RagResult] = [r.result for r in results if
-                     r.status == ChunkProcessStatus.SUCCESS and r.result is not None]
+                                      r.status == ChunkProcessStatus.SUCCESS and r.result is not None]
   failure_score = sum(r.status == ChunkProcessStatus.FAILURE for r in results)
 
   if not success_results and failure_score == len(combined_chunks):
@@ -111,12 +110,19 @@ async def process_clause(qd_client: AsyncQdrantClient,
   if positions[1]:
     rag_result.clause_data[1].position = positions[1]
 
+  if any(not clause.position for clause in rag_result.clause_data):
+    logging.warning(f"원문 일치 position값 불러오지 못함")
+    return ChunkProcessResult(status=ChunkProcessStatus.SUCCESS)
+
   return ChunkProcessResult(status=ChunkProcessStatus.SUCCESS,
                             result=rag_result)
 
+
 async def extract_incorrect_text(rag_result: RagResult) -> str:
-  clause_content_parts = rag_result.incorrect_text.split(ARTICLE_CLAUSE_SEPARATOR, 1)
-  return clause_content_parts[1].strip() if len(clause_content_parts) > 1 else ""
+  clause_content_parts = rag_result.incorrect_text.split(
+    ARTICLE_CLAUSE_SEPARATOR, 1)
+  return clause_content_parts[1].strip() if len(
+    clause_content_parts) > 1 else ""
 
 
 async def search_qdrant(semaphore: Semaphore, collection_name: str,
@@ -211,6 +217,12 @@ async def clean_incorrect_text(text: str) -> str:
 async def find_text_positions(clause_content: str,
     pdf_document: fitz.Document) -> dict[int, List[dict]]:
   all_positions = {}  # 페이지별로 위치 정보를 저장할 딕셔너리
+
+  # +를 기준으로 문장을 나누고 뒤에 있는 부분만 사용
+  clause_content_parts = clause_content.split('+', 1)
+  if len(clause_content_parts) > 1:
+    clause_content = clause_content_parts[1].strip()  # `+` 뒤의 내용만 사용
+
   # "!!!"을 기준으로 더 나눠서 각각을 위치 찾기
   clause_parts = clause_content.split('!!!')
 
