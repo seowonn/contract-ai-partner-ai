@@ -182,23 +182,22 @@ def gather_search_results(search_results: QueryResponse,
 
 
 async def generate_clause_correction(prompt_client: AsyncAzureOpenAI,
-    article_content: str, clause_results: List[SearchResult]) -> Optional[
+    article_content: str, search_results: List[SearchResult]) -> Optional[
   dict[str, Any]]:
   for attempt in range(1, MAX_RETRIES + 1):
     try:
       result = await asyncio.wait_for(
           prompt_service.correct_contract(
               prompt_client,
-              clause_content=article_content,
-              proof_text=[item.proof_text for item in clause_results],  # 기준 문서들
-              incorrect_text=[item.incorrect_text for item in clause_results],
-              corrected_text=[item.corrected_text for item in clause_results]
+              search_results,
+              clause_content=article_content.replace("\n", " ")
           ),
           timeout=LLM_TIMEOUT
       )
       if is_correct_response_format(result):
         return result
-      logging.warning(f"[generate_clause_correction]: llm 응답 필수 키 누락 / str형 반환 안됨")
+      logging.warning(
+          f"[generate_clause_correction]: llm 응답 필수 키 누락 / str형 반환 안됨")
 
     except Exception as e:
       if isinstance(e, asyncio.TimeoutError):
@@ -232,7 +231,8 @@ def set_result_data(corrected_result: Optional[
   )
 
   value = corrected_result["correctedText"]
-  rag_result.corrected_text = " ".join(value) if isinstance(value, list) else value
+  rag_result.corrected_text = " ".join(value) if isinstance(value,
+                                                            list) else value
   value = corrected_result["proofText"]
   rag_result.proof_text = " ".join(value) if isinstance(value, list) else value
 

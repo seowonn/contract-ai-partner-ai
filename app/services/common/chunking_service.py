@@ -1,4 +1,3 @@
-import os
 import re
 from typing import List
 from typing import Optional, Tuple
@@ -13,8 +12,7 @@ import matplotlib.pyplot as plt
 from app.blueprints.standard.standard_exception import StandardException
 from app.clients.openai_clients import get_embedding_sync_client
 from app.common.constants import ARTICLE_CHUNK_PATTERN, ARTICLE_HEADER_PATTERN, \
-  ARTICLE_CLAUSE_SEPARATOR, ARTICLE_HEADER_PARSE_PATTERN, CLAUSE_HEADER_PATTERN, \
-  PROMPT_MODEL
+  ARTICLE_CLAUSE_SEPARATOR, CLAUSE_HEADER_PATTERN, PROMPT_MODEL
 from app.common.exception.custom_exception import CommonException
 from app.common.exception.error_code import ErrorCode
 from app.containers.service_container import embedding_service
@@ -128,7 +126,8 @@ def chunk_legal_terms(extracted_text: str) -> List[ClauseChunk]:
     parts = block.split('\n', 1)
     if len(parts) == 2 and parts[1]:
       title, body = parts[0], parts[1]
-      clauses = semantic_chunk(body)
+      title = title.split('(', 1)[0]
+      clauses = semantic_chunk(body, max_tokens=150, similarity_threshold=0.3)
       for clause in clauses:
         clause.clause_number = title
       chunks.extend(clauses)
