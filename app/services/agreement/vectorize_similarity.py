@@ -142,7 +142,7 @@ async def process_clause(qd_client: AsyncQdrantClient,
     return ChunkProcessResult(status=ChunkProcessStatus.SUCCESS)
 
   all_positions = \
-    await find_text_positions(rag_result.incorrect_text, byte_type_pdf)
+    await find_text_positions(rag_result, byte_type_pdf)
   positions = await extract_positions_by_page(all_positions)
 
   rag_result.accuracy = score
