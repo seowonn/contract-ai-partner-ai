@@ -23,14 +23,14 @@ from app.common.exception.custom_exception import CommonException
 from app.common.exception.error_code import ErrorCode
 from app.containers.service_container import embedding_service, prompt_service
 from app.models.vector import VectorPayload
+from app.schemas.chunk_schema import ClauseChunk
 from app.schemas.document_request import DocumentRequest
 
 STANDARD_LLM_REQUIRED_KEYS = {"incorrect_text", "corrected_text"}
 
 
-async def vectorize_and_save(chunks: List[str],
+async def vectorize_and_save(chunks: List[ClauseChunk],
     pdf_request: DocumentRequest) -> None:
-
   qd_client = get_qdrant_client()
   await ensure_qdrant_collection(qd_client, pdf_request.categoryName)
 
