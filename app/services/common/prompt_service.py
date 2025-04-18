@@ -7,17 +7,23 @@ from openai import AsyncAzureOpenAI
 import re
 
 
-def merge_separated_particles(text: str) -> str:
+def clean_incorrect_part(text: str) -> str:
   particles = ['은', '는', '이', '가', '을', '를', '의', '에', '에서', '보다', '로', '과',
                '와']
 
   for particle in particles:
-    # 조사 앞의 공백 하나 이상을 제거하고 붙이기
-    pattern = rf'([가-힣])\s+{particle}(?=[\s\.,\)\"\'\”\’\]]|$)'  # 조사 뒤는 공백/구두점/끝
+    # 마침표, 느낌표, 물음표 다음엔 조사 결합을 시도하지 않도록 예외 처리
+    # 단어 + 공백 + 조사 이고, 그 앞에 구두점이 **없을 때만** 붙이기
+    pattern = rf'(?<![\.!?])([가-힣])\s+{particle}(?=[\s\.,\)\"\'\”\’\]]|$)'
     replacement = rf'\1{particle}'
     text = re.sub(pattern, replacement, text)
 
+  # 2칸 이상 공백은 1칸으로 줄이기
+  text = re.sub(r'\s{2,}', ' ', text)
+
   return text
+
+
 
 
 def clean_markdown_block(response_text: str) -> str:
@@ -119,7 +125,6 @@ class PromptService:
                 너는 한국에서 계약서 및 법률 문서를 검토하는 최고의 변호사야.
                 계약서에서 법률 위반 가능성이 있는 부분을 정확히 찾아내고,
                 그 부분을 교정할 때 법적인 근거를 설명해야 해.
-                데이터를 반환할때, 조사는 항상 붙여서 반환하고
               """
           },
           {
@@ -136,8 +141,6 @@ class PromptService:
 
                 틀린 확률이 높아보인다면 violation_score를 높게 반환해 주세요.
                 내용적인 측면에서 교정해 주세요.
-                반환할때 문법적인 부분도 고려해서 대답해주세요
-                조사는 항상 붙여서 반환해 주세요
     
                 [입력 데이터 설명]
                 - clause_content: 계약서 문장
@@ -154,8 +157,12 @@ class PromptService:
                     "correctedText": "계약서의 문장을 올바르게 교정한 문장",
                     "proofText": "입력 데이터를 참조해 이유설명"
                     "violation_score": "문장이 틀리거나 법률을 위배할 확률 "
-                    "incorrectPart": clause_content에서 문제가 되는 단어만 똑같이 반환해주세요.  
-
+                    "incorrectPart": clause_content에서 문제가 되는 부분 길이는 최대 단어 5개까지 똑같이 반환해주세요.
+                                     
+                                     아래 규칙을 지켜주세요
+                                     조사를 지우지 말고 완전한 문장을 반환하세요
+                                     clause_content 문장과 일치하지 않고 부분 내용이여야 합니다.
+                                     띄어쓰기, 온점, 반점, 괄호 등은 clause_content와 정확히 일치해야 합니다.
                 }}
 
     
@@ -187,7 +194,7 @@ class PromptService:
       if "incorrectPart" in parsed_response:
         print(f'수정 전 : {parsed_response["incorrectPart"]}')
 
-        parsed_response["incorrectPart"] = merge_separated_particles(
+        parsed_response["incorrectPart"] = clean_incorrect_part(
             parsed_response["incorrectPart"]
         )
         print(f'수정 후 : {parsed_response["incorrectPart"]}')
