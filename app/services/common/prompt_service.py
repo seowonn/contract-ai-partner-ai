@@ -38,22 +38,22 @@ class PromptService:
               - 원문에 명확한 위배 문장이 없어 보여도, **해석 가능성이나 맥락에 근거해 위배 소지가 있는 문장을 추정해서 생성할 것**
               - **절대 원문 그대로 반환하지 말 것**
               - **맞춤법, 어휘 표현 개선은 하지 말고, 오직 불공정성/위배 가능성에만 초점 둘 것**
-      
+
               예시 출력 형식:
               {{
                 "incorrect_text": "업무를 인계받지 못한 공무원은 아무런 책임이 없다.",
                 "corrected_text": "업무를 인계받지 못한 공무원도, 특별한 사유에 해당하지 않는 경우에는 인계 지연에 따른 책임을 부담할 수 있다. 이는 '책임 없음'으로 오해될 수 있는 표현을 방지하기 위함이다."
               }}
-      
+
               원문:
               \"\"\"{clause_content}\"\"\"
-      
+
               불공정 판단 기준:
               - 특정 당사자의 권리를 과도하게 제한하거나
               - 의무를 일방에게만 지우거나
               - 해석 여지로 인해 불리하게 적용될 가능성이 있으며
               - 효력 발생 조건이 불명확하거나 불공정한 경우
-      
+
               지금 문장을 분석해 위 기준에 따라 불리할 수 있는 위배 문장을 생성하고, 공정하게 수정해서 JSON으로 반환해.
               """
 
@@ -76,7 +76,6 @@ class PromptService:
       return None
 
     return parsed_response
-
 
   async def correct_contract(self, prompt_client: AsyncAzureOpenAI,
       clause_content: str, proof_text: List[str],
@@ -131,17 +130,16 @@ class PromptService:
             {json.dumps(input_data, ensure_ascii=False, indent=2)}
 
             [출력 형식]
-            각 항목은 반드시 문자열(string) 형태로 출력할 것:
             {{
-              "correctedText": "계약서의 문장을 올바르게 교정한 문장",
-              "proofText": "입력 데이터를 참조해 잘못된 포인트와 그 이유",
-              "violation_score": "0.000 ~ 1.000 사이의 소수점 셋째 자리까지 정확한 문자열 (예: '0.742', '0.687', '0.913')"
+                "clause_content": "계약서 원문"
+                "correctedText": "계약서의 문장을 올바르게 교정한 문장",
+                "proofText": "입력데이터를 참조해 잘못된 포인트와 이유"
+                "violation_score": "문장이 틀리거나 법률을 위배할 확률 "
+                "incorrectPart": "계약서 원문에서 틀린 단어. 아주 짧게"
             }}
-            
-            주의 사항:
-            - JSON 외의 다른 텍스트는 절대 출력하지 마세요.
-            - `violation_score`는 반드시 **의미 있는 소수점 셋째 자리까지** 생성해 주세요.
-            - 단순히 '0.750', '0.500'과 같이 반복되는 패턴이 아닌, **상황에 맞게 다양하고 구체적인 값**을 반환하세요.
+
+            json 바깥에는 아무것도 반환하지 마세요
+            violation_score는 0~1 범위의 소수점 셋째자리까지 반환해 주세요. 
 
           """
           }

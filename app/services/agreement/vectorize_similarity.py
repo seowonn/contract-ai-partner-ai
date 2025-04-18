@@ -6,6 +6,7 @@ from typing import List, Optional, Any
 
 import fitz
 from openai import AsyncAzureOpenAI
+import numpy as np
 from qdrant_client import models, AsyncQdrantClient
 from qdrant_client.http.models import QueryResponse
 
@@ -24,13 +25,56 @@ from app.schemas.document_request import DocumentRequest
 from app.services.standard.vector_store import ensure_qdrant_collection
 
 SEARCH_COUNT = 3
-VIOLATION_THRESHOLD = 0.75
-LLM_REQUIRED_KEYS = {"correctedText", "proofText", "violation_score"}
+VIOLATION_THRESHOLD = 0.0
+LLM_REQUIRED_KEYS = {"clause_content", "correctedText", "proofText",
+                     "violation_score"}
+
+
+async def vectorize_and_calculate_similarity_ocr(
+    combined_chunks: List[RagResult], document_request: DocumentRequest,
+    all_texts_with_bounding_boxes: List[dict]) -> List[RagResult]:
+
+  qd_client = get_qdrant_client()
+  await ensure_qdrant_collection(qd_client, document_request.categoryName)
+
+  embedding_inputs = []
+  for chunk in combined_chunks:
+    parts = chunk.incorrect_text.split(ARTICLE_CLAUSE_SEPARATOR, 1)
+    title = parts[0].strip() if len(parts) == 2 else ""
+    content = parts[1].strip() if len(parts) == 2 else parts[0].strip()
+    embedding_inputs.append(f"{title} {content}")
+
+  start_time = time.time()
+  embeddings = await embedding_service.batch_embed_texts(
+    get_embedding_async_client(), embedding_inputs)
+  logging.info(f"임베딩 묶음 소요 시간: {time.time() - start_time}")
+
+  semaphore = asyncio.Semaphore(5)
+  prompt_client = get_prompt_async_client()
+  tasks = [
+    process_clause_ocr(qd_client, prompt_client, chunk, embedding,
+                       document_request.categoryName,
+                       semaphore, all_texts_with_bounding_boxes)
+    for chunk, embedding in zip(combined_chunks, embeddings)
+  ]
+
+  # 모든 임베딩 및 유사도 검색 태스크를 병렬로 실행
+  results = await asyncio.gather(*tasks)
+
+  success_results: List[RagResult] = [r.result for r in results if
+                     r.status == ChunkProcessStatus.SUCCESS and r.result is not None]
+  failure_score = sum(r.status == ChunkProcessStatus.FAILURE for r in results)
+
+  if not success_results and failure_score == len(combined_chunks):
+    raise AgreementException(ErrorCode.CHUNK_ANALYSIS_FAILED)
+
+  return success_results
 
 
 async def vectorize_and_calculate_similarity(
     combined_chunks: List[RagResult], document_request: DocumentRequest,
     byte_type_pdf: fitz.Document) -> List[RagResult]:
+
   qd_client = get_qdrant_client()
   await ensure_qdrant_collection(qd_client, document_request.categoryName)
 
@@ -52,7 +96,7 @@ async def vectorize_and_calculate_similarity(
     results = await asyncio.gather(*tasks)
 
   success_results: List[RagResult] = [r.result for r in results if
-                                      r.status == ChunkProcessStatus.SUCCESS and r.result is not None]
+                     r.status == ChunkProcessStatus.SUCCESS and r.result is not None]
   failure_score = sum(r.status == ChunkProcessStatus.FAILURE for r in results)
 
   if not success_results and failure_score == len(combined_chunks):
@@ -75,14 +119,73 @@ async def process_clause(qd_client: AsyncQdrantClient,
     prompt_client: AsyncAzureOpenAI, rag_result: RagResult,
     embedding: List[float], collection_name: str, semaphore: Semaphore,
     byte_type_pdf: fitz.Document) -> ChunkProcessResult:
-
-  search_results = await search_qdrant(semaphore, collection_name, embedding,
-                                       qd_client)
+  search_results = \
+    await search_qdrant(semaphore, collection_name, embedding, qd_client)
   clause_results = await gather_search_results(search_results)
-  await parse_incorrect_text(rag_result)
+
+  clause_content = await extract_incorrect_text(rag_result)
+
   corrected_result = await generate_clause_correction(prompt_client,
-                                                      rag_result.incorrect_text,
+                                                      clause_content,
                                                       clause_results)
+  if not corrected_result:
+    return ChunkProcessResult(status=ChunkProcessStatus.FAILURE)
+
+  try:
+    score = float(corrected_result["violation_score"])
+  except (KeyError, ValueError, TypeError):
+    logging.warning(f"violation_score 추출 실패")
+    return ChunkProcessResult(status=ChunkProcessStatus.FAILURE)
+
+  # chunk는 성공했다는건가?
+  if score < VIOLATION_THRESHOLD:
+    return ChunkProcessResult(status=ChunkProcessStatus.SUCCESS)
+
+  rag_result.incorrect_part = corrected_result["incorrectPart"]
+
+  all_positions, part_positions = \
+    await find_text_positions(rag_result, rag_result.incorrect_part,
+                              byte_type_pdf)
+
+  all_position_boxes = await extract_positions_by_page(all_positions)
+  part_position_boxes = await extract_positions_by_page(part_positions)
+
+  rag_result.accuracy = score
+  rag_result.incorrect_text = await clean_incorrect_text(
+      rag_result.incorrect_text)
+  rag_result.corrected_text = corrected_result["correctedText"]
+  rag_result.proof_text = corrected_result["proofText"]
+
+  rag_result.clause_data[0].position = all_position_boxes[0]
+  if all_position_boxes[1]:
+    rag_result.clause_data[1].position = all_position_boxes[1]
+
+  rag_result.clause_data[0].position_part = part_position_boxes[0]
+  if part_position_boxes[1]:
+    rag_result.clause_data[1].position_part = part_position_boxes[1]
+
+  return ChunkProcessResult(
+      status=ChunkProcessStatus.SUCCESS,
+      result=rag_result
+  )
+
+
+async def extract_incorrect_text(rag_result: RagResult) -> str:
+  clause_content_parts = rag_result.incorrect_text.split(ARTICLE_CLAUSE_SEPARATOR, 1)
+  return clause_content_parts[1].strip() if len(clause_content_parts) > 1 else ""
+
+
+async def process_clause_ocr(qd_client: AsyncQdrantClient,
+    prompt_client: AsyncAzureOpenAI,
+    rag_result: RagResult,
+    embedding: List[float], collection_name: str, semaphore: Semaphore,
+    all_texts_with_bounding_boxes: List[dict]) -> ChunkProcessResult:
+  search_results = \
+    await search_qdrant(semaphore, collection_name, embedding, qd_client)
+  clause_results = await gather_search_results(search_results)
+  corrected_result = \
+    await generate_clause_correction(prompt_client, rag_result.incorrect_text, clause_results)
+
   if not corrected_result:
     return ChunkProcessResult(status=ChunkProcessStatus.FAILURE)
 
@@ -95,28 +198,21 @@ async def process_clause(qd_client: AsyncQdrantClient,
   if score < VIOLATION_THRESHOLD:
     return ChunkProcessResult(status=ChunkProcessStatus.SUCCESS)
 
-  rag_result.accuracy = score
   all_positions = \
-    await find_text_positions(rag_result.incorrect_text, byte_type_pdf)
-  positions = await extract_positions_by_page(all_positions)
+    await find_text_positions_ocr(rag_result.incorrect_text,
+                                  all_texts_with_bounding_boxes)
 
-  await set_result_data(corrected_result, rag_result, positions)
-  if any(not clause.position for clause in rag_result.clause_data):
-    logging.warning(f"원문 일치 position값 불러오지 못함")
-    return ChunkProcessResult(status=ChunkProcessStatus.SUCCESS)
+  rag_result.accuracy = score
+  rag_result.incorrect_text = await clean_incorrect_text(
+      rag_result.incorrect_text)
+  rag_result.corrected_text = corrected_result["correctedText"]
+  rag_result.proof_text = corrected_result["proofText"]
 
+  rag_result.clause_data[0].position.extend(all_positions)
+
+  # 왜 해당 코드 에러
   return ChunkProcessResult(status=ChunkProcessStatus.SUCCESS,
                             result=rag_result)
-
-
-async def parse_incorrect_text(rag_result: RagResult) -> None:
-  try:
-    clause_parts = rag_result.incorrect_text.split(
-        ARTICLE_CLAUSE_SEPARATOR, 1)
-  except Exception:
-    raise AgreementException(ErrorCode.NO_SEPARATOR_FOUND)
-
-  rag_result.incorrect_text = clause_parts[-1]
 
 
 async def search_qdrant(semaphore: Semaphore, collection_name: str,
@@ -199,109 +295,109 @@ async def generate_clause_correction(prompt_client: AsyncAzureOpenAI,
   return None
 
 
-async def set_result_data(corrected_result: Optional[
-  dict[str, Any]], rag_result: RagResult, positions: List[List]):
-  rag_result.incorrect_text = (
-    rag_result.incorrect_text.split(ARTICLE_CLAUSE_SEPARATOR, 1)[-1]
+async def clean_incorrect_text(text: str) -> str:
+  return (
+    text.split(ARTICLE_CLAUSE_SEPARATOR, 1)[-1]
     .replace(CLAUSE_TEXT_SEPARATOR, "")
     .replace("\n", "")
     .replace("", '"')
   )
 
-  value = corrected_result["correctedText"]
-  rag_result.corrected_text = " ".join(value) if isinstance(value, list) else value
-  value = corrected_result["proofText"]
-  rag_result.proof_text = " ".join(value) if isinstance(value, list) else value
+async def find_text_positions(rag_result: RagResult, incorrect_part: str,
+    pdf_document: fitz.Document) -> dict[str, dict[int, List[dict]]]:
 
-  rag_result.clause_data[0].position = positions[0]
-  if positions[1]:
-    rag_result.clause_data[1].position = positions[1]
+  def search_text_in_pdf(text: str, pdf_doc: fitz.Document, clause_data,
+      is_relative=True) -> dict[int, List[dict]]:
+    positions_by_page = {}
+    for clause_part in clause_data:
+      page_num = clause_part.page
+      page = pdf_doc.load_page(page_num - 1)
 
+      page_width = float(page.rect.width)
+      page_height = float(page.rect.height)
 
-async def find_text_positions(clause_content: str,
-    pdf_document: fitz.Document) -> dict[int, List[dict]]:
-  all_positions = {}  # 페이지별로 위치 정보를 저장할 딕셔너리
+      page_positions = []
 
-  # "!!!"을 기준으로 더 나눠서 각각을 위치 찾기
-  clause_parts = clause_content.split('!!!')
-
-  # 모든 페이지를 검색
-  for page_num in range(pdf_document.page_count):
-    page = pdf_document.load_page(page_num)  # 페이지 로드
-
-    # 페이지 크기 얻기 (페이지의 너비와 높이)
-    page_width = float(page.rect.width)  # 명시적으로 float로 처리
-    page_height = float(page.rect.height)  # 명시적으로 float로 처리
-
-    page_positions = []  # 현재 페이지에 대한 위치 정보를 담을 리스트
-
-    # 각 문장에 대해 위치를 찾기
-    for part in clause_parts:
-      part = part.strip()  # 앞뒤 공백 제거
-      if part == "":
-        continue
-
-      # 문장의 위치를 찾기 위해 search_for 사용
-      text_instances = page.search_for(part)
-
-      # y값을 기준으로 묶을 변수
+      # 바로 검색
+      text_instances = page.search_for(text.strip())
       grouped_positions = {}
 
-      # 텍스트 인스턴스들에 대해 위치 정보를 추출
-      for text_instance in text_instances:
-        x0, y0, x1, y1 = text_instance  # 바운딩 박스 좌표
+      for inst in text_instances:
+        x0, y0, x1, y1 = inst
 
-        # 상대적인 위치로 계산 (픽셀을 페이지 크기로 나누어 상대값 계산)
-        rel_x0 = x0 / page_width
-        rel_y0 = y0 / page_height
-        rel_x1 = x1 / page_width
-        rel_y1 = y1 / page_height
+        # 상대값 또는 절대값으로 처리
+        if is_relative:
+          rel_x0 = x0 / page_width
+          rel_y0 = y0 / page_height
+          rel_x1 = x1 / page_width
+          rel_y1 = y1 / page_height
+        else:
+          rel_x0, rel_y0, rel_x1, rel_y1 = x0, y0, x1, y1
 
-        # 바운딩 박스 높이 계산 (상대값 기준)
-        box_height = rel_y1 - rel_y0
-        epsilon = box_height / 4
+        if rel_y0 not in grouped_positions:
+          grouped_positions[rel_y0] = []
 
-        # y 값을 기준으로 그룹화
-        group_found = False
-        for y_key in grouped_positions:
-          if abs(rel_y0 - y_key) <= epsilon:
-            grouped_positions[y_key].append((rel_x0, rel_x1, rel_y0, rel_y1))
-            group_found = True
-            break
+        grouped_positions[rel_y0].append((rel_x0, rel_x1, rel_y0, rel_y1))
 
-        if not group_found:
-          grouped_positions[rel_y0] = [(rel_x0, rel_x1, rel_y0, rel_y1)]
-
-      # 그룹화된 바운딩 박스를 하나의 큰 박스로 묶기
       for y_key, group in grouped_positions.items():
-        # 하나의 그룹에서 x0, x1의 최솟값과 최댓값을 구하기
-        min_x0 = min([x[0] for x in group])  # 최소 x0 값
-        max_x1 = max([x[1] for x in group])  # 최대 x1 값
+        min_x0 = min(x[0] for x in group)
+        max_x1 = max(x[1] for x in group)
+        min_y0 = min(x[2] for x in group)
+        max_y1 = max(x[3] for x in group)
 
-        # 하나의 그룹에서 y0, y1의 최솟값과 최댓값을 구하기
-        min_y0 = min([x[2] for x in group])  # 최소 y0 값
-        max_y1 = max([x[3] for x in group])  # 최대 y1 값
-
-        # 상대적인 값에 100을 곱해줍니다
-        min_x0 *= 100
-        min_y0 *= 100
-        max_x1 *= 100
-        max_y1 *= 100
+        # 상대값이면 100배
+        if is_relative:
+          min_x0 *= 100
+          min_y0 *= 100
+          max_x1 *= 100
+          max_y1 *= 100
 
         width = max_x1 - min_x0
         height = max_y1 - min_y0
 
         # 바운딩 박스를 생성 (최소값과 최대값을 사용)
         page_positions.append({
-          "page": page_num + 1,
-          "bbox": (min_x0, min_y0, width, height)  # 상대적 x, y, 너비, 높이
+          "page": page_num,
+          "bbox": (min_x0, min_y0, width, height)
         })
 
-    # 페이지별로 위치를 딕셔너리에 추가
-    if page_positions:
-      all_positions[page_num + 1] = page_positions
+      if page_positions:
+        positions_by_page[page_num] = page_positions
 
-  return all_positions
+    return positions_by_page
+
+  # incorrect_text 처리 (all_positions 용)
+  clause_content_parts = rag_result.incorrect_text.split('+', 1)
+  if len(clause_content_parts) > 1:
+    rag_result.incorrect_text = clause_content_parts[1].strip()
+
+  clause_parts = rag_result.incorrect_text.split('!!!')
+
+  # 전체 문장 기준으로 검색
+  all_positions = {}
+  part_positions = {}
+  for part in clause_parts:
+    part = part.strip()
+    if part == "":
+      continue
+
+    partial_result = search_text_in_pdf(part, pdf_document,
+                                        rag_result.clause_data)
+    for page, boxes in partial_result.items():
+      if page not in all_positions:
+        all_positions[page] = []
+      all_positions[page].extend(boxes)
+
+  # incorrect_part는 그대로 검색
+  part_position = search_text_in_pdf(incorrect_part, pdf_document,
+                                      rag_result.clause_data)
+  for page, boxes in part_position.items():
+    if page not in part_positions:
+      part_positions[page] = []
+    part_positions[page].extend(boxes)
+
+  return all_positions, part_positions
+
 
 
 async def extract_positions_by_page(all_positions: dict[int, List[dict]]) -> \
