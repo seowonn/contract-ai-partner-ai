@@ -88,7 +88,6 @@ async def generate_point_from_clause(prompt_client: AsyncAzureOpenAI,
 async def retry_make_correction(prompt_client: AsyncAzureOpenAI,
     clause_content: str) -> dict:
   for attempt in range(1, MAX_RETRIES + 1):
-    start = time.time()
     try:
       result = await asyncio.wait_for(
           prompt_service.make_correction_data(prompt_client, clause_content),
