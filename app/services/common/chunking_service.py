@@ -121,6 +121,20 @@ def split_text_by_pattern(text: str, pattern: str) -> List[str]:
   return re.split(pattern, text)
 
 
+def chunk_legal_terms(extracted_text: str) -> List[ClauseChunk]:
+  chunks = []
+  blocks = re.split(r'○\s\n*', extracted_text)
+  for block in blocks:
+    parts = block.split('\n', 1)
+    if len(parts) == 2 and parts[1]:
+      title, body = parts[0], parts[1]
+      clauses = semantic_chunk(body)
+      for clause in clauses:
+        clause.clause_number = title
+      chunks.extend(clauses)
+  return chunks
+
+
 def chunk_by_article_and_clause(extracted_text: str) -> List[ArticleChunk]:
   article_pattern = r'\n(제\s*\d+조(?:\([^)]+\))?)'  # 조(Article) 기준 정규식
 

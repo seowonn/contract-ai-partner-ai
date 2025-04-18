@@ -2,7 +2,6 @@ import asyncio
 import logging
 import time
 import uuid
-from asyncio import Semaphore
 from datetime import datetime
 from typing import List
 
@@ -22,7 +21,7 @@ from app.common.constants import MAX_RETRIES, LLM_TIMEOUT
 from app.common.exception.custom_exception import CommonException
 from app.common.exception.error_code import ErrorCode
 from app.containers.service_container import embedding_service, prompt_service
-from app.models.vector import VectorPayload
+from app.models.vector import VectorPayload, WordPayload
 from app.schemas.chunk_schema import ClauseChunk
 from app.schemas.document_request import DocumentRequest
 
@@ -34,50 +33,74 @@ async def vectorize_and_save(chunks: List[ClauseChunk],
   qd_client = get_qdrant_client()
   await ensure_qdrant_collection(qd_client, pdf_request.categoryName)
 
-  start_time = time.perf_counter()
-  async with get_embedding_async_client() as embedding_client:
-    embeddings = await embedding_service.batch_embed_texts(embedding_client, chunks)
-  logging.info(f"임베딩 묶음 소요 시간: {time.perf_counter() - start_time:.4f}초")
-
-  valid_inputs = [
-    (article, vector)
-    for article, vector in zip(chunks, embeddings)
-    if(
-        vector is not None and
-        isinstance(vector, list) and
-        not any(np.isnan(x) for x in vector)
-    )
-  ]
-
   semaphore = asyncio.Semaphore(5)
   async with get_prompt_async_client() as prompt_client:
-    tasks = [
-      generate_point_from_clause(prompt_client, article, embedding, pdf_request, semaphore)
-      for article, embedding in valid_inputs
-    ]
-    results = await asyncio.gather(*tasks)
+    if pdf_request.categoryName == "법률용어":
+      task_fn = make_word_payload
+    else:
+      task_fn = make_clause_payload
 
-  # None 제거 후 업로드
-  points = [point for point in results if point]
-  await upload_points_to_qdrant(qd_client, pdf_request.categoryName, points)
+    results = await asyncio.gather(*[
+      task_fn(prompt_client, article, pdf_request, semaphore)
+      for article in chunks
+    ])
+
+  embedding_inputs = [point.embedding_input() for point in results if point]
+
+  async with get_embedding_async_client() as embedding_client:
+    start_time = time.perf_counter()
+    embeddings = await embedding_service.batch_embed_texts(embedding_client,
+                                                           embedding_inputs)
+    logging.info(f"임베딩 묶음 소요 시간: {time.perf_counter() - start_time:.4f}초")
+
+  final_points = []
+  for payload, vector in zip(results, embeddings):
+    if vector and isinstance(vector, list) and not any(
+        np.isnan(x) for x in vector):
+      final_points.append(build_point(payload, vector))
+
+  await upload_points_to_qdrant(qd_client, pdf_request.categoryName,
+                                final_points)
 
 
-async def generate_point_from_clause(prompt_client: AsyncAzureOpenAI,
-    article: str, embedding: List[float],
-    pdf_request: DocumentRequest, semaphore: Semaphore) -> PointStruct | None:
+async def make_clause_payload(prompt_client, article, pdf_request,
+    semaphore) -> VectorPayload | None:
   async with semaphore:
     result = await retry_make_correction(prompt_client, article)
     if not result:
       return None
 
-  payload = VectorPayload(
+  return VectorPayload(
       standard_id=pdf_request.id,
       incorrect_text=result.get("incorrect_text") or "",
-      proof_text=article,
+      proof_text=article.clause_content,
       corrected_text=result.get("corrected_text") or "",
       created_at=datetime.now().strftime("%Y-%m-%d %H:%M:%S")
   )
 
+
+async def make_word_payload(prompt_client, article: ClauseChunk, pdf_request,
+    semaphore) -> WordPayload | None:
+  async with semaphore:
+    result = await prompt_service.extract_keywords(prompt_client, article)
+    if (
+        not result or
+        not isinstance(result, dict) or
+        "keyword" not in result or
+        not isinstance(result["keyword"], list)
+    ):
+      return None
+
+  return WordPayload(
+      standard_id=pdf_request.id,
+      term=article.clause_number,
+      original_text=article.clause_content,
+      keywords=result["keyword"],
+      created_at=datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+  )
+
+
+def build_point(payload, embedding: List[float]) -> PointStruct:
   return PointStruct(
       id=str(uuid.uuid4()),
       vector=embedding,
