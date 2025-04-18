@@ -4,6 +4,21 @@ from typing import List, Any, Optional
 
 from openai import AsyncAzureOpenAI
 
+import re
+
+
+def merge_separated_particles(text: str) -> str:
+  particles = ['은', '는', '이', '가', '을', '를', '의', '에', '에서', '보다', '로', '과',
+               '와']
+
+  for particle in particles:
+    # 조사 앞의 공백 하나 이상을 제거하고 붙이기
+    pattern = rf'([가-힣])\s+{particle}(?=[\s\.,\)\"\'\”\’\]]|$)'  # 조사 뒤는 공백/구두점/끝
+    replacement = rf'\1{particle}'
+    text = re.sub(pattern, replacement, text)
+
+  return text
+
 
 def clean_markdown_block(response_text: str) -> str:
   response_text_cleaned = response_text
@@ -104,6 +119,7 @@ class PromptService:
                 너는 한국에서 계약서 및 법률 문서를 검토하는 최고의 변호사야.
                 계약서에서 법률 위반 가능성이 있는 부분을 정확히 찾아내고,
                 그 부분을 교정할 때 법적인 근거를 설명해야 해.
+                데이터를 반환할때, 조사는 항상 붙여서 반환하고
               """
           },
           {
@@ -116,32 +132,37 @@ class PromptService:
                 노동자에게 불리한 문장을 교정하고 그 이유를 proofText 에 설명해 주세요.
                 입력 데이터 변수명을 proofText 에 포함시키면 안됩니다.
                 근로자와의 협의를 덜 고려해 주세요.                    
+                띄어쓰기와 조사 오류 없이 자연스러운 한국어로 출력해 주세요
 
-            틀린 확률이 높아보인다면 violation_score를 높게 반환해 주세요.
-            문법적인 측면이 아닌 내용적인 측면에서 교정해 주세요.
+                틀린 확률이 높아보인다면 violation_score를 높게 반환해 주세요.
+                내용적인 측면에서 교정해 주세요.
+                반환할때 문법적인 부분도 고려해서 대답해주세요
+                조사는 항상 붙여서 반환해 주세요
+    
+                [입력 데이터 설명]
+                - clause_content: 계약서 문장
+                - proof_text: 법률 문서의 문장 목록
+                - incorrect_text: 법률 위반할 가능성이 있는 예시 문장 
+                - corrected_text: 법률 위반 가능성이 있는 예시 문장을 올바르게 수정한 문장 목록
+    
+                [입력 데이터]
+                {json.dumps(input_data, ensure_ascii=False, indent=2)}
+    
+                [출력 형식]
+                {{
+                    "clause_content": "계약서 원문"
+                    "correctedText": "계약서의 문장을 올바르게 교정한 문장",
+                    "proofText": "입력 데이터를 참조해 이유설명"
+                    "violation_score": "문장이 틀리거나 법률을 위배할 확률 "
+                    "incorrectPart": clause_content에서 문제가 되는 단어만 똑같이 반환해주세요.  
 
-            [입력 데이터 설명]
-            - clause_content: 계약서 문장
-            - proof_text: 법률 문서의 문장 목록
-            - incorrect_text: 법률 위반할 가능성이 있는 예시 문장 
-            - corrected_text: 법률 위반 가능성이 있는 예시 문장을 올바르게 수정한 문장 목록
+                }}
 
-            [입력 데이터]
-            {json.dumps(input_data, ensure_ascii=False, indent=2)}
-
-            [출력 형식]
-            {{
-                "clause_content": "계약서 원문"
-                "correctedText": "계약서의 문장을 올바르게 교정한 문장",
-                "proofText": "입력데이터를 참조해 잘못된 포인트와 이유"
-                "violation_score": "문장이 틀리거나 법률을 위배할 확률 "
-                "incorrectPart": "계약서 원문에서 틀린 단어. 아주 짧게"
-            }}
-
-            json 바깥에는 아무것도 반환하지 마세요
-            violation_score는 0~1 범위의 소수점 셋째자리까지 반환해 주세요. 
-
-          """
+    
+                json 바깥에는 아무것도 반환하지 마세요
+                violation_score는 0~1 범위의 소수점 셋째자리까지 반환해 주세요. 
+    
+              """
           }
         ],
         temperature=0.1,
@@ -162,6 +183,15 @@ class PromptService:
 
     try:
       parsed_response = json.loads(pure_json)
+
+      if "incorrectPart" in parsed_response:
+        print(f'수정 전 : {parsed_response["incorrectPart"]}')
+
+        parsed_response["incorrectPart"] = merge_separated_particles(
+            parsed_response["incorrectPart"]
+        )
+        print(f'수정 후 : {parsed_response["incorrectPart"]}')
+
     except json.JSONDecodeError:
       logging.error(
           f"[PromptService] 응답이 JSON 형식이 아님:\n{response_text_cleaned}"
