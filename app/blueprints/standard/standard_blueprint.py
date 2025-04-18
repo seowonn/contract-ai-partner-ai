@@ -34,8 +34,7 @@ def process_standards_pdf_from_s3():
     raise CommonException(ErrorCode.FIELD_MISSING)
 
   documents, _ = preprocess_data(document_request)
-  extracted_text = "\n".join([doc.page_content for doc in documents])
-  chunks = chunk_standard_texts(extracted_text)
+  chunks = chunk_standard_texts(documents, document_request.categoryName)
 
   # 5️⃣ 벡터화 + Qdrant 저장
   start_time = time.time()
