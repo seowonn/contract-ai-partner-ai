@@ -5,7 +5,7 @@ from typing import List, Any, Optional
 from openai import AsyncAzureOpenAI
 
 
-def clean_markdown_block(response_text: str) -> str:
+def clean_markdown_block(response_text: str) -> str | None:
   response_text_cleaned = response_text
 
   if response_text_cleaned.startswith(
@@ -14,8 +14,15 @@ def clean_markdown_block(response_text: str) -> str:
   elif response_text_cleaned.startswith(
       "```") and response_text_cleaned.endswith("```"):
     return response_text_cleaned[3:-3].strip()
-  else:
-    return response_text_cleaned
+
+  try:
+    parsed_response = json.loads(response_text_cleaned)
+  except json.JSONDecodeError as e:
+    logging.error(
+        f"[PromptService]: jsonDecodeError: {e} | raw response: {response_text_cleaned}")
+    return None
+
+  return parsed_response
 
 
 class PromptService:
@@ -64,18 +71,50 @@ class PromptService:
         top_p=1
     )
 
-    raw_response_text = response.choices[
-      0].message.content if response.choices else ''
-    cleaned_text = clean_markdown_block(raw_response_text)
+    response_text = response.choices[0].message.content
+    return clean_markdown_block(response_text)
 
-    try:
-      parsed_response = json.loads(cleaned_text)
-    except json.JSONDecodeError as e:
-      logging.error(
-          f"[PromptService]: jsonDecodeError: {e} | raw response: {cleaned_text}")
-      return None
 
-    return parsed_response
+  async def extract_keywords(self, prompt_client: AsyncAzureOpenAI,
+      clause_content: str) -> Any | None:
+    response = await prompt_client.chat.completions.create(
+        model=self.deployment_name,
+        messages=[
+          {
+            "role": "user",
+            "content": f"""
+              너는 법률 문서를 분석하고, **해석의 위험성과 핵심 개념을 추출**하는 전문가야.
+        
+              아래 문장을 기반으로 다음 두 가지 정보를 추출해:
+              1. **meaning_difference**: 비전문가와 전문가 사이에 해석 차이가 발생할 수 있는 예시 상황을 한 문장으로 설명해줘.  
+                 - 예시는 현실 계약에서 이 문장이 어떻게 오해될 수 있는지를 설명해야 해  
+                 - 반드시 '비전문가는 ~ / 전문가는 ~' 식으로 해석 차이를 비교해서 써줘
+        
+              2. **keyword**: 문장의 핵심 개념 또는 법률적 쟁점을 최대 3개까지 추출해줘  
+                 - 키워드는 법률 용어, 중요 행위자, 핵심 절차, 조건 등을 반영해야 해  
+                 - 반드시 Python 리스트 형태로 제공해
+        
+              다음과 같은 JSON 형식으로만 응답해줘. 그 외의 설명은 절대 하지 마.
+        
+              예시 출력 형식:
+              {{
+                "example_usage": "비전문가는 '협의'를 법적 구속력이 있는 절차로 해석할 수 있지만, 전문가는 단순한 의견 교환으로 본다. 이 문장은 계약 해지 요건과 관련된 해석 차이를 유발할 수 있다.",
+                "keyword": ["협의", "계약 해지", "구속력"]
+              }}
+
+              원문:
+              \"\"\"{clause_content}\"\"\"
+              """
+
+          }
+        ],
+        temperature=0.8,
+        max_tokens=512,
+        top_p=1
+    )
+
+    response_text = response.choices[0].message.content
+    return clean_markdown_block(response_text)
 
 
   async def correct_contract(self, prompt_client: AsyncAzureOpenAI,
@@ -84,8 +123,6 @@ class PromptService:
     dict[str, Any]]:
 
     clause_content = clause_content.replace("\n", " ")
-    clause_content = clause_content.replace("+", "")
-    clause_content = clause_content.replace("!!!", "")
 
     # ✅ JSON 형식으로 변환할 데이터
     input_data = {
@@ -151,23 +188,4 @@ class PromptService:
     )
 
     response_text = response.choices[0].message.content
-    response_text_cleaned = response_text.strip()
-
-    if response_text_cleaned.startswith(
-        "```json") and response_text_cleaned.endswith("```"):
-      pure_json = response_text_cleaned[7:-3].strip()
-    elif response_text_cleaned.startswith(
-        "```") and response_text_cleaned.endswith("```"):
-      pure_json = response_text_cleaned[3:-3].strip()
-    else:
-      pure_json = response_text_cleaned
-
-    try:
-      parsed_response = json.loads(pure_json)
-    except json.JSONDecodeError:
-      logging.error(
-          f"[PromptService] 응답이 JSON 형식이 아님:\n{response_text_cleaned}"
-      )
-      return None
-
-    return parsed_response
+    return clean_markdown_block(response_text)

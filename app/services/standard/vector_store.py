@@ -10,7 +10,6 @@ from httpx import ConnectTimeout
 from openai import AsyncAzureOpenAI
 from qdrant_client import AsyncQdrantClient
 from qdrant_client.http.exceptions import ResponseHandlingException
-
 from qdrant_client.models import Distance, VectorParams, PointStruct
 
 from app.blueprints.standard.standard_exception import StandardException
@@ -35,11 +34,7 @@ async def vectorize_and_save(chunks: List[ClauseChunk],
 
   semaphore = asyncio.Semaphore(5)
   async with get_prompt_async_client() as prompt_client:
-    if pdf_request.categoryName == "법률용어":
-      task_fn = make_word_payload
-    else:
-      task_fn = make_clause_payload
-
+    task_fn = make_word_payload if pdf_request.categoryName == "법률용어" else make_clause_payload
     results = await asyncio.gather(*[
       task_fn(prompt_client, article, pdf_request, semaphore)
       for article in chunks
@@ -67,7 +62,7 @@ async def make_clause_payload(prompt_client, article, pdf_request,
     semaphore) -> VectorPayload | None:
   async with semaphore:
     result = await retry_make_correction(prompt_client, article)
-    if not result:
+    if not result or not isinstance(result, dict):
       return None
 
   return VectorPayload(
@@ -93,9 +88,10 @@ async def make_word_payload(prompt_client, article: ClauseChunk, pdf_request,
 
   return WordPayload(
       standard_id=pdf_request.id,
+      definition=article.clause_content,
       term=article.clause_number,
-      original_text=article.clause_content,
-      keywords=result["keyword"],
+      meaning_difference=result.get("meaning_difference") or "",
+      keywords=result.get("keyword") or [],
       created_at=datetime.now().strftime("%Y-%m-%d %H:%M:%S")
   )
 

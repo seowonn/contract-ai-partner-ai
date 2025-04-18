@@ -22,23 +22,26 @@ class VectorPayload:
   def embedding_input(self) -> str:
     return self.proof_text
 
+
 @dataclass
 class WordPayload:
   standard_id: int
-  original_text: str
+  definition: str
   term: str
+  meaning_difference: str
   created_at: str
   keywords: List[str] = field(default_factory=list)
 
   def to_dict(self) -> dict:
     return {
       "standard_id": self.standard_id or "",
-      "original_text": self.original_text or "",
+      "definition": self.definition or "",
       "term": self.term or "",
+      "meaning_difference": self.meaning_difference or "",
       "keywords": self.keywords or [],
       "created_at": self.created_at or ""
     }
 
   def embedding_input(self) -> str:
-    return f"{self.original_text} 관련 키워드: {' '.join(self.keywords)}"
+    return f"{self.term} {self.definition} {self.meaning_difference}"
 
