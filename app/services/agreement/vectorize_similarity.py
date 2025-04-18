@@ -78,11 +78,10 @@ async def process_clause(qd_client: AsyncQdrantClient,
 
   search_results = await search_qdrant(semaphore, collection_name, embedding,
                                        qd_client)
-  clause_results = gather_search_results(search_results)
   parse_incorrect_text(rag_result)
   corrected_result = await generate_clause_correction(prompt_client,
                                                       rag_result.incorrect_text,
-                                                      clause_results)
+                                                      search_results)
   if not corrected_result:
     return ChunkProcessResult(status=ChunkProcessStatus.FAILURE)
 
@@ -121,7 +120,17 @@ def parse_incorrect_text(rag_result: RagResult) -> None:
 
 async def search_qdrant(semaphore: Semaphore, collection_name: str,
     embedding: List[float],
-    qd_client: AsyncQdrantClient) -> QueryResponse:
+    qd_client: AsyncQdrantClient) -> List[SearchResult]:
+  search_results = await search_collection(qd_client, semaphore,
+                                           collection_name, embedding)
+  legal_term_results = await search_collection(qd_client, semaphore,
+                                               "법률용어", embedding)
+  return gather_search_results(search_results, legal_term_results)
+
+
+async def search_collection(qd_client: AsyncQdrantClient,
+    semaphore: Semaphore, collection_name: str,
+    embedding: List[float]) -> QueryResponse:
   for attempt in range(1, MAX_RETRIES + 1):
     try:
       async with semaphore:
@@ -130,14 +139,14 @@ async def search_qdrant(semaphore: Semaphore, collection_name: str,
             query=embedding,
             search_params=models.SearchParams(hnsw_ef=128, exact=False),
             limit=SEARCH_COUNT,
-            with_payload=["incorrect_text", "corrected_text", "proof_text"]
+            with_payload=True
         )
       break
     except Exception as e:
       if attempt == MAX_RETRIES:
         raise CommonException(ErrorCode.QDRANT_SEARCH_FAILED)
       logging.warning(
-          f"query_points: Qdrant Search 재요청 발생 {attempt}/{MAX_RETRIES} {e}")
+          f"[search_collection]: Qdrant Search 재요청 발생 {attempt}/{MAX_RETRIES} {e}")
       await asyncio.sleep(1)
 
   if search_results is None or not search_results.points:
@@ -146,24 +155,30 @@ async def search_qdrant(semaphore: Semaphore, collection_name: str,
   return search_results
 
 
-def gather_search_results(search_results: QueryResponse) -> List[
+def gather_search_results(search_results: QueryResponse,
+    legal_term_results: QueryResponse) -> List[
   SearchResult]:
-  clause_results = []
-  for match in search_results.points:
-    payload_data = match.payload or {}
+  merged_results: List[SearchResult] = []
 
-    if not isinstance(payload_data, dict):
-      logging.warning(f"search_results dict 타입 반환 안됨: {type(payload_data)}")
-      continue
+  for i in range(SEARCH_COUNT):
+    clause_payload = search_results.points[i].payload if i < len(
+      search_results.points) else {}
+    term_payload = legal_term_results.points[i].payload if i < len(
+      legal_term_results.points) else {}
 
-    clause_results.append(
+    merged_results.append(
         SearchResult(
-            proof_text=payload_data.get("proof_text", ""),
-            incorrect_text=payload_data.get("incorrect_text", ""),
-            corrected_text=payload_data.get("corrected_text", "")
-        ))
+            proof_text=clause_payload.get("proof_text", ""),
+            incorrect_text=clause_payload.get("incorrect_text", ""),
+            corrected_text=clause_payload.get("corrected_text", ""),
+            term=term_payload.get("term", ""),
+            meaning_difference=term_payload.get("meaning_difference", ""),
+            definition=term_payload.get("definition", ""),
+            keywords=term_payload.get("keywords", "")
+        )
+    )
 
-  return clause_results
+  return merged_results
 
 
 async def generate_clause_correction(prompt_client: AsyncAzureOpenAI,
