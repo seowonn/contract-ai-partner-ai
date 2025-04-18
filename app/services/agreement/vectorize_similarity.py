@@ -25,7 +25,8 @@ from app.schemas.document_request import DocumentRequest
 from app.services.standard.vector_store import ensure_qdrant_collection
 
 SEARCH_COUNT = 3
-VIOLATION_THRESHOLD = 0.0
+
+VIOLATION_THRESHOLD =0.75
 LLM_REQUIRED_KEYS = {"clause_content", "correctedText", "proofText",
                      "violation_score"}
 
@@ -199,7 +200,7 @@ async def process_clause_ocr(qd_client: AsyncQdrantClient,
     return ChunkProcessResult(status=ChunkProcessStatus.SUCCESS)
 
   all_positions = \
-    await find_text_positions_ocr(rag_result.incorrect_text,
+    await find_text_positions(rag_result.incorrect_text,
                                   all_texts_with_bounding_boxes)
 
   rag_result.accuracy = score
