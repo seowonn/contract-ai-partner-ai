@@ -2,12 +2,12 @@ import asyncio
 import logging
 import time
 import uuid
+from collections.abc import Callable
 from datetime import datetime
-from typing import List
+from typing import List, Coroutine, Any
 
 import numpy as np
 from httpx import ConnectTimeout
-from openai import AsyncAzureOpenAI
 from qdrant_client import AsyncQdrantClient
 from qdrant_client.http.exceptions import ResponseHandlingException
 from qdrant_client.models import Distance, VectorParams, PointStruct
@@ -25,6 +25,7 @@ from app.schemas.chunk_schema import ClauseChunk
 from app.schemas.document_request import DocumentRequest
 
 STANDARD_LLM_REQUIRED_KEYS = {"incorrect_text", "corrected_text"}
+STANDARD_WORD_REQUIRED_KEYS = {"keyword", "meaning_difference"}
 
 
 async def vectorize_and_save(chunks: List[ClauseChunk],
@@ -61,8 +62,12 @@ async def vectorize_and_save(chunks: List[ClauseChunk],
 async def make_clause_payload(prompt_client, article, pdf_request,
     semaphore) -> VectorPayload | None:
   async with semaphore:
-    result = await retry_make_correction(prompt_client, article)
-    if not result or not isinstance(result, dict):
+    result = await retry_llm_call(
+        prompt_service.make_correction_data,
+        prompt_client, article,
+        required_keys=STANDARD_LLM_REQUIRED_KEYS
+    )
+    if not result:
       return None
 
   return VectorPayload(
@@ -77,13 +82,12 @@ async def make_clause_payload(prompt_client, article, pdf_request,
 async def make_word_payload(prompt_client, article: ClauseChunk, pdf_request,
     semaphore) -> WordPayload | None:
   async with semaphore:
-    result = await prompt_service.extract_keywords(prompt_client, article)
-    if (
-        not result or
-        not isinstance(result, dict) or
-        "keyword" not in result or
-        not isinstance(result["keyword"], list)
-    ):
+    result = await retry_llm_call(
+        prompt_service.extract_keywords,
+        prompt_client, article.clause_content,
+        required_keys=STANDARD_WORD_REQUIRED_KEYS
+    )
+    if not result:
       return None
 
   return WordPayload(
@@ -104,33 +108,31 @@ def build_point(payload, embedding: List[float]) -> PointStruct:
   )
 
 
-async def retry_make_correction(prompt_client: AsyncAzureOpenAI,
-    clause_content: str) -> dict:
+async def retry_llm_call(
+    func: Callable[..., Coroutine[Any, Any, dict]],
+    *args,
+    required_keys: set | None = None) -> dict | None:
   for attempt in range(1, MAX_RETRIES + 1):
     try:
-      result = await asyncio.wait_for(
-          prompt_service.make_correction_data(prompt_client, clause_content),
-          timeout=LLM_TIMEOUT
-      )
-      if isinstance(result, dict) and STANDARD_LLM_REQUIRED_KEYS.issubset(
-          result.keys()):
+      result = await asyncio.wait_for(func(*args), timeout=LLM_TIMEOUT)
+      if isinstance(result, dict) or required_keys.issubset(result.keys()):
         return result
-      logging.warning(f"[retry_make_correction]: llm 응답 필수 키 누락됨")
+      logging.warning(
+          "[retry_make_correction]: llm 응답 필수 키 누락 / dict 구조 아님")
+
+    except asyncio.TimeoutError:
+      logging.warning(
+        f"[retry_make_correction]: Timeout {attempt}/{MAX_RETRIES}")
+      if attempt == MAX_RETRIES:
+        raise CommonException(ErrorCode.LLM_RESPONSE_TIMEOUT)
 
     except Exception as e:
-      if isinstance(e, asyncio.TimeoutError):
-        if attempt == MAX_RETRIES:
-          raise CommonException(ErrorCode.LLM_RESPONSE_TIMEOUT)
+      logging.warning(
+          f"[retry_make_correction]: 재요청 발생 {attempt}/{MAX_RETRIES} {e}")
+      if attempt == MAX_RETRIES:
+        raise StandardException(ErrorCode.STANDARD_REVIEW_FAIL)
 
-      else:
-        if attempt == MAX_RETRIES:
-          raise StandardException(ErrorCode.STANDARD_REVIEW_FAIL)
-        logging.warning(
-            f"[retry_make_correction]: 기준 문서 LLM 재요청 발생 {attempt}/{MAX_RETRIES} {e}"
-        )
-
-      if attempt < MAX_RETRIES:
-        await asyncio.sleep(0.5 * attempt)
+    await asyncio.sleep(0.5 * attempt)
 
   raise StandardException(ErrorCode.PROMPT_MAX_TRIAL_FAILED)
 
