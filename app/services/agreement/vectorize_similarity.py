@@ -26,7 +26,7 @@ from app.services.standard.vector_store import ensure_qdrant_collection
 
 SEARCH_COUNT = 3
 
-VIOLATION_THRESHOLD =0.75
+VIOLATION_THRESHOLD =0.0
 LLM_REQUIRED_KEYS = {"clause_content", "correctedText", "proofText",
                      "violation_score"}
 
@@ -120,6 +120,7 @@ async def process_clause(qd_client: AsyncQdrantClient,
     prompt_client: AsyncAzureOpenAI, rag_result: RagResult,
     embedding: List[float], collection_name: str, semaphore: Semaphore,
     byte_type_pdf: fitz.Document) -> ChunkProcessResult:
+
   search_results = \
     await search_qdrant(semaphore, collection_name, embedding, qd_client)
   clause_results = await gather_search_results(search_results)
@@ -307,66 +308,6 @@ async def clean_incorrect_text(text: str) -> str:
 async def find_text_positions(rag_result: RagResult, incorrect_part: str,
     pdf_document: fitz.Document) -> dict[str, dict[int, List[dict]]]:
 
-  def search_text_in_pdf(text: str, pdf_doc: fitz.Document, clause_data,
-      is_relative=True) -> dict[int, List[dict]]:
-    positions_by_page = {}
-    for clause_part in clause_data:
-      page_num = clause_part.page
-      page = pdf_doc.load_page(page_num - 1)
-
-      page_width = float(page.rect.width)
-      page_height = float(page.rect.height)
-
-      page_positions = []
-
-      # 바로 검색
-      text_instances = page.search_for(text.strip())
-      grouped_positions = {}
-
-      for inst in text_instances:
-        x0, y0, x1, y1 = inst
-
-        # 상대값 또는 절대값으로 처리
-        if is_relative:
-          rel_x0 = x0 / page_width
-          rel_y0 = y0 / page_height
-          rel_x1 = x1 / page_width
-          rel_y1 = y1 / page_height
-        else:
-          rel_x0, rel_y0, rel_x1, rel_y1 = x0, y0, x1, y1
-
-        if rel_y0 not in grouped_positions:
-          grouped_positions[rel_y0] = []
-
-        grouped_positions[rel_y0].append((rel_x0, rel_x1, rel_y0, rel_y1))
-
-      for y_key, group in grouped_positions.items():
-        min_x0 = min(x[0] for x in group)
-        max_x1 = max(x[1] for x in group)
-        min_y0 = min(x[2] for x in group)
-        max_y1 = max(x[3] for x in group)
-
-        # 상대값이면 100배
-        if is_relative:
-          min_x0 *= 100
-          min_y0 *= 100
-          max_x1 *= 100
-          max_y1 *= 100
-
-        width = max_x1 - min_x0
-        height = max_y1 - min_y0
-
-        # 바운딩 박스를 생성 (최소값과 최대값을 사용)
-        page_positions.append({
-          "page": page_num,
-          "bbox": (min_x0, min_y0, width, height)
-        })
-
-      if page_positions:
-        positions_by_page[page_num] = page_positions
-
-    return positions_by_page
-
   # incorrect_text 처리 (all_positions 용)
   clause_content_parts = rag_result.incorrect_text.split('+', 1)
   if len(clause_content_parts) > 1:
@@ -381,7 +322,7 @@ async def find_text_positions(rag_result: RagResult, incorrect_part: str,
     part = part.strip()
     if part == "":
       continue
-
+    print(f'part:{part}')
     partial_result = search_text_in_pdf(part, pdf_document,
                                         rag_result.clause_data)
     for page, boxes in partial_result.items():
