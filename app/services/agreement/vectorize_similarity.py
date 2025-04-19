@@ -308,6 +308,7 @@ async def clean_incorrect_text(text: str) -> str:
 def search_text_in_pdf(text: str, pdf_doc: fitz.Document, clause_data,
     is_relative=True) -> dict[int, List[dict]]:
   positions_by_page = {}
+  # 페이지별 검색
   for clause_part in clause_data:
     page_num = clause_part.page
     page = pdf_doc.load_page(page_num - 1)
@@ -382,7 +383,6 @@ async def find_text_positions(rag_result: RagResult, incorrect_part: str,
     part = part.strip()
     if part == "":
       continue
-    print(f'part:{part}')
     partial_result = search_text_in_pdf(part, pdf_document,
                                         rag_result.clause_data)
     for page, boxes in partial_result.items():
