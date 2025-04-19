@@ -105,7 +105,7 @@ class PromptService:
 
     clause_content = clause_content.replace("\n", " ")
     clause_content = clause_content.replace("+", "")
-    clause_content = clause_content.replace("!!!", "")
+    clause_content = clause_content.replace("!!!", " ")
 
     # ✅ JSON 형식으로 변환할 데이터
     input_data = {
@@ -192,12 +192,10 @@ class PromptService:
       parsed_response = json.loads(pure_json)
 
       if "incorrectPart" in parsed_response:
-        print(f'수정 전 : {parsed_response["incorrectPart"]}')
 
         parsed_response["incorrectPart"] = clean_incorrect_part(
             parsed_response["incorrectPart"]
         )
-        print(f'수정 후 : {parsed_response["incorrectPart"]}')
 
     except json.JSONDecodeError:
       logging.error(
