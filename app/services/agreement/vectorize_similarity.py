@@ -21,7 +21,7 @@ from app.common.exception.error_code import ErrorCode
 from app.containers.service_container import embedding_service, prompt_service
 from app.schemas.analysis_response import RagResult, SearchResult
 from app.schemas.document_request import DocumentRequest
-from app.services.standard.vector_store import ensure_qdrant_collection
+from app.services.common.qdrant_utils import ensure_qdrant_collection
 
 SEARCH_COUNT = 3
 VIOLATION_THRESHOLD = 0.75
