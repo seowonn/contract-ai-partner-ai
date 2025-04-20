@@ -1,6 +1,4 @@
 import asyncio
-import logging
-import time
 import uuid
 from typing import List
 
@@ -10,6 +8,7 @@ from qdrant_client.models import PointStruct
 from app.clients.openai_clients import get_prompt_async_client, \
   get_embedding_async_client
 from app.clients.qdrant_client import get_qdrant_client
+from app.common.decorators import async_measure_time
 from app.containers.service_container import embedding_service
 from app.schemas.chunk_schema import ClauseChunk
 from app.schemas.document_request import DocumentRequest
@@ -19,6 +18,7 @@ from app.services.standard.vector_store.payload_builder import \
   make_word_payload, make_clause_payload
 
 
+@async_measure_time
 async def vectorize_and_save(chunks: List[ClauseChunk],
     pdf_request: DocumentRequest) -> None:
   qd_client = get_qdrant_client()
@@ -35,10 +35,8 @@ async def vectorize_and_save(chunks: List[ClauseChunk],
   embedding_inputs = [point.embedding_input() for point in results if point]
 
   async with get_embedding_async_client() as embedding_client:
-    start_time = time.perf_counter()
     embeddings = await embedding_service.batch_embed_texts(embedding_client,
                                                            embedding_inputs)
-    logging.info(f"임베딩 묶음 소요 시간: {time.perf_counter() - start_time:.4f}초")
 
   final_points = []
   for payload, vector in zip(results, embeddings):

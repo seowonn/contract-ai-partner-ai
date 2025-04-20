@@ -1,14 +1,11 @@
 import asyncio
-import logging
-import time
 from http import HTTPStatus
 
-from flask import Blueprint, request
-from pydantic import ValidationError
+from flask import Blueprint
 
 from app.blueprints.agreement.agreement_exception import AgreementException
 from app.common.constants import SUCCESS
-from app.common.exception.custom_exception import CommonException
+from app.common.decorators import parse_request
 from app.common.exception.error_code import ErrorCode
 from app.schemas.analysis_response import StandardResponse
 from app.schemas.document_request import DocumentRequest
@@ -24,24 +21,13 @@ standards = Blueprint('standards', __name__, url_prefix="/flask/standards")
 
 
 @standards.route('/analysis', methods=['POST'])
-def process_standards_pdf_from_s3():
-  try:
-    json_data = request.get_json()
-    if json_data is None:
-      raise CommonException(ErrorCode.INVALID_JSON_FORMAT)
-
-    document_request = DocumentRequest(**json_data)
-  except ValidationError:
-    raise CommonException(ErrorCode.FIELD_MISSING)
+@parse_request(DocumentRequest)
+def process_standards_pdf_from_s3(document_request: DocumentRequest):
 
   documents, _ = preprocess_data(document_request)
   chunks = chunk_standard_texts(documents, document_request.categoryName)
 
-  # 5️⃣ 벡터화 + Qdrant 저장
-  start_time = time.time()
   asyncio.run(vectorize_and_save(chunks, document_request))
-  end_time = time.time()
-  logging.info(f"vectorize_and_save 소요 시간: {end_time - start_time}")
 
   contents = [normalize_spacing(doc.page_content) for doc in documents]
   return SuccessResponse(SuccessCode.ANALYSIS_COMPLETE,

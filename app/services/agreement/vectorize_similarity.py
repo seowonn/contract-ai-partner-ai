@@ -1,6 +1,5 @@
 import asyncio
 import logging
-import time
 from asyncio import Semaphore
 from typing import List, Optional, Any
 
@@ -15,19 +14,21 @@ from app.clients.qdrant_client import get_qdrant_client
 from app.common.chunk_status import ChunkProcessResult, ChunkProcessStatus
 from app.common.constants import ARTICLE_CLAUSE_SEPARATOR, \
   CLAUSE_TEXT_SEPARATOR, MAX_RETRIES
+from app.common.decorators import async_measure_time
 from app.common.exception.custom_exception import CommonException
 from app.common.exception.error_code import ErrorCode
 from app.containers.service_container import embedding_service, prompt_service
 from app.schemas.analysis_response import RagResult, SearchResult
 from app.schemas.document_request import DocumentRequest
-from app.services.common.qdrant_utils import ensure_qdrant_collection
 from app.services.common.llm_retry import retry_llm_call
+from app.services.common.qdrant_utils import ensure_qdrant_collection
 
 SEARCH_COUNT = 3
 VIOLATION_THRESHOLD = 0.75
 LLM_REQUIRED_KEYS = {"correctedText", "proofText", "violation_score"}
 
 
+@async_measure_time
 async def vectorize_and_calculate_similarity(
     combined_chunks: List[RagResult], document_request: DocumentRequest,
     byte_type_pdf: fitz.Document) -> List[RagResult]:
@@ -36,11 +37,9 @@ async def vectorize_and_calculate_similarity(
 
   embedding_inputs = await prepare_embedding_inputs(combined_chunks)
 
-  start_time = time.time()
   async with get_embedding_async_client() as embedding_client:
     embeddings = await embedding_service.batch_embed_texts(
         embedding_client, embedding_inputs)
-  logging.info(f"임베딩 묶음 소요 시간: {time.time() - start_time}")
 
   tasks = [
     process_clause(qd_client, chunk, embedding,
