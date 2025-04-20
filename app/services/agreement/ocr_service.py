@@ -5,6 +5,9 @@ import numpy as np
 import cv2
 import json
 import time
+import os
+from dotenv import load_dotenv
+
 
 from app.common.constants import ARTICLE_OCR_HEADER_PATTERN, \
   CLAUSE_HEADER_PATTERN, ARTICLE_CLAUSE_SEPARATOR
@@ -16,6 +19,12 @@ from app.services.common.chunking_service import split_by_clause_header_pattern,
   parse_article_header
 import requests
 
+
+# .env 파일에서 환경변수 불러오기
+load_dotenv()
+
+NAVER_CLOVA_API_URL = os.getenv("NAVER_CLOVA_API_URL")
+NAVER_CLOVA_API_KEY = os.getenv("NAVER_CLOVA_API_KEY")
 
 
 def chunk_preamble_content_ocr(page_text: str, chunks: List[DocumentChunk],
@@ -70,9 +79,6 @@ def append_preamble_ocr(result: List[DocumentChunk], preamble: str,
 
 def extract_ocr(image_url: str) -> Tuple[str, List[dict]]:
 
-  api_url = 'https://j1gc26xlo7.apigw.ntruss.com/custom/v1/40588/33fe635b5703b4f6d707423be0d20bb9db938ef92692a5bf2aa1bee17d1b8e34/general'
-  secret_key = 'eEh6bmFEQXppU3dSS3JkTENtbk1QZFdJcmpSRGNkd2c='
-
   # URL에서 이미지를 다운로드
 
   image_response = requests.get(image_url)
@@ -121,16 +127,19 @@ def extract_ocr(image_url: str) -> Tuple[str, List[dict]]:
     'image/jpeg'))  # 이진화된 이미지를 바이너리로 전송
   ]
   headers = {
-    'X-OCR-SECRET': secret_key
+    'X-OCR-SECRET': NAVER_CLOVA_API_KEY
   }
 
   # OCR 요청 보내기
-  response = requests.request("POST", api_url, headers=headers, data=payload,
+  response = requests.request("POST", NAVER_CLOVA_API_URL, headers=headers, data=payload,
                               files=files)
   ocr_results = json.loads(response.text)
 
+  image_height, image_width = binarized_img.shape[:2]
 
-  all_texts_with_bounding_boxes = []  # 텍스트와 바운딩 박스를 묶어서 저장할 리스트
+  all_texts_with_bounding_boxes = []
+  full_text = ""
+  current_idx = 0
 
   # OCR 결과에서 텍스트와 바운딩 박스를 묶어서 리스트로 저장
   for image_result in ocr_results['images']:
@@ -138,20 +147,28 @@ def extract_ocr(image_url: str) -> Tuple[str, List[dict]]:
       text = field['inferText']
       bounding_box = field['boundingPoly']['vertices']
 
-      # 상대적인 좌표로 변환
-      relative_bounding_box = []
-      for vertex in bounding_box:
-        x_rel = vertex['x'] / width  # x 좌표를 이미지 너비로 나누어 비율 계산
-        y_rel = vertex['y'] / height  # y 좌표를 이미지 높이로 나누어 비율 계산
-        relative_bounding_box.append({'x': x_rel, 'y': y_rel})
+      # 상대 좌표 변환
+      relative_bounding_box = [
+        {
+          'x': vertex['x'] / image_width,
+          'y': vertex['y'] / image_height
+        }
+        for vertex in bounding_box
+      ]
 
-        # 텍스트와 상대적인 바운딩 박스를 하나의 딕셔너리로 묶어서 리스트에 추가
+      start_idx = current_idx
+      end_idx = start_idx + len(text)
+
+      # 텍스트 인덱스와 바운딩 박스를 함께 저장
       all_texts_with_bounding_boxes.append({
         'text': text,
-        'bounding_box': relative_bounding_box
+        'bounding_box': relative_bounding_box,
+        'start_idx': start_idx,
+        'end_idx': end_idx
       })
 
-  # 텍스트 결합하기 (각 텍스트를 공백 기준으로 결합)
-  full_text = " ".join([item['text'] for item in all_texts_with_bounding_boxes])
+      # full_text와 current_idx 갱신
+      full_text += text + " "
+      current_idx = len(full_text)
 
   return full_text, all_texts_with_bounding_boxes

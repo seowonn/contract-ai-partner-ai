@@ -25,7 +25,7 @@ from app.schemas.document_request import DocumentRequest
 from app.services.standard.vector_store import ensure_qdrant_collection
 
 SEARCH_COUNT = 3
-VIOLATION_THRESHOLD =0.0
+VIOLATION_THRESHOLD = 0.0
 LLM_REQUIRED_KEYS = {"clause_content", "correctedText", "proofText",
                      "violation_score"}
 
@@ -119,7 +119,6 @@ async def process_clause(qd_client: AsyncQdrantClient,
     prompt_client: AsyncAzureOpenAI, rag_result: RagResult,
     embedding: List[float], collection_name: str, semaphore: Semaphore,
     byte_type_pdf: fitz.Document) -> ChunkProcessResult:
-
   search_results = \
     await search_qdrant(semaphore, collection_name, embedding, qd_client)
   clause_results = await gather_search_results(search_results)
@@ -138,7 +137,7 @@ async def process_clause(qd_client: AsyncQdrantClient,
     logging.warning(f"violation_score 추출 실패")
     return ChunkProcessResult(status=ChunkProcessStatus.FAILURE)
 
-
+  # chunk는 성공했다는건가?
   if score < VIOLATION_THRESHOLD:
     return ChunkProcessResult(status=ChunkProcessStatus.SUCCESS)
 
@@ -200,7 +199,7 @@ async def process_clause_ocr(qd_client: AsyncQdrantClient,
     return ChunkProcessResult(status=ChunkProcessStatus.SUCCESS)
 
   all_positions = \
-    await find_text_positions(rag_result.incorrect_text,
+    await find_text_positions_ocr(rag_result.incorrect_text,
                                   all_texts_with_bounding_boxes)
 
   rag_result.accuracy = score
@@ -404,89 +403,62 @@ async def find_text_positions(rag_result: RagResult, incorrect_part: str,
 
 async def find_text_positions_ocr(clause_content: str,
     all_texts_with_bounding_boxes: List[dict]) -> List[dict]:
-  epsilon = None
-  all_positions = {}  # 페이지별로 위치 정보를 저장할 딕셔너리
+
+  epsilon=None
+  full_text = " ".join([item['text'] for item in all_texts_with_bounding_boxes])
 
   # +를 기준으로 문장을 나누고 뒤에 있는 부분만 사용
   clause_content_parts = clause_content.split('+', 1)
   if len(clause_content_parts) > 1:
     clause_content = clause_content_parts[1].strip()  # `+` 뒤의 내용만 사용
 
-  full_text = " ".join([item['text'] for item in all_texts_with_bounding_boxes])
 
-  if clause_content in full_text:  # 해당 문장이 전체 텍스트에 포함되어 있는지 확인
+  # 검색 범위의 시작과 끝 인덱스를 찾음
+  search_start_idx = full_text.find(clause_content)
+  search_end_idx = search_start_idx + len(clause_content)
+  print(
+    f'Search text "{clause_content}" is located from index {search_start_idx} to {search_end_idx} in full text.')
 
-    # 검색 범위의 시작과 끝 인덱스를 찾음
-    search_start_idx = full_text.find(clause_content)
-    search_end_idx = search_start_idx + len(clause_content)
+  # 3. 매칭되는 단어들만 추출
+  matched_items = []
+  for item in all_texts_with_bounding_boxes:
+    if search_start_idx <= item['start_idx'] < search_end_idx:
+      matched_items.append(item)
 
-    search_text_parts = clause_content.split()  # 텍스트 조각을 분리 (공백 기준)
+  print(f"✅ 문장 내 단어 개수: {len(matched_items)}")
 
-    # y값 기준으로 텍스트를 그룹화
-    grouped_texts = {}
+  # y값 기준으로 텍스트를 그룹화
+  grouped_texts = {}
 
-    # 검색 시작 인덱스
-    start_idx = search_start_idx  # 처음에는 전체 검색 범위의 시작 인덱스로 시작
-    last_end_idx = -1  # 이전 끝 인덱스를 저장할 변수 초기화
+  for item in matched_items:
+    bounding_box = item['bounding_box']
+    center_y = (sum(vertex['y'] for vertex in bounding_box)
+                / len(bounding_box))
 
-    # 전체 바운딩 박스 변수 초기화
-    max_x_total = float('-inf')
-    max_y_total = float('-inf')
-    min_x_total = float('inf')
-    min_y_total = float('inf')
+    # 첫 단어일 때만 높이 비율 기반 동적 epsilon 설정
+    if epsilon is None:
+      y_values = [vertex['y'] for vertex in bounding_box]
+      group_height = max(y_values) - min(y_values)
+      epsilon = group_height * 0.5
 
-    # 검색 시작
-    for item in all_texts_with_bounding_boxes:
+    abs_center_y = center_y
 
-      for part in search_text_parts:
-        if part == item['text']:  # 부분 텍스트 일치
-          # 첫 번째 단어는 처음부터 검색
-          if last_end_idx == -1:  # 처음에는 0부터 검색
-            start_idx = 0
-          else:
-            # 중복되는 단어는 이전 검색에서 찾은 끝 인덱스 이후부터 시작
-            start_idx = last_end_idx
+    # y값 기준으로 그룹화 (epsilon 값으로 오차 범위 설정)
+    group_found = False
+    for y_group in grouped_texts:
+      if abs_center_y > y_group - (
+          epsilon) and abs_center_y < y_group + (
+          epsilon):
+        grouped_texts[y_group].append(item)
+        group_found = True
+        break
 
-          item_text_start_idx = full_text.find(part,
-                                               start_idx)  # 각 단어의 시작 인덱스를 찾음
-          if item_text_start_idx == -1:
-            break  # 더 이상 찾을 것이 없으면 종료
-          item_text_end_idx = item_text_start_idx + len(part)
+    if not group_found:
+      grouped_texts[abs_center_y] = [item]
 
-          # 텍스트가 정확히 검색 범위 내에 있을 경우만 처리
-          if search_start_idx <= item_text_start_idx and search_end_idx >= item_text_end_idx:
 
-            bounding_box = item['bounding_box']
 
-            for vertex in bounding_box:
-              center_y = (sum(vertex['y'] for vertex in bounding_box)
-                          / len(bounding_box))
 
-              # 첫 단어일 때만 높이 비율 기반 동적 epsilon 설정
-              if epsilon is None:
-                y_values = [vertex['y'] for vertex in bounding_box]
-                height_ratio = max(y_values) - min(y_values)
-                epsilon = height_ratio / 2
-
-              # y값 기준으로 그룹화 (epsilon 값으로 오차 범위 설정)
-              group_found = False
-              for y_group in grouped_texts:
-                if center_y > y_group - (
-                    epsilon) and center_y < y_group + (
-                    epsilon):
-                  grouped_texts[y_group].append(item)
-                  group_found = True
-                  break
-
-              if not group_found:
-                grouped_texts[center_y] = [item]
-
-            # 한 번 단어를 찾고 나면, 다음 검색을 위해 item_text_start_idx를 이동시킴
-            item_text_start_idx += len(part)
-            last_end_idx = item_text_end_idx
-
-            # 찾은 단어가 범위 내에 있을 때 바로 루프 종료
-            break
 
 
     points_list = []
