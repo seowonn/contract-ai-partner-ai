@@ -120,7 +120,7 @@ class PromptService:
 
 
   async def correct_contract(self, prompt_client: AsyncAzureOpenAI,
-      search_results: List[SearchResult], clause_content: str) -> Optional[
+      clause_content: str, search_results: List[SearchResult]) -> Optional[
     dict[str, Any]]:
 
     input_data = {
@@ -170,18 +170,20 @@ class PromptService:
             - meaning_difference: 이 용어에 대해 비전문가와 전문가의 해석 차이가 발생할 수 있는 경우 설명
             - definition: 해당 법률 용어의 사전적 또는 법적 정의
 
+            [violation_score 판단 기준 및 생성 형식]
+            - 반드시 "0.000"부터 "1.000" 사이의 **소수점 셋째 자리까지의 문자열(float 형식)**로 출력하세요.
+            - 다음과 같은 **정밀하고 다양한 값** 중 하나처럼 생성하세요: `"0.731"`, `"0.294"`, `"0.867"`, `"0.423"`, `"0.986"` 등
+            - `0.750`, `0.500`과 같이 끝자리가 `0`인 고정된 패턴은 피하고, 상황에 맞는 **정규분포 기반의 다양성 있는 float 값**을 사용해 주세요.
+            - 무작위가 아닌, 문장의 위반 가능성을 기반으로 신중하게 결정해 주세요.
+
             [출력 형식]
             각 항목은 반드시 문자열(string) 형태로 출력할 것:
             {{
               "correctedText": "계약서의 문장을 올바르게 교정한 문장",
               "proofText": "입력 데이터를 참조해 잘못된 포인트와 그 이유",
-              "violation_score": "계약서 문장의 위배 확률로, 0.000 ~ 1.000 사이의 소수점 셋째 자리까지 정확한 문자열"
+              "violation_score": "0.000 ~ 1.000 사이의 소수점 셋째 자리까지의 문자열"
             }}
             
-            주의 사항:
-            - JSON 외의 다른 텍스트는 절대 출력하지 마세요.
-            - `violation_score`는 반드시 **의미 있는 소수점 셋째 자리까지** 생성하되, 단순히 '0.750', '0.500'과 같은 반복 패턴이 아닌, **상황에 맞게 다양하고 구체적인 값**을 반환하세요.
-
             [입력 데이터]
             {json.dumps(input_data, ensure_ascii=False, indent=2)}
           """
@@ -193,6 +195,7 @@ class PromptService:
 
     response_text = response.choices[0].message.content
     return clean_markdown_block(response_text)
+
 
   async def original_correct_contract(self, prompt_client: AsyncAzureOpenAI,
       clause_content: str, proof_text: List[str],
