@@ -22,6 +22,7 @@ from app.containers.service_container import embedding_service, prompt_service
 from app.schemas.analysis_response import RagResult, SearchResult
 from app.schemas.document_request import DocumentRequest
 from app.services.common.qdrant_utils import ensure_qdrant_collection
+from app.services.standard.vector_store.llm_retry import retry_llm_call
 
 SEARCH_COUNT = 3
 VIOLATION_THRESHOLD = 0.75
@@ -42,14 +43,12 @@ async def vectorize_and_calculate_similarity(
         embedding_client, embedding_inputs)
   logging.info(f"임베딩 묶음 소요 시간: {time.time() - start_time}")
 
-  semaphore = asyncio.Semaphore(5)
-  async with get_prompt_async_client() as prompt_client:
-    tasks = [
-      process_clause(qd_client, prompt_client, chunk, embedding,
-                     document_request.categoryName, semaphore, byte_type_pdf)
-      for chunk, embedding in zip(combined_chunks, embeddings)
-    ]
-    results = await asyncio.gather(*tasks)
+  tasks = [
+    process_clause(qd_client, chunk, embedding,
+                   document_request.categoryName, byte_type_pdf)
+    for chunk, embedding in zip(combined_chunks, embeddings)
+  ]
+  results = await asyncio.gather(*tasks)
 
   success_results: List[RagResult] = [r.result for r in results if
                                       r.status == ChunkProcessStatus.SUCCESS and r.result is not None]
@@ -71,17 +70,21 @@ async def prepare_embedding_inputs(chunks: List[RagResult]) -> List[str]:
   return inputs
 
 
-async def process_clause(qd_client: AsyncQdrantClient,
-    prompt_client: AsyncAzureOpenAI, rag_result: RagResult,
-    embedding: List[float], collection_name: str, semaphore: Semaphore,
+async def process_clause(qd_client: AsyncQdrantClient, rag_result: RagResult,
+    embedding: List[float], collection_name: str,
     byte_type_pdf: fitz.Document) -> ChunkProcessResult:
-
+  semaphore = asyncio.Semaphore(5)
   search_results = await search_qdrant(semaphore, collection_name, embedding,
                                        qd_client)
   parse_incorrect_text(rag_result)
-  corrected_result = await generate_clause_correction(prompt_client,
-                                                      rag_result.incorrect_text,
-                                                      search_results)
+
+  async with get_prompt_async_client() as prompt_client:
+    corrected_result = await retry_llm_call(
+        prompt_service.correct_contract,
+        prompt_client, rag_result.incorrect_text.replace("\n", " "),
+        search_results,
+        required_keys=LLM_REQUIRED_KEYS
+    )
   if not corrected_result:
     return ChunkProcessResult(status=ChunkProcessStatus.FAILURE)
 
@@ -162,9 +165,9 @@ def gather_search_results(search_results: QueryResponse,
 
   for i in range(SEARCH_COUNT):
     clause_payload = search_results.points[i].payload if i < len(
-      search_results.points) else {}
+        search_results.points) else {}
     term_payload = legal_term_results.points[i].payload if i < len(
-      legal_term_results.points) else {}
+        legal_term_results.points) else {}
 
     merged_results.append(
         SearchResult(
@@ -179,38 +182,6 @@ def gather_search_results(search_results: QueryResponse,
     )
 
   return merged_results
-
-
-async def generate_clause_correction(prompt_client: AsyncAzureOpenAI,
-    article_content: str, search_results: List[SearchResult]) -> Optional[
-  dict[str, Any]]:
-  for attempt in range(1, MAX_RETRIES + 1):
-    try:
-      result = await asyncio.wait_for(
-          prompt_service.correct_contract(
-              prompt_client,
-              search_results,
-              clause_content=article_content.replace("\n", " ")
-          ),
-          timeout=LLM_TIMEOUT
-      )
-      if is_correct_response_format(result):
-        return result
-      logging.warning(
-          f"[generate_clause_correction]: llm 응답 필수 키 누락 / str형 반환 안됨")
-
-    except Exception as e:
-      if isinstance(e, asyncio.TimeoutError):
-        if attempt == MAX_RETRIES:
-          raise CommonException(ErrorCode.LLM_RESPONSE_TIMEOUT)
-      else:
-        if attempt == MAX_RETRIES:
-          raise AgreementException(ErrorCode.AGREEMENT_REVIEW_FAIL)
-        logging.warning(
-            f"query_points: 계약서 LLM 재요청 발생 {attempt}/{MAX_RETRIES} {e}")
-        await asyncio.sleep(0.5 * attempt)
-
-  return None
 
 
 def is_correct_response_format(result: dict[str, str]) -> bool:
