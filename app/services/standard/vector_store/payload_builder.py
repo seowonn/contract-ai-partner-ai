@@ -3,7 +3,7 @@ from datetime import datetime
 from app.containers.service_container import prompt_service
 from app.models.vector import VectorPayload, WordPayload
 from app.schemas.chunk_schema import ClauseChunk
-from app.services.standard.vector_store.llm_retry import retry_llm_call
+from app.services.common.llm_retry import retry_llm_call
 
 STANDARD_LLM_REQUIRED_KEYS = {"incorrect_text", "corrected_text"}
 STANDARD_WORD_REQUIRED_KEYS = {"keyword", "meaning_difference"}

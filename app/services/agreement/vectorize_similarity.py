@@ -21,7 +21,7 @@ from app.containers.service_container import embedding_service, prompt_service
 from app.schemas.analysis_response import RagResult, SearchResult
 from app.schemas.document_request import DocumentRequest
 from app.services.common.qdrant_utils import ensure_qdrant_collection
-from app.services.standard.vector_store.llm_retry import retry_llm_call
+from app.services.common.llm_retry import retry_llm_call
 
 SEARCH_COUNT = 3
 VIOLATION_THRESHOLD = 0.75
