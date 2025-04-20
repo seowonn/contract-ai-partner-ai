@@ -27,3 +27,8 @@ class DocumentMetadata:
 class Document:
   page_content: str
   metadata: DocumentMetadata
+
+@dataclass
+class OCRDocument:
+  content: str
+

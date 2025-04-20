@@ -25,8 +25,7 @@ from app.schemas.document_request import DocumentRequest
 from app.services.standard.vector_store import ensure_qdrant_collection
 
 SEARCH_COUNT = 3
-
-VIOLATION_THRESHOLD =0.75
+VIOLATION_THRESHOLD =0.0
 LLM_REQUIRED_KEYS = {"clause_content", "correctedText", "proofText",
                      "violation_score"}
 
@@ -138,7 +137,6 @@ async def process_clause(qd_client: AsyncQdrantClient,
     logging.warning(f"violation_score 추출 실패")
     return ChunkProcessResult(status=ChunkProcessStatus.FAILURE)
 
-  # chunk는 성공했다는건가?
   if score < VIOLATION_THRESHOLD:
     return ChunkProcessResult(status=ChunkProcessStatus.SUCCESS)
 
@@ -335,11 +333,13 @@ async def find_text_positions(rag_result: RagResult, incorrect_part: str,
         else:
           rel_x0, rel_y0, rel_x1, rel_y1 = x0, y0, x1, y1
 
+        # y 값을 기준으로 그룹화
         if rel_y0 not in grouped_positions:
           grouped_positions[rel_y0] = []
 
         grouped_positions[rel_y0].append((rel_x0, rel_x1, rel_y0, rel_y1))
 
+      # 그룹화된 바운딩 박스를 하나의 큰 박스로 묶기
       for y_key, group in grouped_positions.items():
         min_x0 = min(x[0] for x in group)
         max_x1 = max(x[1] for x in group)
@@ -401,7 +401,151 @@ async def find_text_positions(rag_result: RagResult, incorrect_part: str,
 
 
 
+async def find_text_positions_ocr(clause_content: str,
+    all_texts_with_bounding_boxes: List[dict]) -> List[dict]:
+  epsilon = None
+  all_positions = {}  # 페이지별로 위치 정보를 저장할 딕셔너리
+
+  # +를 기준으로 문장을 나누고 뒤에 있는 부분만 사용
+  clause_content_parts = clause_content.split('+', 1)
+  if len(clause_content_parts) > 1:
+    clause_content = clause_content_parts[1].strip()  # `+` 뒤의 내용만 사용
+
+  full_text = " ".join([item['text'] for item in all_texts_with_bounding_boxes])
+
+  if clause_content in full_text:  # 해당 문장이 전체 텍스트에 포함되어 있는지 확인
+
+    # 검색 범위의 시작과 끝 인덱스를 찾음
+    search_start_idx = full_text.find(clause_content)
+    search_end_idx = search_start_idx + len(clause_content)
+
+    search_text_parts = clause_content.split()  # 텍스트 조각을 분리 (공백 기준)
+
+    # y값 기준으로 텍스트를 그룹화
+    grouped_texts = {}
+
+    # 검색 시작 인덱스
+    start_idx = search_start_idx  # 처음에는 전체 검색 범위의 시작 인덱스로 시작
+    last_end_idx = -1  # 이전 끝 인덱스를 저장할 변수 초기화
+
+    # 전체 바운딩 박스 변수 초기화
+    max_x_total = float('-inf')
+    max_y_total = float('-inf')
+    min_x_total = float('inf')
+    min_y_total = float('inf')
+
+    # 검색 시작
+    for item in all_texts_with_bounding_boxes:
+
+      for part in search_text_parts:
+        if part == item['text']:  # 부분 텍스트 일치
+          # 첫 번째 단어는 처음부터 검색
+          if last_end_idx == -1:  # 처음에는 0부터 검색
+            start_idx = 0
+          else:
+            # 중복되는 단어는 이전 검색에서 찾은 끝 인덱스 이후부터 시작
+            start_idx = last_end_idx
+
+          item_text_start_idx = full_text.find(part,
+                                               start_idx)  # 각 단어의 시작 인덱스를 찾음
+          if item_text_start_idx == -1:
+            break  # 더 이상 찾을 것이 없으면 종료
+          item_text_end_idx = item_text_start_idx + len(part)
+
+          # 텍스트가 정확히 검색 범위 내에 있을 경우만 처리
+          if search_start_idx <= item_text_start_idx and search_end_idx >= item_text_end_idx:
+
+            bounding_box = item['bounding_box']
+
+            for vertex in bounding_box:
+              center_y = (sum(vertex['y'] for vertex in bounding_box)
+                          / len(bounding_box))
+
+              # 첫 단어일 때만 높이 비율 기반 동적 epsilon 설정
+              if epsilon is None:
+                y_values = [vertex['y'] for vertex in bounding_box]
+                height_ratio = max(y_values) - min(y_values)
+                epsilon = height_ratio / 2
+
+              # y값 기준으로 그룹화 (epsilon 값으로 오차 범위 설정)
+              group_found = False
+              for y_group in grouped_texts:
+                if center_y > y_group - (
+                    epsilon) and center_y < y_group + (
+                    epsilon):
+                  grouped_texts[y_group].append(item)
+                  group_found = True
+                  break
+
+              if not group_found:
+                grouped_texts[center_y] = [item]
+
+            # 한 번 단어를 찾고 나면, 다음 검색을 위해 item_text_start_idx를 이동시킴
+            item_text_start_idx += len(part)
+            last_end_idx = item_text_end_idx
+
+            # 찾은 단어가 범위 내에 있을 때 바로 루프 종료
+            break
+
+
+    points_list = []
+    unique_relative_points = set()
+    # 그룹화된 텍스트에 대해 바운딩 박스를 계산
+    for y_group in grouped_texts:
+      min_x_group = float('inf')
+      min_y_group = float('inf')
+      max_x_group = float('-inf')
+      max_y_group = float('-inf')
+
+      # 그룹에 속한 텍스트들의 바운딩 박스를 계산
+      for item in grouped_texts[y_group]:
+        bounding_box = item['bounding_box']
+        for vertex in bounding_box:
+          abs_x = vertex['x']
+          abs_y = vertex['y']
+
+          min_x_group = min(min_x_group, abs_x)
+          min_y_group = min(min_y_group, abs_y)
+          max_x_group = max(max_x_group, abs_x)
+          max_y_group = max(max_y_group, abs_y)
+
+      # 바운딩 박스 계산
+      min_x = min_x_group * 100
+      min_y = min_y_group * 100
+      width = (max_x_group - min_x_group) * 100
+      height = (max_y_group - min_y_group) * 100
+
+      points = np.array([[min_x, min_y, width, height]], np.float64)
+
+      points_tuple = tuple(points[0])
+
+      if points_tuple not in unique_relative_points:
+        unique_relative_points.add(points_tuple)
+        points_list.append(points[0].tolist())
+
+  return points_list
+
+
 async def extract_positions_by_page(all_positions: dict[int, List[dict]]) -> \
+    List[List]:
+  positions = [[], []]
+  first_page = None
+
+  # `rag_result.clause_data`에 두 개만 저장
+  for page_num, positions_in_page in all_positions.items():
+    # 첫 번째 문장이 시작되는 페이지를 찾으면 첫 번째 위치에 저장
+    if first_page is None:
+      first_page = page_num
+      positions[0].extend(p['bbox'] for p in positions_in_page)
+    else:
+      # 첫 번째 문장이 시작된 후, 페이지가 변경되면 두 번째 위치에 저장
+      if page_num != first_page:
+        positions[1].extend(p['bbox'] for p in positions_in_page)
+
+  return positions
+
+
+async def extract_positions_ocr(all_positions: dict[int, List[dict]]) -> \
     List[List]:
   positions = [[], []]
   first_page = None
