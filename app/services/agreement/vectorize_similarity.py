@@ -5,7 +5,6 @@ from asyncio import Semaphore
 from typing import List, Optional, Any
 
 import fitz
-from openai import AsyncAzureOpenAI
 from qdrant_client import models, AsyncQdrantClient
 from qdrant_client.http.models import QueryResponse
 
@@ -15,7 +14,7 @@ from app.clients.openai_clients import get_prompt_async_client, \
 from app.clients.qdrant_client import get_qdrant_client
 from app.common.chunk_status import ChunkProcessResult, ChunkProcessStatus
 from app.common.constants import ARTICLE_CLAUSE_SEPARATOR, \
-  CLAUSE_TEXT_SEPARATOR, MAX_RETRIES, LLM_TIMEOUT
+  CLAUSE_TEXT_SEPARATOR, MAX_RETRIES
 from app.common.exception.custom_exception import CommonException
 from app.common.exception.error_code import ErrorCode
 from app.containers.service_container import embedding_service, prompt_service
