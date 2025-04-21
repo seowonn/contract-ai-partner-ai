@@ -2,7 +2,7 @@ name: Flask App Docker CI/CD
 
 on:
    push:
-     branches: main
+     branches: [main, feat/intergration]
    pull_request:
      branches: main
 
