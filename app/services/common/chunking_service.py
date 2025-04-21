@@ -95,7 +95,7 @@ def visualize_embeddings_3d(embeddings: List[List[float]], sentences: List[str],
     ax.text(x, y, z, text[:30] + "...", size=9)
   ax.set_title("Semantic Embedding 결과")
   plt.tight_layout()
-  plt.show()
+  plt.savefig("semantic_embedding_result")
 
 
 def ensure_punkt():
@@ -111,7 +111,7 @@ def split_into_sentences(extracted_text: str):
 
 
 def count_tokens(text: str) -> int:
-  encoding = tiktoken.encoding_for_model(PROMPT_MODEL)
+  encoding = tiktoken.encoding_for_model("gpt-4o-mini")
   return len(encoding.encode(text))
 
 
