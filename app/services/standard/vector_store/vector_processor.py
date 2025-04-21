@@ -13,7 +13,8 @@ from app.containers.service_container import embedding_service
 from app.schemas.chunk_schema import ClauseChunk
 from app.schemas.document_request import DocumentRequest
 from app.services.common.qdrant_utils import ensure_qdrant_collection, \
-  upload_points_to_qdrant
+  upload_points_to_qdrant, point_exists
+from app.services.standard.vector_delete import delete_by_standard_id
 from app.services.standard.vector_store.payload_builder import \
   make_word_payload, make_clause_payload
 
@@ -43,6 +44,9 @@ async def vectorize_and_save(chunks: List[ClauseChunk],
     if vector and isinstance(vector, list) and not any(
         np.isnan(x) for x in vector):
       final_points.append(build_point(payload, vector))
+
+  if await point_exists(qd_client, pdf_request.categoryName, pdf_request.id):
+    await delete_by_standard_id(pdf_request.id, pdf_request.categoryName)
 
   await upload_points_to_qdrant(qd_client, pdf_request.categoryName,
                                 final_points)

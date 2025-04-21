@@ -8,6 +8,7 @@ from app.clients.qdrant_client import get_qdrant_client
 from app.common.exception.custom_exception import CommonException
 from app.common.exception.error_code import ErrorCode
 from app.schemas.success_code import SuccessCode
+from app.services.common.qdrant_utils import point_exists
 
 
 async def delete_by_standard_id(standard_id: int, collection_name: str) -> SuccessCode:
@@ -17,22 +18,13 @@ async def delete_by_standard_id(standard_id: int, collection_name: str) -> Succe
   except UnexpectedResponse:
     raise StandardException(ErrorCode.COLLECTION_NOT_FOUND)
 
+  if not await point_exists(qd_client, collection_name, standard_id):
+    return SuccessCode.NO_DOCUMENT_FOUND
+
   filter_condition = Filter(
       must=[
         FieldCondition(key="standard_id", match=MatchValue(value=standard_id))]
   )
-
-  try:
-    points, _ = await qd_client.scroll(
-      collection_name=collection_name,
-      scroll_filter=filter_condition,
-      limit=1
-    )
-  except (ConnectTimeout, ResponseHandlingException):
-    raise CommonException(ErrorCode.QDRANT_CONNECTION_TIMEOUT)
-
-  if not points:
-    return SuccessCode.NO_DOCUMENT_FOUND
 
   try:
     await qd_client.delete(

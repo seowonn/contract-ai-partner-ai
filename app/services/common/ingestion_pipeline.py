@@ -9,12 +9,11 @@ from app.common.exception.custom_exception import CommonException
 from app.common.exception.error_code import ErrorCode
 from app.common.file_type import FileType
 from app.schemas.analysis_response import RagResult, ClauseData
-from app.schemas.chunk_schema import DocumentChunk, ClauseChunk
+from app.schemas.chunk_schema import ClauseChunk
 from app.schemas.chunk_schema import Document
 from app.schemas.chunk_schema import DocumentChunk, DocumentMetadata
 from app.schemas.document_request import DocumentRequest
 from app.services.agreement.ocr_service import extract_ocr
-
 from app.services.agreement.vectorize_similarity import \
   vectorize_and_calculate_similarity_ocr, vectorize_and_calculate_similarity
 from app.services.common.chunking_service import \
@@ -60,10 +59,8 @@ def pdf_agreement_service(document_request: DocumentRequest) -> Tuple[
   return chunks, len(combined_chunks), len(documents)
 
 
-# fitz_document 이거 가져오려고 함수 쪼갬 - 근데 standard에서 쓰여서 삭제 못함
 def preprocess_data(document_request: DocumentRequest) -> Tuple[
   List[Document], fitz.Document]:
-  documents: List[Document] = []
 
   s3_stream = s3_get_object(document_request.url)
   pdf_bytes_io = convert_to_bytes_io(s3_stream)
