@@ -1,14 +1,13 @@
-import boto3
-from botocore.exceptions import ClientError
-from botocore.response import StreamingBody
+import os
 
-from app.blueprints.agreement.agreement_exception import AgreementException
+import boto3
+import requests
+from botocore.response import StreamingBody
+from dotenv import load_dotenv
+
 from app.common.exception.custom_exception import CommonException
 from app.common.exception.error_code import ErrorCode
 from config.s3_config import AWS_S3_BUCKET_REGION
-import requests
-import os
-from dotenv import load_dotenv
 
 load_dotenv()
 
