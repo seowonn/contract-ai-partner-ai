@@ -41,6 +41,11 @@ def clean_markdown_block(response_text: str) -> str | None:
 
   try:
     parsed_response = json.loads(response_text_cleaned)
+    if "incorrectPart" in parsed_response:
+      parsed_response["incorrectPart"] = clean_incorrect_part(
+          parsed_response["incorrectPart"]
+      )
+
   except json.JSONDecodeError as e:
     logging.error(
         f"[PromptService]: jsonDecodeError: {e} | raw response: {response_text_cleaned}")
@@ -144,6 +149,10 @@ class PromptService:
       clause_content: str, search_results: List[SearchResult]) -> Optional[
     dict[str, Any]]:
 
+    clause_content = clause_content.replace("\n", " ")
+    clause_content = clause_content.replace("+", "")
+    clause_content = clause_content.replace("!!!", " ")
+
     input_data = {
       "clause_content": clause_content,
       "proof_text": [item.proof_text for item in search_results],
@@ -203,6 +212,12 @@ class PromptService:
               "correctedText": "계약서의 문장을 올바르게 교정한 문장",
               "proofText": "입력 데이터를 참조해 잘못된 포인트와 그 이유",
               "violation_score": "0.000 ~ 1.000 사이의 소수점 셋째 자리까지의 문자열"
+              "incorrectPart": clause_content에서 문제가 되는 부분 길이는 최대 단어 5개까지 똑같이 반환해주세요.
+                                     
+                                     아래 규칙을 지켜주세요
+                                     조사를 지우지 말고 완전한 문장을 반환하세요
+                                     clause_content 문장과 일치하지 않고 부분 내용이여야 합니다.
+                                     띄어쓰기, 온점, 반점, 괄호 등은 clause_content와 정확히 일치해야 합니다.
             }}
             
             [입력 데이터]

@@ -5,7 +5,7 @@ from typing import List, Optional, Any
 
 import fitz
 from openai import AsyncAzureOpenAI
-import numpy as np
+
 from qdrant_client import models, AsyncQdrantClient
 from qdrant_client.http.models import QueryResponse
 
@@ -45,10 +45,9 @@ async def vectorize_and_calculate_similarity_ocr(
     content = parts[1].strip() if len(parts) == 2 else parts[0].strip()
     embedding_inputs.append(f"{title} {content}")
 
-  start_time = time.time()
+
   embeddings = await embedding_service.batch_embed_texts(
     get_embedding_async_client(), embedding_inputs)
-  logging.info(f"임베딩 묶음 소요 시간: {time.time() - start_time}")
 
   semaphore = asyncio.Semaphore(5)
   prompt_client = get_prompt_async_client()
@@ -140,21 +139,14 @@ async def process_clause(qd_client: AsyncQdrantClient, rag_result: RagResult,
   if score < VIOLATION_THRESHOLD:
     return ChunkProcessResult(status=ChunkProcessStatus.SUCCESS)
 
-  rag_result.incorrect_part = corrected_result["incorrectPart"]
-
-  all_positions, part_positions = \
-    await find_text_positions(rag_result, rag_result.incorrect_part,
-                              byte_type_pdf)
-
-  all_position_boxes = await extract_positions_by_page(all_positions)
-  part_position_boxes = await extract_positions_by_page(part_positions)
-
   rag_result.accuracy = score
-  all_positions = \
-    await find_text_positions(rag_result.incorrect_text, byte_type_pdf)
+  rag_result.incorrect_part = corrected_result["incorrectPart"]
+  all_positions, part_position = \
+    await find_text_positions(rag_result,byte_type_pdf)
   positions = await extract_positions_by_page(all_positions)
+  part_positions = await extract_positions_by_page(part_position)
 
-  set_result_data(corrected_result, rag_result, positions)
+  set_result_data(corrected_result, rag_result, positions, part_positions)
   if any(not clause.position for clause in rag_result.clause_data):
     logging.warning(f"원문 일치 position값 불러오지 못함")
     return ChunkProcessResult(status=ChunkProcessStatus.SUCCESS)
@@ -290,7 +282,9 @@ def is_correct_response_format(result: dict[str, str]) -> bool:
 
 
 def set_result_data(corrected_result: Optional[
-  dict[str, Any]], rag_result: RagResult, positions: List[List]):
+  dict[str, Any]], rag_result: RagResult, positions: List[List],
+    part_positions: List[List]):
+
   rag_result.incorrect_text = (
     rag_result.incorrect_text.split(ARTICLE_CLAUSE_SEPARATOR, 1)[-1]
     .replace(CLAUSE_TEXT_SEPARATOR, "")
@@ -298,6 +292,9 @@ def set_result_data(corrected_result: Optional[
     .replace("", '"')
   )
 
+  value = corrected_result["incorrectPart"]
+  rag_result.incorrect_part = " ".join(value) if isinstance(value,
+                                                            list) else value
   value = corrected_result["correctedText"]
   rag_result.corrected_text = " ".join(value) if isinstance(value,
                                                             list) else value
@@ -307,6 +304,10 @@ def set_result_data(corrected_result: Optional[
   rag_result.clause_data[0].position = positions[0]
   if positions[1]:
     rag_result.clause_data[1].position = positions[1]
+
+  rag_result.clause_data[0].position_part = part_positions[0]
+  if positions[1]:
+    rag_result.clause_data[1].position_part = part_positions[1]
 
 
 def search_text_in_pdf(text: str, pdf_doc: fitz.Document, clause_data,
@@ -372,90 +373,40 @@ def search_text_in_pdf(text: str, pdf_doc: fitz.Document, clause_data,
 
 
 
-async def find_text_positions(clause_content: str,
-    pdf_document: fitz.Document) -> dict[int, List[dict]]:
-  all_positions = {}  # 페이지별로 위치 정보를 저장할 딕셔너리
 
-  # "!!!"을 기준으로 더 나눠서 각각을 위치 찾기
-  clause_parts = clause_content.split('!!!')
+async def find_text_positions(rag_result: RagResult,
+    pdf_document: fitz.Document) -> dict[str, dict[int, List[dict]]]:
 
-  # 모든 페이지를 검색
-  for page_num in range(pdf_document.page_count):
-    page = pdf_document.load_page(page_num)  # 페이지 로드
+  # incorrect_text 처리 (all_positions 용)
+  clause_content_parts = rag_result.incorrect_text.split('+', 1)
+  if len(clause_content_parts) > 1:
+    rag_result.incorrect_text = clause_content_parts[1].strip()
 
-    # 페이지 크기 얻기 (페이지의 너비와 높이)
-    page_width = float(page.rect.width)  # 명시적으로 float로 처리
-    page_height = float(page.rect.height)  # 명시적으로 float로 처리
+  clause_parts = rag_result.incorrect_text.split('!!!')
 
-    page_positions = []  # 현재 페이지에 대한 위치 정보를 담을 리스트
+  # 전체 문장 기준으로 검색
+  all_positions = {}
+  part_positions = {}
+  for part in clause_parts:
+    part = part.strip()
+    if part == "":
+      continue
+    partial_result = search_text_in_pdf(part, pdf_document,
+                                        rag_result.clause_data)
+    for page, boxes in partial_result.items():
+      if page not in all_positions:
+        all_positions[page] = []
+      all_positions[page].extend(boxes)
 
-    # 각 문장에 대해 위치를 찾기
-    for part in clause_parts:
-      part = part.strip()  # 앞뒤 공백 제거
-      if part == "":
-        continue
+  # incorrect_part는 그대로 검색
+  part_position = search_text_in_pdf(rag_result.incorrect_part, pdf_document,
+                                      rag_result.clause_data)
+  for page, boxes in part_position.items():
+    if page not in part_positions:
+      part_positions[page] = []
+    part_positions[page].extend(boxes)
 
-      # 문장의 위치를 찾기 위해 search_for 사용
-      text_instances = page.search_for(part)
-
-      # y값을 기준으로 묶을 변수
-      grouped_positions = {}
-
-      # 텍스트 인스턴스들에 대해 위치 정보를 추출
-      for text_instance in text_instances:
-        x0, y0, x1, y1 = text_instance  # 바운딩 박스 좌표
-
-        # 상대적인 위치로 계산 (픽셀을 페이지 크기로 나누어 상대값 계산)
-        rel_x0 = x0 / page_width
-        rel_y0 = y0 / page_height
-        rel_x1 = x1 / page_width
-        rel_y1 = y1 / page_height
-
-        # 바운딩 박스 높이 계산 (상대값 기준)
-        box_height = rel_y1 - rel_y0
-        epsilon = box_height / 4
-
-        # y 값을 기준으로 그룹화
-        group_found = False
-        for y_key in grouped_positions:
-          if abs(rel_y0 - y_key) <= epsilon:
-            grouped_positions[y_key].append((rel_x0, rel_x1, rel_y0, rel_y1))
-            group_found = True
-            break
-
-        if not group_found:
-          grouped_positions[rel_y0] = [(rel_x0, rel_x1, rel_y0, rel_y1)]
-
-      # 그룹화된 바운딩 박스를 하나의 큰 박스로 묶기
-      for y_key, group in grouped_positions.items():
-        # 하나의 그룹에서 x0, x1의 최솟값과 최댓값을 구하기
-        min_x0 = min([x[0] for x in group])  # 최소 x0 값
-        max_x1 = max([x[1] for x in group])  # 최대 x1 값
-
-        # 하나의 그룹에서 y0, y1의 최솟값과 최댓값을 구하기
-        min_y0 = min([x[2] for x in group])  # 최소 y0 값
-        max_y1 = max([x[3] for x in group])  # 최대 y1 값
-
-        # 상대적인 값에 100을 곱해줍니다
-        min_x0 *= 100
-        min_y0 *= 100
-        max_x1 *= 100
-        max_y1 *= 100
-
-        width = max_x1 - min_x0
-        height = max_y1 - min_y0
-
-        # 바운딩 박스를 생성 (최소값과 최대값을 사용)
-        page_positions.append({
-          "page": page_num + 1,
-          "bbox": (min_x0, min_y0, width, height)  # 상대적 x, y, 너비, 높이
-        })
-
-    # 페이지별로 위치를 딕셔너리에 추가
-    if page_positions:
-      all_positions[page_num + 1] = page_positions
-
-  return all_positions
+  return all_positions, part_positions
 
 
 async def extract_positions_by_page(all_positions: dict[int, List[dict]]) -> \
