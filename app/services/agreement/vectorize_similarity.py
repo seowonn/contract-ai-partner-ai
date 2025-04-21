@@ -2,9 +2,7 @@ import asyncio
 import logging
 from asyncio import Semaphore
 from typing import List, Optional, Any
-import numpy as np
 import fitz
-from openai import AsyncAzureOpenAI
 
 from qdrant_client import models, AsyncQdrantClient
 from qdrant_client.http.models import QueryResponse
@@ -26,7 +24,7 @@ from app.services.common.llm_retry import retry_llm_call
 from app.services.common.qdrant_utils import ensure_qdrant_collection
 
 SEARCH_COUNT = 3
-VIOLATION_THRESHOLD = 0.0
+VIOLATION_THRESHOLD = 0.75
 LLM_REQUIRED_KEYS = {"clause_content", "correctedText", "proofText",
                      "violation_score"}
 
@@ -50,7 +48,6 @@ async def vectorize_and_calculate_similarity_ocr(
       embedding_client, embedding_inputs)
 
   semaphore = asyncio.Semaphore(5)
-  prompt_client = get_prompt_async_client()
   tasks = [
     process_clause_ocr(qd_client, chunk, embedding,
                        document_request.categoryName,
@@ -193,7 +190,6 @@ async def process_clause_ocr(qd_client: AsyncQdrantClient,
   all_positions, part_position = \
     await find_text_positions_ocr(rag_result,
                                   all_texts_with_bounding_boxes)
-
 
   rag_result.accuracy = score
   rag_result.corrected_text = corrected_result["correctedText"]
@@ -537,21 +533,3 @@ async def extract_positions_by_page(all_positions: dict[int, List[dict]]) -> \
 
   return positions
 
-
-async def extract_positions_ocr(all_positions: dict[int, List[dict]]) -> \
-    List[List]:
-  positions = [[], []]
-  first_page = None
-
-  # `rag_result.clause_data`에 두 개만 저장
-  for page_num, positions_in_page in all_positions.items():
-    # 첫 번째 문장이 시작되는 페이지를 찾으면 첫 번째 위치에 저장
-    if first_page is None:
-      first_page = page_num
-      positions[0].extend(p['bbox'] for p in positions_in_page)
-    else:
-      # 첫 번째 문장이 시작된 후, 페이지가 변경되면 두 번째 위치에 저장
-      if page_num != first_page:
-        positions[1].extend(p['bbox'] for p in positions_in_page)
-
-  return positions

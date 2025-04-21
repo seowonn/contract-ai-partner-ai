@@ -16,5 +16,3 @@ PROMPT_MODEL = "gpt-4.1-mini"
 EMBEDDING_MODEL = "text-embedding-3-small"
 
 ARTICLE_OCR_HEADER_PATTERN = r'(제\s*\d+\s*조\s*[【\[].*?[】\]])\s*(.*?)(?=제\s*\d+\s*조|$)'
-
-#ARTICLE_OCR_HEADER_PATTERN = r'(제\s*\d+\s*조[^【\[\n]*[】\]]?)\s*(.*?)(?=제\s*\d+\s*조|$)'
