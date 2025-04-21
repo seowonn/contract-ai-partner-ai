@@ -26,7 +26,7 @@ from app.services.common.llm_retry import retry_llm_call
 from app.services.common.qdrant_utils import ensure_qdrant_collection
 
 SEARCH_COUNT = 3
-VIOLATION_THRESHOLD = 0.75
+VIOLATION_THRESHOLD = 0.0
 LLM_REQUIRED_KEYS = {"clause_content", "correctedText", "proofText",
                      "violation_score"}
 
@@ -52,7 +52,7 @@ async def vectorize_and_calculate_similarity_ocr(
   semaphore = asyncio.Semaphore(5)
   prompt_client = get_prompt_async_client()
   tasks = [
-    process_clause_ocr(qd_client, prompt_client, chunk, embedding,
+    process_clause_ocr(qd_client, chunk, embedding,
                        document_request.categoryName,
                        semaphore, all_texts_with_bounding_boxes)
     for chunk, embedding in zip(combined_chunks, embeddings)
@@ -160,9 +160,7 @@ async def extract_incorrect_text(rag_result: RagResult) -> str:
 
 
 async def process_clause_ocr(qd_client: AsyncQdrantClient,
-    prompt_client: AsyncAzureOpenAI,
-    rag_result: RagResult,
-    embedding: List[float], collection_name: str, semaphore: Semaphore,
+    rag_result: RagResult, embedding: List[float], collection_name: str, semaphore: Semaphore,
     all_texts_with_bounding_boxes: List[dict]) -> ChunkProcessResult:
 
   semaphore = asyncio.Semaphore(5)
@@ -178,8 +176,6 @@ async def process_clause_ocr(qd_client: AsyncQdrantClient,
         search_results,
         required_keys=LLM_REQUIRED_KEYS
     )
-
-
   if not corrected_result:
     return ChunkProcessResult(status=ChunkProcessStatus.FAILURE)
 
@@ -192,17 +188,22 @@ async def process_clause_ocr(qd_client: AsyncQdrantClient,
   if score < VIOLATION_THRESHOLD:
     return ChunkProcessResult(status=ChunkProcessStatus.SUCCESS)
 
-  all_positions = \
-    await find_text_positions_ocr(rag_result.incorrect_text,
+  rag_result.incorrect_part = corrected_result["incorrectPart"]
+
+  all_positions, part_position = \
+    await find_text_positions_ocr(rag_result,
                                   all_texts_with_bounding_boxes)
 
+
   rag_result.accuracy = score
+  # 이게 필요한가?
   rag_result.incorrect_text = await clean_incorrect_text(
       rag_result.incorrect_text)
   rag_result.corrected_text = corrected_result["correctedText"]
   rag_result.proof_text = corrected_result["proofText"]
 
   rag_result.clause_data[0].position.extend(all_positions)
+  rag_result.clause_data[0].position_part.extend(part_position)
 
   # 왜 해당 코드 에러
   return ChunkProcessResult(status=ChunkProcessStatus.SUCCESS,
@@ -217,6 +218,7 @@ def parse_incorrect_text(rag_result: RagResult) -> None:
     raise AgreementException(ErrorCode.NO_SEPARATOR_FOUND)
 
   rag_result.incorrect_text = clause_parts[-1]
+  rag_result.incorrect_text = rag_result.incorrect_text.replace("\n", "") # 여기서
 
 
 async def search_qdrant(semaphore: Semaphore, collection_name: str,
@@ -424,102 +426,116 @@ async def find_text_positions(rag_result: RagResult,
 
   return all_positions, part_positions
 
-async def find_text_positions_ocr(clause_content: str,
-    all_texts_with_bounding_boxes: List[dict]) -> List[dict]:
 
-  epsilon=None
-  full_text = " ".join([item['text'] for item in all_texts_with_bounding_boxes])
+
+async def find_text_positions_ocr(rag_result: RagResult,
+    all_texts_with_bounding_boxes: List[dict]) -> tuple[List[tuple], List[tuple]]:
+
 
   # +를 기준으로 문장을 나누고 뒤에 있는 부분만 사용
-  clause_content_parts = clause_content.split('+', 1)
-  if len(clause_content_parts) > 1:
-    clause_content = clause_content_parts[1].strip()  # `+` 뒤의 내용만 사용
+  clause_content = rag_result.incorrect_text.split('+', 1)
+  if len(clause_content) > 1:
+    rag_result.incorrect_text = clause_content[1].strip()
+
+  # +를 기준으로 문장을 나누고 뒤에 있는 부분만 사용
+  part_clause_content = rag_result.incorrect_part.split('+', 1)
+  if len(part_clause_content) > 1:
+    rag_result.incorrect_part = part_clause_content[1].strip()
+
+  all_positions, part_positions = extract_bbox_positions(rag_result.incorrect_text,
+                                                         rag_result.incorrect_part,
+                                                         all_texts_with_bounding_boxes)
+
+  return all_positions, part_positions
 
 
-  # 검색 범위의 시작과 끝 인덱스를 찾음
-  search_start_idx = full_text.find(clause_content)
-  search_end_idx = search_start_idx + len(clause_content)
-  print(
-    f'Search text "{clause_content}" is located from index {search_start_idx} to {search_end_idx} in full text.')
+def extract_bbox_positions(
+    clause_content: str,
+    incorrect_part: str,
+    all_texts_with_bounding_boxes: List[dict]
+) -> tuple[List[tuple], List[tuple]]:
+  full_text = " ".join(item['text'] for item in all_texts_with_bounding_boxes)
 
-  # 3. 매칭되는 단어들만 추출
-  matched_items = []
-  for item in all_texts_with_bounding_boxes:
-    if search_start_idx <= item['start_idx'] < search_end_idx:
-      matched_items.append(item)
+  def get_position_range(target_text: str, base_start: int = 0) -> tuple[
+    int, int]:
+    start_idx = full_text.find(target_text, base_start)
+    end_idx = start_idx + len(target_text) if start_idx != -1 else -1
+    return start_idx, end_idx
 
-  print(f"✅ 문장 내 단어 개수: {len(matched_items)}")
+  def extract_bboxes(start_idx: int, end_idx: int) -> List[tuple]:
+    epsilon = None
 
-  # y값 기준으로 텍스트를 그룹화
-  grouped_texts = {}
+    matched_items = [
+      item for item in all_texts_with_bounding_boxes
+      if start_idx <= item['start_idx'] < end_idx
+    ]
 
-  for item in matched_items:
-    bounding_box = item['bounding_box']
-    center_y = (sum(vertex['y'] for vertex in bounding_box)
-                / len(bounding_box))
+    grouped_texts = {}
+    for item in matched_items:
+      bounding_box = item['bounding_box']
+      center_y = sum(vertex['y'] for vertex in bounding_box) / len(bounding_box)
 
-    # 첫 단어일 때만 높이 비율 기반 동적 epsilon 설정
-    if epsilon is None:
-      y_values = [vertex['y'] for vertex in bounding_box]
-      group_height = max(y_values) - min(y_values)
-      epsilon = group_height * 0.5
+      if epsilon is None:
+        y_values = [vertex['y'] for vertex in bounding_box]
+        group_height = max(y_values) - min(y_values)
+        epsilon = group_height * 0.5
 
-    abs_center_y = center_y
-
-    # y값 기준으로 그룹화 (epsilon 값으로 오차 범위 설정)
-    group_found = False
-    for y_group in grouped_texts:
-      if abs_center_y > y_group - (
-          epsilon) and abs_center_y < y_group + (
-          epsilon):
-        grouped_texts[y_group].append(item)
-        group_found = True
-        break
-
-    if not group_found:
-      grouped_texts[abs_center_y] = [item]
-
-
-
-
-
+      abs_center_y = center_y
+      group_found = False
+      for y_group in grouped_texts:
+        if y_group - epsilon < abs_center_y < y_group + epsilon:
+          grouped_texts[y_group].append(item)
+          group_found = True
+          break
+      if not group_found:
+        grouped_texts[abs_center_y] = [item]
 
     points_list = []
     unique_relative_points = set()
-    # 그룹화된 텍스트에 대해 바운딩 박스를 계산
     for y_group in grouped_texts:
       min_x_group = float('inf')
       min_y_group = float('inf')
       max_x_group = float('-inf')
       max_y_group = float('-inf')
 
-      # 그룹에 속한 텍스트들의 바운딩 박스를 계산
       for item in grouped_texts[y_group]:
-        bounding_box = item['bounding_box']
-        for vertex in bounding_box:
+        for vertex in item['bounding_box']:
           abs_x = vertex['x']
           abs_y = vertex['y']
-
           min_x_group = min(min_x_group, abs_x)
           min_y_group = min(min_y_group, abs_y)
           max_x_group = max(max_x_group, abs_x)
           max_y_group = max(max_y_group, abs_y)
 
-      # 바운딩 박스 계산
       min_x = min_x_group * 100
       min_y = min_y_group * 100
       width = (max_x_group - min_x_group) * 100
       height = (max_y_group - min_y_group) * 100
 
-      points = np.array([[min_x, min_y, width, height]], np.float64)
-
-      points_tuple = tuple(points[0])
-
+      points_tuple = (min_x, min_y, width, height)
       if points_tuple not in unique_relative_points:
         unique_relative_points.add(points_tuple)
-        points_list.append(points[0].tolist())
+        points_list.append(points_tuple)
 
-  return points_list
+    print(f'points_list : {points_list}')
+    return points_list
+
+  # 전체 문장 기준
+  clause_start_idx, clause_end_idx = get_position_range(clause_content)
+  print(
+    f"Search clause_content: '{clause_content}' from {clause_start_idx} to {clause_end_idx}")
+
+  # 부분 문장은 전체 문장 안에서만 찾기
+  part_start_idx, part_end_idx = get_position_range(incorrect_part,
+                                                    clause_start_idx)
+  print(
+    f"Search incorrect_part: '{incorrect_part}' from {part_start_idx} to {part_end_idx}")
+
+  all_positions = extract_bboxes(clause_start_idx, clause_end_idx)
+  part_positions = extract_bboxes(part_start_idx, part_end_idx)
+
+  return all_positions, part_positions
+
 
 
 
