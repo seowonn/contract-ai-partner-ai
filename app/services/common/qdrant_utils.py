@@ -2,6 +2,7 @@ from httpx import ConnectTimeout
 from qdrant_client import AsyncQdrantClient
 from qdrant_client.http.exceptions import ResponseHandlingException
 from qdrant_client.http.models import VectorParams, Distance
+from qdrant_client.models import Filter, FieldCondition, MatchValue
 
 from app.blueprints.standard.standard_exception import StandardException
 from app.common.exception.custom_exception import CommonException
@@ -39,3 +40,23 @@ async def upload_points_to_qdrant(qd_client: AsyncQdrantClient, collection_name,
     await qd_client.upsert(collection_name=collection_name, points=points)
   except (ConnectTimeout, ResponseHandlingException):
     raise CommonException(ErrorCode.QDRANT_CONNECTION_TIMEOUT)
+
+
+async def point_exists(qd_client: AsyncQdrantClient, collection_name: str,
+    standard_id: int) -> bool:
+
+  filter_condition = Filter(
+      must=[
+        FieldCondition(key="standard_id", match=MatchValue(value=standard_id))]
+  )
+
+  try:
+    points, _ = await qd_client.scroll(
+      collection_name=collection_name,
+      scroll_filter=filter_condition,
+      limit=1
+    )
+  except (ConnectTimeout, ResponseHandlingException):
+    raise CommonException(ErrorCode.QDRANT_CONNECTION_TIMEOUT)
+
+  return bool(points)
