@@ -2,7 +2,7 @@ import asyncio
 import logging
 from asyncio import Semaphore
 from typing import List, Optional, Any
-
+import numpy as np
 import fitz
 from openai import AsyncAzureOpenAI
 
@@ -163,13 +163,22 @@ async def process_clause_ocr(qd_client: AsyncQdrantClient,
     prompt_client: AsyncAzureOpenAI,
     rag_result: RagResult,
     embedding: List[float], collection_name: str, semaphore: Semaphore,
-    all_texts_with_bounding_boxes: List[dict], clean_incorrect_text=None,
-    find_text_positions_ocr=None, generate_clause_correction=None) -> ChunkProcessResult:
+    all_texts_with_bounding_boxes: List[dict]) -> ChunkProcessResult:
+
+  semaphore = asyncio.Semaphore(5)
   search_results = \
     await search_qdrant(semaphore, collection_name, embedding, qd_client)
-  clause_results = await gather_search_results(search_results)
-  corrected_result = \
-    await generate_clause_correction(prompt_client, rag_result.incorrect_text, clause_results)
+
+  parse_incorrect_text(rag_result)
+
+  async with get_prompt_async_client() as prompt_client:
+    corrected_result = await retry_llm_call(
+        prompt_service.correct_contract,
+        prompt_client, rag_result.incorrect_text.replace("\n", " "),
+        search_results,
+        required_keys=LLM_REQUIRED_KEYS
+    )
+
 
   if not corrected_result:
     return ChunkProcessResult(status=ChunkProcessStatus.FAILURE)
@@ -372,6 +381,13 @@ def search_text_in_pdf(text: str, pdf_doc: fitz.Document, clause_data,
   return positions_by_page
 
 
+async def clean_incorrect_text(text: str) -> str:
+  return (
+    text.split(ARTICLE_CLAUSE_SEPARATOR, 1)[-1]
+    .replace(CLAUSE_TEXT_SEPARATOR, "")
+    .replace("\n", "")
+    .replace("", '"')
+  )
 
 
 async def find_text_positions(rag_result: RagResult,
@@ -407,6 +423,104 @@ async def find_text_positions(rag_result: RagResult,
     part_positions[page].extend(boxes)
 
   return all_positions, part_positions
+
+async def find_text_positions_ocr(clause_content: str,
+    all_texts_with_bounding_boxes: List[dict]) -> List[dict]:
+
+  epsilon=None
+  full_text = " ".join([item['text'] for item in all_texts_with_bounding_boxes])
+
+  # +를 기준으로 문장을 나누고 뒤에 있는 부분만 사용
+  clause_content_parts = clause_content.split('+', 1)
+  if len(clause_content_parts) > 1:
+    clause_content = clause_content_parts[1].strip()  # `+` 뒤의 내용만 사용
+
+
+  # 검색 범위의 시작과 끝 인덱스를 찾음
+  search_start_idx = full_text.find(clause_content)
+  search_end_idx = search_start_idx + len(clause_content)
+  print(
+    f'Search text "{clause_content}" is located from index {search_start_idx} to {search_end_idx} in full text.')
+
+  # 3. 매칭되는 단어들만 추출
+  matched_items = []
+  for item in all_texts_with_bounding_boxes:
+    if search_start_idx <= item['start_idx'] < search_end_idx:
+      matched_items.append(item)
+
+  print(f"✅ 문장 내 단어 개수: {len(matched_items)}")
+
+  # y값 기준으로 텍스트를 그룹화
+  grouped_texts = {}
+
+  for item in matched_items:
+    bounding_box = item['bounding_box']
+    center_y = (sum(vertex['y'] for vertex in bounding_box)
+                / len(bounding_box))
+
+    # 첫 단어일 때만 높이 비율 기반 동적 epsilon 설정
+    if epsilon is None:
+      y_values = [vertex['y'] for vertex in bounding_box]
+      group_height = max(y_values) - min(y_values)
+      epsilon = group_height * 0.5
+
+    abs_center_y = center_y
+
+    # y값 기준으로 그룹화 (epsilon 값으로 오차 범위 설정)
+    group_found = False
+    for y_group in grouped_texts:
+      if abs_center_y > y_group - (
+          epsilon) and abs_center_y < y_group + (
+          epsilon):
+        grouped_texts[y_group].append(item)
+        group_found = True
+        break
+
+    if not group_found:
+      grouped_texts[abs_center_y] = [item]
+
+
+
+
+
+
+    points_list = []
+    unique_relative_points = set()
+    # 그룹화된 텍스트에 대해 바운딩 박스를 계산
+    for y_group in grouped_texts:
+      min_x_group = float('inf')
+      min_y_group = float('inf')
+      max_x_group = float('-inf')
+      max_y_group = float('-inf')
+
+      # 그룹에 속한 텍스트들의 바운딩 박스를 계산
+      for item in grouped_texts[y_group]:
+        bounding_box = item['bounding_box']
+        for vertex in bounding_box:
+          abs_x = vertex['x']
+          abs_y = vertex['y']
+
+          min_x_group = min(min_x_group, abs_x)
+          min_y_group = min(min_y_group, abs_y)
+          max_x_group = max(max_x_group, abs_x)
+          max_y_group = max(max_y_group, abs_y)
+
+      # 바운딩 박스 계산
+      min_x = min_x_group * 100
+      min_y = min_y_group * 100
+      width = (max_x_group - min_x_group) * 100
+      height = (max_y_group - min_y_group) * 100
+
+      points = np.array([[min_x, min_y, width, height]], np.float64)
+
+      points_tuple = tuple(points[0])
+
+      if points_tuple not in unique_relative_points:
+        unique_relative_points.add(points_tuple)
+        points_list.append(points[0].tolist())
+
+  return points_list
+
 
 
 async def extract_positions_by_page(all_positions: dict[int, List[dict]]) -> \
