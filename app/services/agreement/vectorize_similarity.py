@@ -196,9 +196,6 @@ async def process_clause_ocr(qd_client: AsyncQdrantClient,
 
 
   rag_result.accuracy = score
-  # 이게 필요한가?
-  rag_result.incorrect_text = await clean_incorrect_text(
-      rag_result.incorrect_text)
   rag_result.corrected_text = corrected_result["correctedText"]
   rag_result.proof_text = corrected_result["proofText"]
 
@@ -383,15 +380,6 @@ def search_text_in_pdf(text: str, pdf_doc: fitz.Document, clause_data,
   return positions_by_page
 
 
-async def clean_incorrect_text(text: str) -> str:
-  return (
-    text.split(ARTICLE_CLAUSE_SEPARATOR, 1)[-1]
-    .replace(CLAUSE_TEXT_SEPARATOR, "")
-    .replace("\n", "")
-    .replace("", '"')
-  )
-
-
 async def find_text_positions(rag_result: RagResult,
     pdf_document: fitz.Document) -> dict[str, dict[int, List[dict]]]:
 
@@ -517,26 +505,18 @@ def extract_bbox_positions(
         unique_relative_points.add(points_tuple)
         points_list.append(points_tuple)
 
-    print(f'points_list : {points_list}')
     return points_list
 
   # 전체 문장 기준
   clause_start_idx, clause_end_idx = get_position_range(clause_content)
-  print(
-    f"Search clause_content: '{clause_content}' from {clause_start_idx} to {clause_end_idx}")
-
   # 부분 문장은 전체 문장 안에서만 찾기
   part_start_idx, part_end_idx = get_position_range(incorrect_part,
                                                     clause_start_idx)
-  print(
-    f"Search incorrect_part: '{incorrect_part}' from {part_start_idx} to {part_end_idx}")
 
   all_positions = extract_bboxes(clause_start_idx, clause_end_idx)
   part_positions = extract_bboxes(part_start_idx, part_end_idx)
 
   return all_positions, part_positions
-
-
 
 
 async def extract_positions_by_page(all_positions: dict[int, List[dict]]) -> \
