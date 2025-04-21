@@ -44,21 +44,3 @@ def read_s3_stream(s3_stream: StreamingBody):
     return s3_stream.read()
   except (OSError, IOError):
     raise CommonException(ErrorCode.S3_STREAM_READ_FAILED)
-
-
-def generate_pre_signed_url(s3_path: str, expiration=3600) -> str:
-  if not s3_path.startswith("s3://"):
-    raise AgreementException(ErrorCode.INVALID_S3_PATH)
-
-  parts = s3_path.replace("s3://", "").split("/", 1)
-  bucket_name, object_key = parts[0], parts[1]
-
-  try:
-    url = s3.generate_presigned_url(
-        "get_object",
-        Params={"Bucket": bucket_name, "Key": object_key},
-        ExpiresIn=expiration
-    )
-    return url
-  except ClientError:
-    raise AgreementException(ErrorCode.S3_CLIENT_ERROR)
