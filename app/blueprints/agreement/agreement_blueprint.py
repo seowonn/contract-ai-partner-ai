@@ -1,8 +1,8 @@
 from http import HTTPStatus
 
-from flask import Blueprint, request
-from pydantic import ValidationError
+from flask import Blueprint
 
+from app.common.decorators import parse_request
 from app.common.exception.custom_exception import CommonException
 from app.common.exception.error_code import ErrorCode
 from app.common.file_type import FileType
@@ -14,19 +14,13 @@ from app.services.common.ingestion_pipeline import \
   extract_file_type, \
   pdf_agreement_service, ocr_service
 
+
 agreements = Blueprint('agreements', __name__, url_prefix="/flask/agreements")
 
 
 @agreements.route('/analysis', methods=['POST'])
-def process_agreements_pdf_from_s3():
-  try:
-    json_data = request.get_json()
-    if json_data is None:
-      raise CommonException(ErrorCode.INVALID_JSON_FORMAT)
-
-    document_request = DocumentRequest(**json_data)
-  except ValidationError:
-    raise CommonException(ErrorCode.FIELD_MISSING)
+@parse_request(DocumentRequest)
+def process_agreements_pdf_from_s3(document_request: DocumentRequest):
 
   file_type = extract_file_type(document_request.url)
   if file_type in (FileType.PNG, FileType.JPG, FileType.JPEG):

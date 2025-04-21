@@ -1,20 +1,20 @@
-import os
 import re
 from typing import List
 from typing import Optional, Tuple
 
-import matplotlib.pyplot as plt
 import nltk
 import numpy as np
 import tiktoken
 from nltk import find
 from sklearn.manifold import TSNE
+import matplotlib.pyplot as plt
 
 from app.blueprints.standard.standard_exception import StandardException
 from app.clients.openai_clients import get_embedding_sync_client
 from app.common.constants import ARTICLE_CHUNK_PATTERN, ARTICLE_HEADER_PATTERN, \
-  ARTICLE_CLAUSE_SEPARATOR, ARTICLE_HEADER_PARSE_PATTERN, CLAUSE_HEADER_PATTERN, \
+  ARTICLE_CLAUSE_SEPARATOR, CLAUSE_HEADER_PATTERN, \
   PROMPT_MODEL, ARTICLE_OCR_HEADER_PATTERN
+from app.common.exception.custom_exception import CommonException
 from app.common.exception.error_code import ErrorCode
 from app.containers.service_container import embedding_service
 from app.schemas.chunk_schema import ArticleChunk, ClauseChunk, DocumentChunk
@@ -24,7 +24,7 @@ MIN_CLAUSE_BODY_LENGTH = 20
 
 
 def semantic_chunk(extracted_text: str, similarity_threshold: float = 0.9,
-    max_tokens: int = 250, visualize: bool = False) -> List[str]:
+    max_tokens: int = 250, visualize: bool = False) -> List[ClauseChunk]:
   sentences = split_into_sentences(extracted_text)
   sentences = [s for s in sentences if len(s.strip()) > MIN_CLAUSE_BODY_LENGTH]
   if not sentences:
@@ -44,7 +44,7 @@ def semantic_chunk(extracted_text: str, similarity_threshold: float = 0.9,
 
     if similarity < similarity_threshold or token_len > max_tokens:
       chunk_text = " ".join(current_chunk)
-      chunks.append(chunk_text)
+      chunks.append(ClauseChunk(clause_content=chunk_text))
       current_chunk = [sentences[i]]
     else:
       current_chunk.append(sentences[i])
@@ -59,6 +59,8 @@ def semantic_chunk(extracted_text: str, similarity_threshold: float = 0.9,
     except Exception as e:
       print(f"[시각화 오류] {e}")
 
+  if not chunks:
+    raise CommonException(ErrorCode.CHUNKING_FAIL)
   return chunks
 
 
@@ -68,16 +70,16 @@ def cosine(a: List[float], b: List[float]) -> float:
   return np.dot(a, b) / (np.linalg.norm(a) * np.linalg.norm(b))
 
 
-def append_chunk_if_valid(chunks: List[str], current_chunk: List[str]):
+def append_chunk_if_valid(chunks: List[ClauseChunk], current_chunk: List[str]):
   chunk_text = " ".join(current_chunk)
   if len(chunk_text.strip()) >= MIN_CLAUSE_BODY_LENGTH:
-    chunks.append(chunk_text)
+    chunks.append(ClauseChunk(clause_content=chunk_text))
 
 
 def visualize_embeddings_3d(embeddings: List[List[float]], sentences: List[str],
-    chunks: List[str]):
+    chunks: List[ClauseChunk]):
   for idx, chunk in enumerate(chunks):
-    print(f"[청크 {idx}] 길이: {len(chunk)} / 토큰 수: {count_tokens(chunk)}")
+    print(f"[청크 {idx}] 길이: {len(chunk.clause_content)} / 토큰 수: {count_tokens(chunk.clause_content)}")
 
   plt.rcParams['font.family'] = 'Malgun Gothic'  # 또는 'AppleGothic'
   plt.rcParams['axes.unicode_minus'] = False
@@ -116,6 +118,21 @@ def count_tokens(text: str) -> int:
 
 def split_text_by_pattern(text: str, pattern: str) -> List[str]:
   return re.split(pattern, text)
+
+
+def chunk_legal_terms(extracted_text: str) -> List[ClauseChunk]:
+  chunks = []
+  blocks = re.split(r'○\s\n*', extracted_text)
+  for block in blocks:
+    parts = block.split('\n', 1)
+    if len(parts) == 2 and parts[1]:
+      title, body = parts[0], parts[1]
+      title = title.split('(', 1)[0]
+      clauses = semantic_chunk(body, max_tokens=150, similarity_threshold=0.3)
+      for clause in clauses:
+        clause.clause_number = title
+      chunks.extend(clauses)
+  return chunks
 
 
 def chunk_by_article_and_clause(extracted_text: str) -> List[ArticleChunk]:
