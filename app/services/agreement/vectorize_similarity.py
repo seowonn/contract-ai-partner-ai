@@ -45,9 +45,9 @@ async def vectorize_and_calculate_similarity_ocr(
     content = parts[1].strip() if len(parts) == 2 else parts[0].strip()
     embedding_inputs.append(f"{title} {content}")
 
-
-  embeddings = await embedding_service.batch_embed_texts(
-    get_embedding_async_client(), embedding_inputs)
+  async with get_embedding_async_client() as embedding_client:
+    embeddings = await embedding_service.batch_embed_texts(
+      embedding_client, embedding_inputs)
 
   semaphore = asyncio.Semaphore(5)
   prompt_client = get_prompt_async_client()
