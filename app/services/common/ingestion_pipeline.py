@@ -100,15 +100,15 @@ def chunk_standard_texts(documents: List[Document], category: str,
 
 def chunk_agreement_documents(documents: List[Document], split_pattern: str) -> \
 List[DocumentChunk]:
-  # chunks = chunk_by_article_and_clause_with_page(documents, split_pattern)
+  chunks = chunk_by_article_and_clause_with_page(documents, split_pattern)
   # keep_text, _ = chunks[0].clause_content.split("1.", 1)
   # chunks[0].clause_content = keep_text
   # keep_text, _ = chunks[-2].clause_content.split("날짜 :", 1)
   # chunks[-2].clause_content = keep_text.strip()
   # del chunks[-1]
 
-  # if not chunks:
-  chunks = chunk_by_article_and_clause_with_page(documents, NUMBER_HEADER_PATTERN)
+  if not chunks:
+    chunks = chunk_by_article_and_clause_with_page(documents, NUMBER_HEADER_PATTERN)
 
   if not chunks:
     raise CommonException(ErrorCode.CHUNKING_FAIL)
