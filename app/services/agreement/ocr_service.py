@@ -1,24 +1,19 @@
+import json
+import os
 import re
+import time
 import uuid
 from typing import List, Tuple
-import numpy as np
+
 import cv2
-import json
-import time
-import os
+import numpy as np
+import requests
 from dotenv import load_dotenv
 
-
-from app.common.constants import ARTICLE_OCR_HEADER_PATTERN, \
-  CLAUSE_HEADER_PATTERN, ARTICLE_CLAUSE_SEPARATOR
-from app.schemas.analysis_response import RagResult, ClauseData
-from app.schemas.chunk_schema import Document, DocumentChunk, DocumentMetadata
-from app.services.common.chunking_service import split_by_clause_header_pattern, \
-  MIN_CLAUSE_BODY_LENGTH, get_clause_pattern, split_text_by_pattern, \
-  chunk_preamble_content, check_if_preamble_exists_except_first_page, \
-  parse_article_header
-import requests
-
+from app.common.constants import ARTICLE_OCR_HEADER_PATTERN
+from app.schemas.chunk_schema import DocumentChunk
+from app.services.common.chunking_service import MIN_CLAUSE_BODY_LENGTH, \
+  get_clause_pattern, split_text_by_pattern
 
 # .env 파일에서 환경변수 불러오기
 load_dotenv()
