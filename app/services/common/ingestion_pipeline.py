@@ -4,7 +4,8 @@ from typing import List, Tuple
 
 import fitz
 
-from app.common.constants import CLAUSE_TEXT_SEPARATOR
+from app.common.constants import CLAUSE_TEXT_SEPARATOR, ARTICLE_CHUNK_PATTERN, \
+  ARTICLE_OCR_HEADER_PATTERN, NUMBER_HEADER_PATTERN
 from app.common.exception.custom_exception import CommonException
 from app.common.exception.error_code import ErrorCode
 from app.common.file_type import FileType
@@ -30,7 +31,7 @@ def ocr_service(document_request: DocumentRequest):
   documents: List[Document] = [
     Document(page_content=full_text, metadata=DocumentMetadata(page=1))]
 
-  document_chunks = chunk_agreement_documents(documents)
+  document_chunks = chunk_agreement_documents(documents, ARTICLE_OCR_HEADER_PATTERN)
   combined_chunks = combine_chunks_by_clause_number(document_chunks)
 
   # 입력값이 다르기에 함수가 분리되어야 함
@@ -51,7 +52,7 @@ def pdf_agreement_service(document_request: DocumentRequest) -> Tuple[
   if not documents:
     raise CommonException(ErrorCode.NO_TEXTS_EXTRACTED)
 
-  document_chunks = chunk_agreement_documents(documents)
+  document_chunks = chunk_agreement_documents(documents, ARTICLE_CHUNK_PATTERN)
   combined_chunks = combine_chunks_by_clause_number(document_chunks)
   chunks = asyncio.run(
       vectorize_and_calculate_similarity(combined_chunks, document_request,
@@ -62,7 +63,6 @@ def pdf_agreement_service(document_request: DocumentRequest) -> Tuple[
 
 def preprocess_data(document_request: DocumentRequest) -> Tuple[
   List[Document], fitz.Document]:
-
   s3_stream = s3_get_object(document_request.url)
   pdf_bytes_io = convert_to_bytes_io(s3_stream)
   fitz_document = extract_fitz_document_from_pdf_io(pdf_bytes_io)
@@ -83,7 +83,6 @@ def extract_file_type(url: str) -> FileType:
 
 def chunk_standard_texts(documents: List[Document], category: str,
     page_batch_size: int = 50) -> List[ClauseChunk]:
-
   all_clauses = []
 
   for start in range(0, len(documents), page_batch_size):
@@ -99,13 +98,17 @@ def chunk_standard_texts(documents: List[Document], category: str,
   return all_clauses
 
 
-def chunk_agreement_documents(documents: List[Document]) -> List[DocumentChunk]:
-  chunks = chunk_by_article_and_clause_with_page(documents)
+def chunk_agreement_documents(documents: List[Document], split_pattern: str) -> \
+List[DocumentChunk]:
+  # chunks = chunk_by_article_and_clause_with_page(documents, split_pattern)
   # keep_text, _ = chunks[0].clause_content.split("1.", 1)
   # chunks[0].clause_content = keep_text
   # keep_text, _ = chunks[-2].clause_content.split("날짜 :", 1)
   # chunks[-2].clause_content = keep_text.strip()
   # del chunks[-1]
+
+  # if not chunks:
+  chunks = chunk_by_article_and_clause_with_page(documents, NUMBER_HEADER_PATTERN)
 
   if not chunks:
     raise CommonException(ErrorCode.CHUNKING_FAIL)

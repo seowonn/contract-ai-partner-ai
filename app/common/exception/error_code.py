@@ -44,7 +44,7 @@ class ErrorCode(Enum):
   CHUNK_ANALYSIS_FAILED = (HTTPStatus.INTERNAL_SERVER_ERROR, "A006", "계약서 분석 내 누락건으로 인해 분석 실패")
   NO_SEPARATOR_FOUND = (HTTPStatus.INTERNAL_SERVER_ERROR, "A007", "원문 분리 인자 발견 못함")
   UNSUPPORTED_FILE_TYPE = (HTTPStatus.BAD_REQUEST, "A008", "지원되지 않는 타입의 파일")
-
+  NOT_SUPPORTED_FORMAT = (HTTPStatus.BAD_REQUEST, "A009", "지원되지 않는 문서 형식")
 
   def __init__(self, status: HTTPStatus, code: str, message: str):
     self.status = status

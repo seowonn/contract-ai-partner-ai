@@ -9,11 +9,12 @@ from nltk import find
 from sklearn.manifold import TSNE
 import matplotlib.pyplot as plt
 
+from app.blueprints.agreement.agreement_exception import AgreementException
 from app.blueprints.standard.standard_exception import StandardException
 from app.clients.openai_clients import get_embedding_sync_client
 from app.common.constants import ARTICLE_CHUNK_PATTERN, ARTICLE_HEADER_PATTERN, \
   ARTICLE_CLAUSE_SEPARATOR, CLAUSE_HEADER_PATTERN, \
-  PROMPT_MODEL, ARTICLE_OCR_HEADER_PATTERN
+  PROMPT_MODEL, ARTICLE_OCR_HEADER_PATTERN, NUMBER_HEADER_PATTERN
 from app.common.exception.custom_exception import CommonException
 from app.common.exception.error_code import ErrorCode
 from app.containers.service_container import embedding_service
@@ -135,7 +136,7 @@ def chunk_legal_terms(extracted_text: str) -> List[ClauseChunk]:
   return chunks
 
 
-def chunk_by_article_and_clause_with_page(documents: List[Document]) -> List[
+def chunk_by_article_and_clause_with_page(documents: List[Document], pattern: str) -> List[
   DocumentChunk]:
   chunks: List[DocumentChunk] = []
 
@@ -150,9 +151,15 @@ def chunk_by_article_and_clause_with_page(documents: List[Document]) -> List[
       order_index, chunks = (
         chunk_preamble_content(page_text, chunks, page, order_index))
 
-    matches = re.findall(ARTICLE_OCR_HEADER_PATTERN, page_text, flags=re.DOTALL)
+    matches = re.findall(pattern, page_text, flags=re.DOTALL)
     for header, body in matches:
-      header_match = parse_article_header(header)
+      header_match = None
+
+      if pattern == NUMBER_HEADER_PATTERN:
+        header_match = parse_number_header(header)
+      elif pattern == ARTICLE_CHUNK_PATTERN:
+        header_match = parse_article_header(header)
+
       if not header_match:
         continue
 
@@ -196,24 +203,34 @@ def chunk_by_article_and_clause_with_page(documents: List[Document]) -> List[
   return chunks
 
 
-def parse_article_header(header: str) -> Tuple[int, str] | None:
-  header = header.replace(" ", "")  # 공백 제거
+def parse_article_header(header: str) -> Tuple[int, str]:
+  clean_header = header.replace(" ", "")
 
-  if not header.startswith("제") or "조" not in header:
-    return None
+
+  if not clean_header.startswith("제") or "조" not in clean_header:
+    raise AgreementException(ErrorCode.NOT_SUPPORTED_FORMAT)
 
   try:
-    num_part = header.split("조")[0].replace("제", "")
-    title_part = header.split("조")[1]
-
-    article_number = int(num_part)
-
-    # 제목 괄호 제거
-    article_title = title_part.strip("【】()[]")
-    return article_number, article_title
+    num_part = clean_header.split("조")[0].replace("제", "")
+    title_part = clean_header.split("조")[1]
+    title_without_parentheses = title_part.strip("【】()[]")
+    return int(num_part), title_without_parentheses
 
   except Exception:
-    return None
+    raise AgreementException(ErrorCode.NOT_SUPPORTED_FORMAT)
+
+
+def parse_number_header(header: str) -> Tuple[int, str]:
+  clean_header = header.replace(" ", "")
+
+  try:
+    num_part = clean_header.split(".")[0]
+    title_part = clean_header.split(".")[1]
+    title_without_parentheses = title_part.strip("【】()[]")
+    return int(num_part), title_without_parentheses
+
+  except Exception:
+    raise AgreementException(ErrorCode.NOT_SUPPORTED_FORMAT)
 
 
 def check_if_preamble_exists_except_first_page(page: int,
