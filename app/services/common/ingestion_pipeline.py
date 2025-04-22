@@ -13,9 +13,10 @@ from app.schemas.chunk_schema import ClauseChunk
 from app.schemas.chunk_schema import Document
 from app.schemas.chunk_schema import DocumentChunk, DocumentMetadata
 from app.schemas.document_request import DocumentRequest
-from app.services.agreement.ocr_service import extract_ocr
+from app.services.agreement.ocr_service import extract_ocr, \
+  vectorize_and_calculate_similarity_ocr
 from app.services.agreement.vectorize_similarity import \
-  vectorize_and_calculate_similarity_ocr, vectorize_and_calculate_similarity
+  vectorize_and_calculate_similarity
 from app.services.common.chunking_service import \
   chunk_by_article_and_clause_with_page, semantic_chunk, chunk_legal_terms
 from app.services.common.pdf_service import convert_to_bytes_io, \
