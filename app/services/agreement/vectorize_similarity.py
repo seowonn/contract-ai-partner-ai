@@ -137,9 +137,9 @@ async def process_clause(qd_client: AsyncQdrantClient, rag_result: RagResult,
     return ChunkProcessResult(status=ChunkProcessStatus.SUCCESS)
 
   rag_result.accuracy = score
-  rag_result.incorrect_part = corrected_result["incorrectPart"]
+  incorrect_part = corrected_result["incorrectPart"]
   all_positions, part_position = \
-    await find_text_positions(rag_result,byte_type_pdf)
+    await find_text_positions(rag_result,incorrect_part,byte_type_pdf)
   positions = await extract_positions_by_page(all_positions)
   part_positions = await extract_positions_by_page(part_position)
 
@@ -185,10 +185,10 @@ async def process_clause_ocr(qd_client: AsyncQdrantClient,
   if score < VIOLATION_THRESHOLD:
     return ChunkProcessResult(status=ChunkProcessStatus.SUCCESS)
 
-  rag_result.incorrect_part = corrected_result["incorrectPart"]
+  incorrect_part = corrected_result["incorrectPart"]
 
   all_positions, part_position = \
-    await find_text_positions_ocr(rag_result,
+    await find_text_positions_ocr(rag_result, incorrect_part,
                                   all_texts_with_bounding_boxes)
 
   rag_result.accuracy = score
@@ -376,7 +376,7 @@ def search_text_in_pdf(text: str, pdf_doc: fitz.Document, clause_data,
   return positions_by_page
 
 
-async def find_text_positions(rag_result: RagResult,
+async def find_text_positions(rag_result: RagResult, incorrect_part: str,
     pdf_document: fitz.Document) -> dict[str, dict[int, List[dict]]]:
 
   # incorrect_text 처리 (all_positions 용)
@@ -401,7 +401,7 @@ async def find_text_positions(rag_result: RagResult,
       all_positions[page].extend(boxes)
 
   # incorrect_part는 그대로 검색
-  part_position = search_text_in_pdf(rag_result.incorrect_part, pdf_document,
+  part_position = search_text_in_pdf(incorrect_part, pdf_document,
                                       rag_result.clause_data)
   for page, boxes in part_position.items():
     if page not in part_positions:
@@ -412,7 +412,7 @@ async def find_text_positions(rag_result: RagResult,
 
 
 
-async def find_text_positions_ocr(rag_result: RagResult,
+async def find_text_positions_ocr(rag_result: RagResult, incorrect_part: str,
     all_texts_with_bounding_boxes: List[dict]) -> tuple[List[tuple], List[tuple]]:
 
 
@@ -422,12 +422,12 @@ async def find_text_positions_ocr(rag_result: RagResult,
     rag_result.incorrect_text = clause_content[1].strip()
 
   # +를 기준으로 문장을 나누고 뒤에 있는 부분만 사용
-  part_clause_content = rag_result.incorrect_part.split('+', 1)
+  part_clause_content = incorrect_part.split('+', 1)
   if len(part_clause_content) > 1:
-    rag_result.incorrect_part = part_clause_content[1].strip()
+    incorrect_part = part_clause_content[1].strip()
 
   all_positions, part_positions = extract_bbox_positions(rag_result.incorrect_text,
-                                                         rag_result.incorrect_part,
+                                                         incorrect_part,
                                                          all_texts_with_bounding_boxes)
 
   return all_positions, part_positions

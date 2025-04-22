@@ -25,7 +25,6 @@ class RagResult:
   corrected_text: Optional[str] = None
   proof_text: Optional[str] = None
   accuracy: Optional[float] = None
-  incorrect_part: Optional[str] = None
   clause_data: List[ClauseData] = field(default_factory=list)
 
 @dataclass
