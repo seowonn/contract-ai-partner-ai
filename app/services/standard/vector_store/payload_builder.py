@@ -1,4 +1,5 @@
 from datetime import datetime
+from zoneinfo import ZoneInfo
 
 from app.containers.service_container import prompt_service
 from app.models.vector import VectorPayload, WordPayload
@@ -20,12 +21,13 @@ async def make_clause_payload(prompt_client, article, pdf_request,
     if not result:
       return None
 
+  korea_time = datetime.now(ZoneInfo("Asia/Seoul"))
   return VectorPayload(
       standard_id=pdf_request.id,
       incorrect_text=result.get("incorrect_text") or "",
       proof_text=article.clause_content,
       corrected_text=result.get("corrected_text") or "",
-      created_at=datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+      created_at=korea_time.strftime("%Y-%m-%d %H:%M:%S")
   )
 
 
@@ -40,11 +42,12 @@ async def make_word_payload(prompt_client, article: ClauseChunk, pdf_request,
     if not result:
       return None
 
+  korea_time = datetime.now(ZoneInfo("Asia/Seoul"))
   return WordPayload(
       standard_id=pdf_request.id,
       definition=article.clause_content,
       term=article.clause_number,
       meaning_difference=result.get("meaning_difference") or "",
       keywords=result.get("keyword") or [],
-      created_at=datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+      created_at=korea_time.strftime("%Y-%m-%d %H:%M:%S")
   )
