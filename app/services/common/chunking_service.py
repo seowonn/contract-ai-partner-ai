@@ -12,7 +12,8 @@ import matplotlib.pyplot as plt
 from app.blueprints.standard.standard_exception import StandardException
 from app.clients.openai_clients import get_embedding_sync_client
 from app.common.constants import ARTICLE_CHUNK_PATTERN, ARTICLE_HEADER_PATTERN, \
-  ARTICLE_CLAUSE_SEPARATOR, CLAUSE_HEADER_PATTERN, PROMPT_MODEL
+  ARTICLE_CLAUSE_SEPARATOR, CLAUSE_HEADER_PATTERN, \
+  PROMPT_MODEL, ARTICLE_OCR_HEADER_PATTERN
 from app.common.exception.custom_exception import CommonException
 from app.common.exception.error_code import ErrorCode
 from app.containers.service_container import embedding_service
@@ -149,7 +150,7 @@ def chunk_by_article_and_clause_with_page(documents: List[Document]) -> List[
       order_index, chunks = (
         chunk_preamble_content(page_text, chunks, page, order_index))
 
-    matches = re.findall(ARTICLE_CHUNK_PATTERN, page_text, flags=re.DOTALL)
+    matches = re.findall(ARTICLE_OCR_HEADER_PATTERN, page_text, flags=re.DOTALL)
     for header, body in matches:
       header_match = parse_article_header(header)
       if not header_match:

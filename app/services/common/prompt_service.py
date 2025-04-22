@@ -4,7 +4,29 @@ from typing import List, Any, Optional
 
 from openai import AsyncAzureOpenAI
 
+import re
+
 from app.schemas.analysis_response import SearchResult
+
+
+def clean_incorrect_part(text: str) -> str:
+  particles = ['은', '는', '이', '가', '을', '를', '의', '에', '에서', '보다', '로', '과',
+               '와']
+
+  for particle in particles:
+    # 마침표, 느낌표, 물음표 다음엔 조사 결합을 시도하지 않도록 예외 처리
+    # 단어 + 공백 + 조사 이고, 그 앞에 구두점이 **없을 때만** 붙이기
+    pattern = rf'(?<![\.!?])([가-힣])\s+{particle}(?=[\s\.,\)\"\'\”\’\]]|$)'
+    replacement = rf'\1{particle}'
+    text = re.sub(pattern, replacement, text)
+
+  # 2칸 이상 공백은 1칸으로 줄이기
+  text = re.sub(r'\s{2,}', ' ', text)
+
+  return text
+
+
+
 
 
 def clean_markdown_block(response_text: str) -> str | None:
@@ -19,6 +41,11 @@ def clean_markdown_block(response_text: str) -> str | None:
 
   try:
     parsed_response = json.loads(response_text_cleaned)
+    if "incorrectPart" in parsed_response:
+      parsed_response["incorrectPart"] = clean_incorrect_part(
+          parsed_response["incorrectPart"]
+      )
+
   except json.JSONDecodeError as e:
     logging.error(
         f"[PromptService]: jsonDecodeError: {e} | raw response: {response_text_cleaned}")
@@ -47,7 +74,7 @@ class PromptService:
               - 원문에 명확한 위배 문장이 없어 보여도, **해석 가능성이나 맥락에 근거해 위배 소지가 있는 문장을 추정해서 생성할 것**
               - **절대 원문 그대로 반환하지 말 것**
               - **맞춤법, 어휘 표현 개선은 하지 말고, 오직 불공정성/위배 가능성에만 초점 둘 것**
-      
+
               예시 출력 형식:
               {{
                 "incorrect_text": "업무를 인계받지 못한 공무원은 아무런 책임이 없다.",
@@ -118,10 +145,13 @@ class PromptService:
     response_text = response.choices[0].message.content
     return clean_markdown_block(response_text)
 
-
   async def correct_contract(self, prompt_client: AsyncAzureOpenAI,
       clause_content: str, search_results: List[SearchResult]) -> Optional[
     dict[str, Any]]:
+
+    clause_content = clause_content.replace("\n", " ")
+    clause_content = clause_content.replace("+", "")
+    clause_content = clause_content.replace("!!!", " ")
 
     input_data = {
       "clause_content": clause_content,
@@ -182,6 +212,12 @@ class PromptService:
               "correctedText": "계약서의 문장을 올바르게 교정한 문장",
               "proofText": "입력 데이터를 참조해 잘못된 포인트와 그 이유",
               "violation_score": "0.000 ~ 1.000 사이의 소수점 셋째 자리까지의 문자열"
+              "incorrectPart": clause_content에서 문제가 되는 부분 길이는 최대 단어 5개까지 똑같이 반환해주세요.
+                                     
+                                     아래 규칙을 지켜주세요
+                                     조사를 지우지 말고 완전한 문장을 반환하세요
+                                     clause_content 문장과 일치하지 않고 부분 내용이여야 합니다.
+                                     띄어쓰기, 온점, 반점, 괄호 등은 clause_content와 정확히 일치해야 합니다.
             }}
             
             [입력 데이터]
@@ -204,7 +240,7 @@ class PromptService:
 
     clause_content = clause_content.replace("\n", " ")
     clause_content = clause_content.replace("+", "")
-    clause_content = clause_content.replace("!!!", "")
+    clause_content = clause_content.replace("!!!", " ")
 
     # ✅ JSON 형식으로 변환할 데이터
     input_data = {
@@ -236,33 +272,39 @@ class PromptService:
                 노동자에게 불리한 문장을 교정하고 그 이유를 proofText 에 설명해 주세요.
                 입력 데이터 변수명을 proofText 에 포함시키면 안됩니다.
                 근로자와의 협의를 덜 고려해 주세요.                    
+                띄어쓰기와 조사 오류 없이 자연스러운 한국어로 출력해 주세요
 
-            틀린 확률이 높아보인다면 violation_score를 높게 반환해 주세요.
-            문법적인 측면이 아닌 내용적인 측면에서 교정해 주세요.
+                틀린 확률이 높아보인다면 violation_score를 높게 반환해 주세요.
+                내용적인 측면에서 교정해 주세요.
+    
+                [입력 데이터 설명]
+                - clause_content: 계약서 문장
+                - proof_text: 법률 문서의 문장 목록
+                - incorrect_text: 법률 위반할 가능성이 있는 예시 문장 
+                - corrected_text: 법률 위반 가능성이 있는 예시 문장을 올바르게 수정한 문장 목록
+    
+                [입력 데이터]
+                {json.dumps(input_data, ensure_ascii=False, indent=2)}
+    
+                [출력 형식]
+                {{
+                    "clause_content": "계약서 원문"
+                    "correctedText": "계약서의 문장을 올바르게 교정한 문장",
+                    "proofText": "입력 데이터를 참조해 이유설명"
+                    "violation_score": "문장이 틀리거나 법률을 위배할 확률 "
+                    "incorrectPart": clause_content에서 문제가 되는 부분 길이는 최대 단어 5개까지 똑같이 반환해주세요.
+                                     
+                                     아래 규칙을 지켜주세요
+                                     조사를 지우지 말고 완전한 문장을 반환하세요
+                                     clause_content 문장과 일치하지 않고 부분 내용이여야 합니다.
+                                     띄어쓰기, 온점, 반점, 괄호 등은 clause_content와 정확히 일치해야 합니다.
+                }}
 
-            [입력 데이터 설명]
-            - clause_content: 계약서 문장
-            - proof_text: 법률 문서의 문장 목록
-            - incorrect_text: 법률 위반할 가능성이 있는 예시 문장 
-            - corrected_text: 법률 위반 가능성이 있는 예시 문장을 올바르게 수정한 문장 목록
-
-            [입력 데이터]
-            {json.dumps(input_data, ensure_ascii=False, indent=2)}
-
-            [출력 형식]
-            각 항목은 반드시 문자열(string) 형태로 출력할 것:
-            {{
-              "correctedText": "계약서의 문장을 올바르게 교정한 문장",
-              "proofText": "입력 데이터를 참조해 잘못된 포인트와 그 이유",
-              "violation_score": "0.000 ~ 1.000 사이의 소수점 셋째 자리까지 정확한 문자열 (예: '0.742', '0.687', '0.913')"
-            }}
-
-            주의 사항:
-            - JSON 외의 다른 텍스트는 절대 출력하지 마세요.
-            - `violation_score`는 반드시 **의미 있는 소수점 셋째 자리까지** 생성해 주세요.
-            - 단순히 '0.750', '0.500'과 같이 반복되는 패턴이 아닌, **상황에 맞게 다양하고 구체적인 값**을 반환하세요.
-
-          """
+    
+                json 바깥에는 아무것도 반환하지 마세요
+                violation_score는 0~1 범위의 소수점 셋째자리까지 반환해 주세요. 
+    
+              """
           }
         ],
         temperature=0.1,
@@ -283,6 +325,13 @@ class PromptService:
 
     try:
       parsed_response = json.loads(pure_json)
+
+      if "incorrectPart" in parsed_response:
+
+        parsed_response["incorrectPart"] = clean_incorrect_part(
+            parsed_response["incorrectPart"]
+        )
+
     except json.JSONDecodeError:
       logging.error(
           f"[PromptService] 응답이 JSON 형식이 아님:\n{response_text_cleaned}"

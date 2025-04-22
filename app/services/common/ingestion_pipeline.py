@@ -9,11 +9,13 @@ from app.common.exception.custom_exception import CommonException
 from app.common.exception.error_code import ErrorCode
 from app.common.file_type import FileType
 from app.schemas.analysis_response import RagResult, ClauseData
+from app.schemas.chunk_schema import ClauseChunk
 from app.schemas.chunk_schema import Document
-from app.schemas.chunk_schema import DocumentChunk, ClauseChunk
+from app.schemas.chunk_schema import DocumentChunk, DocumentMetadata
 from app.schemas.document_request import DocumentRequest
+from app.services.agreement.ocr_service import extract_ocr
 from app.services.agreement.vectorize_similarity import \
-  vectorize_and_calculate_similarity
+  vectorize_and_calculate_similarity_ocr, vectorize_and_calculate_similarity
 from app.services.common.chunking_service import \
   chunk_by_article_and_clause_with_page, semantic_chunk, chunk_legal_terms
 from app.services.common.pdf_service import convert_to_bytes_io, \
@@ -22,7 +24,20 @@ from app.services.common.s3_service import s3_get_object
 
 
 def ocr_service(document_request: DocumentRequest):
-  pass
+  full_text, all_texts_with_bounding_boxes = extract_ocr(document_request.url)
+
+  documents: List[Document] = [
+    Document(page_content=full_text, metadata=DocumentMetadata(page=1))]
+
+  document_chunks = chunk_agreement_documents(documents)
+  combined_chunks = combine_chunks_by_clause_number(document_chunks)
+
+  # 입력값이 다르기에 함수가 분리되어야 함
+  chunks = asyncio.run(
+      vectorize_and_calculate_similarity_ocr(combined_chunks, document_request,
+                                             all_texts_with_bounding_boxes))
+
+  return chunks, len(combined_chunks), len(documents)
 
 
 def pdf_agreement_service(document_request: DocumentRequest) -> Tuple[

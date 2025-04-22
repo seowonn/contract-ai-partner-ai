@@ -7,6 +7,7 @@ class ClauseData:
   order_index: int = 0
   page: int = 0
   position: List[List[float]] = field(default_factory=list)
+  position_part: Optional[List[List[float]]] = field(default_factory=list)
 
 @dataclass
 class SearchResult:
