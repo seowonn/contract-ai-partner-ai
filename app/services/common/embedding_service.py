@@ -3,6 +3,7 @@ from typing import List
 import numpy as np
 from openai import AsyncAzureOpenAI, AzureOpenAI
 
+from app.common.decorators import async_measure_time
 from app.common.exception.custom_exception import CommonException
 from app.common.exception.error_code import ErrorCode
 
@@ -14,6 +15,7 @@ class EmbeddingService:
     self.deployment_name = deployment_name
 
 
+  @async_measure_time
   async def batch_embed_texts(self, embedding_client: AsyncAzureOpenAI,
       inputs: List[str]) -> List[List[float]]:
 

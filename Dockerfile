@@ -12,7 +12,11 @@ RUN pip install --upgrade pip && \
     pip install -r requirements.txt && \
     pip install gunicorn && \
     python -c "import nltk; nltk.download('punkt'); nltk.download('punkt_tab')"
-RUN apt-get update && apt-get install -y curl
+RUN apt-get update && apt-get install -y \
+    curl \
+    libgl1-mesa-glx \
+    libglib2.0-0
+
 
 COPY . .
 

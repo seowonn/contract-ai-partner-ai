@@ -1,4 +1,3 @@
-import os
 import re
 from typing import List
 from typing import Optional, Tuple
@@ -13,8 +12,9 @@ import matplotlib.pyplot as plt
 from app.blueprints.standard.standard_exception import StandardException
 from app.clients.openai_clients import get_embedding_sync_client
 from app.common.constants import ARTICLE_CHUNK_PATTERN, ARTICLE_HEADER_PATTERN, \
-  ARTICLE_CLAUSE_SEPARATOR, ARTICLE_HEADER_PARSE_PATTERN, CLAUSE_HEADER_PATTERN, \
-  PROMPT_MODEL
+  ARTICLE_CLAUSE_SEPARATOR, CLAUSE_HEADER_PATTERN, \
+  PROMPT_MODEL, ARTICLE_OCR_HEADER_PATTERN
+from app.common.exception.custom_exception import CommonException
 from app.common.exception.error_code import ErrorCode
 from app.containers.service_container import embedding_service
 from app.schemas.chunk_schema import ArticleChunk, ClauseChunk, DocumentChunk
@@ -24,14 +24,14 @@ MIN_CLAUSE_BODY_LENGTH = 20
 
 
 def semantic_chunk(extracted_text: str, similarity_threshold: float = 0.9,
-    max_tokens: int = 250, visualize: bool = False) -> List[str]:
+    max_tokens: int = 250, visualize: bool = False) -> List[ClauseChunk]:
   sentences = split_into_sentences(extracted_text)
   sentences = [s for s in sentences if len(s.strip()) > MIN_CLAUSE_BODY_LENGTH]
   if not sentences:
     raise StandardException(ErrorCode.CHUNKING_FAIL)
 
-  embedding_client = get_embedding_sync_client()
-  embeddings = embedding_service.batch_sync_embed_texts(embedding_client, sentences)
+  with get_embedding_sync_client() as embedding_client:
+      embeddings = embedding_service.batch_sync_embed_texts(embedding_client, sentences)
 
   chunks = []
   current_chunk = [sentences[0]]
@@ -44,7 +44,7 @@ def semantic_chunk(extracted_text: str, similarity_threshold: float = 0.9,
 
     if similarity < similarity_threshold or token_len > max_tokens:
       chunk_text = " ".join(current_chunk)
-      chunks.append(chunk_text)
+      chunks.append(ClauseChunk(clause_content=chunk_text))
       current_chunk = [sentences[i]]
     else:
       current_chunk.append(sentences[i])
@@ -59,6 +59,8 @@ def semantic_chunk(extracted_text: str, similarity_threshold: float = 0.9,
     except Exception as e:
       print(f"[시각화 오류] {e}")
 
+  if not chunks:
+    raise CommonException(ErrorCode.CHUNKING_FAIL)
   return chunks
 
 
@@ -68,16 +70,16 @@ def cosine(a: List[float], b: List[float]) -> float:
   return np.dot(a, b) / (np.linalg.norm(a) * np.linalg.norm(b))
 
 
-def append_chunk_if_valid(chunks: List[str], current_chunk: List[str]):
+def append_chunk_if_valid(chunks: List[ClauseChunk], current_chunk: List[str]):
   chunk_text = " ".join(current_chunk)
   if len(chunk_text.strip()) >= MIN_CLAUSE_BODY_LENGTH:
-    chunks.append(chunk_text)
+    chunks.append(ClauseChunk(clause_content=chunk_text))
 
 
 def visualize_embeddings_3d(embeddings: List[List[float]], sentences: List[str],
-    chunks: List[str]):
+    chunks: List[ClauseChunk]):
   for idx, chunk in enumerate(chunks):
-    print(f"[청크 {idx}] 길이: {len(chunk)} / 토큰 수: {count_tokens(chunk)}")
+    print(f"[청크 {idx}] 길이: {len(chunk.clause_content)} / 토큰 수: {count_tokens(chunk.clause_content)}")
 
   plt.rcParams['font.family'] = 'Malgun Gothic'  # 또는 'AppleGothic'
   plt.rcParams['axes.unicode_minus'] = False
@@ -94,7 +96,7 @@ def visualize_embeddings_3d(embeddings: List[List[float]], sentences: List[str],
     ax.text(x, y, z, text[:30] + "...", size=9)
   ax.set_title("Semantic Embedding 결과")
   plt.tight_layout()
-  plt.show()
+  plt.savefig("semantic_embedding_result")
 
 
 def ensure_punkt():
@@ -110,7 +112,7 @@ def split_into_sentences(extracted_text: str):
 
 
 def count_tokens(text: str) -> int:
-  encoding = tiktoken.encoding_for_model(PROMPT_MODEL)
+  encoding = tiktoken.encoding_for_model("gpt-4o-mini")
   return len(encoding.encode(text))
 
 
@@ -118,45 +120,19 @@ def split_text_by_pattern(text: str, pattern: str) -> List[str]:
   return re.split(pattern, text)
 
 
-def chunk_by_article_and_clause(extracted_text: str) -> List[ArticleChunk]:
-  article_pattern = r'\n(제\s*\d+조(?:\([^)]+\))?)'  # 조(Article) 기준 정규식
-
-  chunks = split_text_by_pattern(extracted_text, article_pattern)
-  result: List[ArticleChunk] = []
-
-  for i in range(1, len(chunks), 2):
-    article_title = chunks[i].strip()
-    article_body = chunks[i + 1].strip() if i + 1 < len(chunks) else ""
-
-    clauses = []
-
-    # ⭐ 항이 ① 또는 1. 로만 시작한다는 전제 (따라서 기준문서도 이에 맞는 문서만 필요)
-    first_clause_match = re.search(r'(①|1\.)', article_body)
-    if first_clause_match is None:
-      result.append(
-          ArticleChunk(article_title=article_title + article_body, clauses=[]))
-      continue
-
-    match_idx = first_clause_match.start()
-    article_title += ' ' + article_body[:match_idx]
-    if first_clause_match:
-      clause_pattern = r'([\n\s]*[①-⑨])' if first_clause_match.group(
-          1) == '①' else r'(\n\s*\d+\.)'
-      clause_chunks = split_text_by_pattern("\n" + article_body[match_idx:],
-                                            clause_pattern)
-
-      for j in range(1, len(clause_chunks), 2):
-        clause_title = clause_chunks[j].strip()
-        clause_body = clause_chunks[j + 1].strip() if j + 1 < len(
-            clause_chunks) else ""
-
-        if len(clause_body) >= MIN_CLAUSE_BODY_LENGTH:
-          clauses.append(
-              ClauseChunk(clause_number=clause_title,
-                          clause_content=clause_body))
-      result.append(ArticleChunk(article_title=article_title, clauses=clauses))
-
-  return result
+def chunk_legal_terms(extracted_text: str) -> List[ClauseChunk]:
+  chunks = []
+  blocks = re.split(r'○\s\n*', extracted_text)
+  for block in blocks:
+    parts = block.split('\n', 1)
+    if len(parts) == 2 and parts[1]:
+      title, body = parts[0], parts[1]
+      title = title.split('(', 1)[0]
+      clauses = semantic_chunk(body, max_tokens=150, similarity_threshold=0.3)
+      for clause in clauses:
+        clause.clause_number = title
+      chunks.extend(clauses)
+  return chunks
 
 
 def chunk_by_article_and_clause_with_page(documents: List[Document]) -> List[
@@ -174,7 +150,7 @@ def chunk_by_article_and_clause_with_page(documents: List[Document]) -> List[
       order_index, chunks = (
         chunk_preamble_content(page_text, chunks, page, order_index))
 
-    matches = re.findall(ARTICLE_CHUNK_PATTERN, page_text, flags=re.DOTALL)
+    matches = re.findall(ARTICLE_OCR_HEADER_PATTERN, page_text, flags=re.DOTALL)
     for header, body in matches:
       header_match = parse_article_header(header)
       if not header_match:

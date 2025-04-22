@@ -12,6 +12,7 @@ ARTICLE_CLAUSE_SEPARATOR = "+"
 MAX_RETRIES = 5
 LLM_TIMEOUT = 30.0
 
-PROMPT_MODEL = "gpt-4o-mini"
+PROMPT_MODEL = "gpt-4.1-mini"
 EMBEDDING_MODEL = "text-embedding-3-small"
 
+ARTICLE_OCR_HEADER_PATTERN = r'(제\s*\d+\s*조\s*[【\[].*?[】\]])\s*(.*?)(?=제\s*\d+\s*조|$)'

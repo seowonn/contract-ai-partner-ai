@@ -7,12 +7,17 @@ class ClauseData:
   order_index: int = 0
   page: int = 0
   position: List[List[float]] = field(default_factory=list)
+  position_part: Optional[List[List[float]]] = field(default_factory=list)
 
 @dataclass
 class SearchResult:
   proof_text: str
   incorrect_text: str
   corrected_text: str
+  term: str
+  meaning_difference: str
+  definition: str
+  keywords: str
 
 @dataclass
 class RagResult:
