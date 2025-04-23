@@ -1,7 +1,6 @@
 import asyncio
 import json
 import logging
-import os
 import re
 import time
 import uuid
@@ -10,10 +9,10 @@ from typing import List, Tuple
 import cv2
 import numpy as np
 import requests
-from dotenv import load_dotenv
 from qdrant_client import AsyncQdrantClient
 
 from app.blueprints.agreement.agreement_exception import AgreementException
+from app.clients.naver_clients import get_naver_ocr_client
 from app.clients.openai_clients import get_embedding_async_client, \
   get_prompt_async_client
 from app.clients.qdrant_client import get_qdrant_client
@@ -32,11 +31,8 @@ from app.services.common.chunking_service import MIN_CLAUSE_BODY_LENGTH, \
 from app.services.common.llm_retry import retry_llm_call
 from app.services.common.qdrant_utils import ensure_qdrant_collection
 
-# .env 파일에서 환경변수 불러오기
-load_dotenv()
 
-NAVER_CLOVA_API_URL = os.getenv("NAVER_CLOVA_API_URL")
-NAVER_CLOVA_API_KEY = os.getenv("NAVER_CLOVA_API_KEY")
+# .env 파일에서 환경변수 불러오기
 
 
 def chunk_preamble_content_ocr(page_text: str, chunks: List[DocumentChunk],
@@ -90,9 +86,6 @@ def append_preamble_ocr(result: List[DocumentChunk], preamble: str,
 
 
 def extract_ocr(image_url: str) -> Tuple[str, List[dict]]:
-
-  # URL에서 이미지를 다운로드
-
   image_response = requests.get(image_url)
   image_data = image_response.content
 
@@ -129,7 +122,7 @@ def extract_ocr(image_url: str) -> Tuple[str, List[dict]]:
     'timestamp': int(round(time.time() * 1000))
   }
 
-
+  api_url, headers = get_naver_ocr_client()
   payload = {'message': json.dumps(request_json).encode('UTF-8')}
 
   # 전송을 위한 인코딩
@@ -138,12 +131,9 @@ def extract_ocr(image_url: str) -> Tuple[str, List[dict]]:
     'photo1_binary_low.jpg', cv2.imencode('.jpg', binarized_img)[1].tobytes(),
     'image/jpeg'))  # 이진화된 이미지를 바이너리로 전송
   ]
-  headers = {
-    'X-OCR-SECRET': NAVER_CLOVA_API_KEY
-  }
 
   try:
-    response = requests.request("POST", NAVER_CLOVA_API_URL, headers=headers, data=payload,
+    response = requests.request("POST", api_url, headers=headers, data=payload,
                               files=files)
   except Exception:
     raise AgreementException(ErrorCode.NAVER_OCR_REQUEST_FAIL)
