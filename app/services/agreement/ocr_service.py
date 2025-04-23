@@ -142,9 +142,12 @@ def extract_ocr(image_url: str) -> Tuple[str, List[dict]]:
     'X-OCR-SECRET': NAVER_CLOVA_API_KEY
   }
 
-  # OCR 요청 보내기
-  response = requests.request("POST", NAVER_CLOVA_API_URL, headers=headers, data=payload,
+  try:
+    response = requests.request("POST", NAVER_CLOVA_API_URL, headers=headers, data=payload,
                               files=files)
+  except Exception:
+    raise AgreementException(ErrorCode.NAVER_OCR_REQUEST_FAIL)
+
   ocr_results = json.loads(response.text)
 
   image_height, image_width = binarized_img.shape[:2]
