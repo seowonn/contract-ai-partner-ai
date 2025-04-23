@@ -3,7 +3,7 @@ from contextlib import asynccontextmanager, contextmanager
 
 import httpx
 from dotenv import load_dotenv
-from openai import AsyncOpenAI, OpenAI, AsyncAzureOpenAI, AzureOpenAI
+from openai import AsyncAzureOpenAI, AzureOpenAI
 
 from app.common.constants import EMBEDDING_MODEL, PROMPT_MODEL
 

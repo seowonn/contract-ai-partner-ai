@@ -1,7 +1,6 @@
 import asyncio
 import json
 import logging
-import os
 import re
 import time
 import uuid
@@ -10,7 +9,6 @@ from typing import List, Tuple
 import cv2
 import numpy as np
 import requests
-from dotenv import load_dotenv
 from qdrant_client import AsyncQdrantClient
 
 from app.blueprints.agreement.agreement_exception import AgreementException
@@ -32,6 +30,7 @@ from app.services.common.chunking_service import MIN_CLAUSE_BODY_LENGTH, \
   get_clause_pattern, split_text_by_pattern
 from app.services.common.llm_retry import retry_llm_call
 from app.services.common.qdrant_utils import ensure_qdrant_collection
+
 
 # .env 파일에서 환경변수 불러오기
 

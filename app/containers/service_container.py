@@ -1,4 +1,4 @@
-from app.clients.openai_clients import embedding_deployment_name, prompt_deployment_name,openai_client
+from app.clients.openai_clients import embedding_deployment_name, prompt_deployment_name
 from app.services.common.embedding_service import EmbeddingService
 from app.services.common.prompt_service import PromptService
 
