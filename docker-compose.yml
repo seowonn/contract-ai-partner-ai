@@ -8,9 +8,9 @@ services:
     environment:
       - APP_ENV=prod
       - FLASK_ENV=production # 운영 모드
-      - OPENAI_API_KEY=${OPENAI_API_KEY}
-      - NAVER_CLOVA_API_KEY=${NAVER_CLOVA_API_KEY}
-      - NAVER_CLOVA_API_URL=${NAVER_CLOVA_API_URL}
+      - OPENAI_API_KEY: ${OPENAI_API_KEY}
+      - NAVER_CLOVA_API_KEY: ${NAVER_CLOVA_API_KEY}
+      - NAVER_CLOVA_API_URL: ${NAVER_CLOVA_API_URL}
     depends_on:
       - qdrant # Qdrant 먼저 시작
     restart: always # 서버 재시작 시 자동 복구
