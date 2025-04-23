@@ -33,10 +33,6 @@ from app.services.common.llm_retry import retry_llm_call
 from app.services.common.qdrant_utils import ensure_qdrant_collection
 
 # .env 파일에서 환경변수 불러오기
-load_dotenv()
-
-NAVER_CLOVA_API_URL = os.getenv("NAVER_CLOVA_API_URL")
-NAVER_CLOVA_API_KEY = os.getenv("NAVER_CLOVA_API_KEY")
 
 
 def chunk_preamble_content_ocr(page_text: str, chunks: List[DocumentChunk],
@@ -92,10 +88,14 @@ def append_preamble_ocr(result: List[DocumentChunk], preamble: str,
 def extract_ocr(image_url: str) -> Tuple[str, List[dict]]:
   logging.info(f"image_url: {image_url}")
   # URL에서 이미지를 다운로드
+  load_dotenv()
+
+  NAVER_CLOVA_API_URL = os.getenv("NAVER_CLOVA_API_URL")
+  NAVER_CLOVA_API_KEY = os.getenv("NAVER_CLOVA_API_KEY")
+
 
   image_response = requests.get(image_url)
   image_data = image_response.content
-  logging.info(f"image_response: {image_response}")
 
   # 이미지 열기 (바이너리로 읽은 데이터를 사용)
 
@@ -143,7 +143,6 @@ def extract_ocr(image_url: str) -> Tuple[str, List[dict]]:
     'X-OCR-SECRET': NAVER_CLOVA_API_KEY
   }
   logging.info(f"headers: {headers}")
-  logging.info(f"payload: {payload}")
 
   try:
     response = requests.request("POST", NAVER_CLOVA_API_URL, headers=headers, data=payload,
