@@ -1,3 +1,4 @@
+import logging
 import os
 from contextlib import asynccontextmanager, contextmanager
 
@@ -51,6 +52,8 @@ async def get_prompt_async_client():
         azure_endpoint=os.getenv("AZURE_PROMPT_OPENAI_ENDPOINT"),
         http_client=httpx_client
     ) as client:
+      ad = os.getenv("AZURE_PROMPT_OPENAI_ENDPOINT")
+      logging.info(f"endpoint: {ad}")
       yield client
 
 prompt_deployment_name = PROMPT_MODEL
