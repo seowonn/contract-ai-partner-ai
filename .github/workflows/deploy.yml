@@ -77,8 +77,21 @@ jobs:
           git fetch origin
           git checkout ${{ github.ref_name }}
           git pull origin ${{ github.ref_name }}
+
+          # ✅ .env 파일 생성
+          cat <<ENV > .env
+          OPENAI_API_KEY=${{ secrets.OPENAI_API_KEY }}
+          AZURE_EMBEDDING_API_KEY=${{ secrets.AZURE_EMBEDDING_API_KEY }}
+          AZURE_EMBEDDING_OPENAI_ENDPOINT=${{ secrets.AZURE_EMBEDDING_OPENAI_ENDPOINT }}
+          AZURE_PROMPT_API_KEY=${{ secrets.AZURE_PROMPT_API_KEY }}
+          AZURE_PROMPT_OPENAI_ENDPOINT=${{ secrets.AZURE_PROMPT_OPENAI_ENDPOINT }}
+          PLATFORM_API_URL=${{ secrets.PLATFORM_API_URL }}
+          PLATFORM_API_KEY=${{ secrets.PLATFORM_API_KEY }}
+          ENV
+
           docker-compose up -d --build
           echo "[✅ Flask 서버 배포 완료]"
           EOC
           EOF
+
 
