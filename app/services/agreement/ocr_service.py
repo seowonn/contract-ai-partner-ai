@@ -35,6 +35,9 @@ from app.services.common.qdrant_utils import ensure_qdrant_collection
 # .env 파일에서 환경변수 불러오기
 load_dotenv()
 
+NAVER_CLOVA_API_URL = os.getenv("NAVER_CLOVA_API_URL")
+NAVER_CLOVA_API_KEY = os.getenv("NAVER_CLOVA_API_KEY")
+
 
 def chunk_preamble_content_ocr(page_text: str, chunks: List[DocumentChunk],
     order_index: int) -> Tuple[int, List[DocumentChunk]]:
@@ -87,8 +90,6 @@ def append_preamble_ocr(result: List[DocumentChunk], preamble: str,
 
 
 def extract_ocr(image_url: str) -> Tuple[str, List[dict]]:
-  NAVER_CLOVA_API_URL = os.getenv("NAVER_CLOVA_API_URL")
-  NAVER_CLOVA_API_KEY = os.getenv("NAVER_CLOVA_API_KEY")
   logging.info(f"image_url: {image_url}")
   # URL에서 이미지를 다운로드
 
