@@ -2,8 +2,6 @@ import asyncio
 import re
 from typing import List, Tuple
 
-import fitz
-
 from app.common.constants import CLAUSE_TEXT_SEPARATOR, ARTICLE_CHUNK_PATTERN, \
   ARTICLE_OCR_HEADER_PATTERN, NUMBER_HEADER_PATTERN
 from app.common.exception.custom_exception import CommonException
@@ -20,9 +18,7 @@ from app.services.agreement.vectorize_similarity import \
   vectorize_and_calculate_similarity
 from app.services.common.chunking_service import \
   chunk_by_article_and_clause_with_page, semantic_chunk, chunk_legal_terms
-from app.services.common.pdf_service import convert_to_bytes_io, \
-  parse_pdf_to_documents, extract_fitz_document_from_pdf_io
-from app.services.common.s3_service import s3_get_object
+from app.services.common.pdf_service import preprocess_pdf
 
 
 def ocr_service(document_request: DocumentRequest):
@@ -31,7 +27,8 @@ def ocr_service(document_request: DocumentRequest):
   documents: List[Document] = [
     Document(page_content=full_text, metadata=DocumentMetadata(page=1))]
 
-  document_chunks = chunk_agreement_documents(documents, ARTICLE_OCR_HEADER_PATTERN)
+  document_chunks = chunk_agreement_documents(documents,
+                                              ARTICLE_OCR_HEADER_PATTERN)
   combined_chunks = combine_chunks_by_clause_number(document_chunks)
 
   # 입력값이 다르기에 함수가 분리되어야 함
@@ -44,14 +41,7 @@ def ocr_service(document_request: DocumentRequest):
 
 def pdf_agreement_service(document_request: DocumentRequest) -> Tuple[
   List[RagResult], int, int]:
-  s3_stream = s3_get_object(document_request.url)
-  pdf_bytes_io = convert_to_bytes_io(s3_stream)
-  fitz_document = extract_fitz_document_from_pdf_io(pdf_bytes_io)
-  documents = parse_pdf_to_documents(fitz_document)
-
-  if not documents:
-    raise CommonException(ErrorCode.NO_TEXTS_EXTRACTED)
-
+  documents, fitz_document = preprocess_pdf(document_request)
   document_chunks = chunk_agreement_documents(documents, ARTICLE_CHUNK_PATTERN)
   combined_chunks = combine_chunks_by_clause_number(document_chunks)
   chunks = asyncio.run(
@@ -59,18 +49,6 @@ def pdf_agreement_service(document_request: DocumentRequest) -> Tuple[
                                          fitz_document))
 
   return chunks, len(combined_chunks), len(documents)
-
-
-def preprocess_data(document_request: DocumentRequest) -> Tuple[
-  List[Document], fitz.Document]:
-  s3_stream = s3_get_object(document_request.url)
-  pdf_bytes_io = convert_to_bytes_io(s3_stream)
-  fitz_document = extract_fitz_document_from_pdf_io(pdf_bytes_io)
-  documents = parse_pdf_to_documents(fitz_document)
-
-  if not documents:
-    raise CommonException(ErrorCode.NO_TEXTS_EXTRACTED)
-  return documents, fitz_document
 
 
 def extract_file_type(url: str) -> FileType:
@@ -99,7 +77,7 @@ def chunk_standard_texts(documents: List[Document], category: str,
 
 
 def chunk_agreement_documents(documents: List[Document], split_pattern: str) -> \
-List[DocumentChunk]:
+    List[DocumentChunk]:
   chunks = chunk_by_article_and_clause_with_page(documents, split_pattern)
   # keep_text, _ = chunks[0].clause_content.split("1.", 1)
   # chunks[0].clause_content = keep_text
@@ -108,7 +86,8 @@ List[DocumentChunk]:
   # del chunks[-1]
 
   if not chunks:
-    chunks = chunk_by_article_and_clause_with_page(documents, NUMBER_HEADER_PATTERN)
+    chunks = chunk_by_article_and_clause_with_page(documents,
+                                                   NUMBER_HEADER_PATTERN)
 
   if not chunks:
     raise CommonException(ErrorCode.CHUNKING_FAIL)
