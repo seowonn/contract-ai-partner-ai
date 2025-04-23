@@ -45,6 +45,7 @@ class ErrorCode(Enum):
   NO_SEPARATOR_FOUND = (HTTPStatus.INTERNAL_SERVER_ERROR, "A007", "원문 분리 인자 발견 못함")
   UNSUPPORTED_FILE_TYPE = (HTTPStatus.BAD_REQUEST, "A008", "지원되지 않는 타입의 파일")
   NOT_SUPPORTED_FORMAT = (HTTPStatus.BAD_REQUEST, "A009", "지원되지 않는 문서 형식")
+  NAVER_OCR_REQUEST_FAIL = (HTTPStatus.INTERNAL_SERVER_ERROR, "A010", "네이버 OCR 요청 실패")
 
   def __init__(self, status: HTTPStatus, code: str, message: str):
     self.status = status
