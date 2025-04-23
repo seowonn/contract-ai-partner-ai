@@ -14,8 +14,7 @@ from app.blueprints.agreement.agreement_exception import AgreementException
 from app.blueprints.standard.standard_exception import StandardException
 from app.clients.openai_clients import get_embedding_sync_client
 from app.common.constants import ARTICLE_CHUNK_PATTERN, ARTICLE_HEADER_PATTERN, \
-  ARTICLE_CLAUSE_SEPARATOR, CLAUSE_HEADER_PATTERN, \
-  NUMBER_HEADER_PATTERN, ARTICLE_OCR_HEADER_PATTERN
+  ARTICLE_CLAUSE_SEPARATOR, CLAUSE_HEADER_PATTERN, NUMBER_HEADER_PATTERN
 from app.common.exception.custom_exception import CommonException
 from app.common.exception.error_code import ErrorCode
 from app.containers.service_container import embedding_service
@@ -147,11 +146,11 @@ def chunk_by_article_and_clause_with_page(documents: List[Document],
     page_text = doc.page_content
     order_index = 1
 
-    # preamble_exists = check_if_preamble_exists_except_first_page(page,
-    #                                                              page_text)
-    # if preamble_exists:
-    #   order_index, chunks = (
-    #     chunk_preamble_content(page_text, chunks, page, order_index))
+    preamble_exists = check_if_preamble_exists_except_first_page(page,
+                                                                 page_text)
+    if preamble_exists:
+      order_index, chunks = (
+        chunk_preamble_content(page_text, chunks, page, order_index))
 
     matches = re.findall(pattern, page_text, flags=re.DOTALL)
     for header, body in matches:
