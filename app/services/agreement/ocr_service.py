@@ -37,6 +37,8 @@ load_dotenv()
 
 NAVER_CLOVA_API_URL = os.getenv("NAVER_CLOVA_API_URL")
 NAVER_CLOVA_API_KEY = os.getenv("NAVER_CLOVA_API_KEY")
+logging.info(f"NAVER_CLOVA_API_URL: {NAVER_CLOVA_API_URL}")
+logging.info(f"NAVER_CLOVA_API_KEY: {NAVER_CLOVA_API_KEY}")
 
 
 def chunk_preamble_content_ocr(page_text: str, chunks: List[DocumentChunk],
