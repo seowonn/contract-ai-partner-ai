@@ -21,14 +21,14 @@ jobs:
         AZURE_EMBEDDING_OPENAI_ENDPOINT: ${{ secrets.AZURE_EMBEDDING_OPENAI_ENDPOINT }}
         AZURE_PROMPT_API_KEY: ${{ secrets.AZURE_PROMPT_API_KEY }}
         AZURE_PROMPT_OPENAI_ENDPOINT: ${{ secrets.AZURE_PROMPT_OPENAI_ENDPOINT }}
-        PLATFORM_API_URL: ${{ secrets.PLATFORM_API_URL }}
-        PLATFORM_API_KEY: ${{ secrets.PLATFORM_API_KEY }}
+        NAVER_CLOVA_API_URL: ${{ secrets.NAVER_CLOVA_API_URL }}
+        NAVER_CLOVA_API_KEY: ${{ secrets.NAVER_CLOVA_API_KEY }}
 
 
     - name: Check environment variables
       run: |
-        echo "PLATFORM_API_URL: $PLATFORM_API_URL"
-        echo "PLATFORM_API_KEY: $PLATFORM_API_KEY"
+        echo "NAVER_CLOVA_API_URL: NAVER_CLOVA_API_URL"
+        echo "NAVER_CLOVA_API_KEY: NAVER_CLOVA_API_KEY"
         echo "AZURE_EMBEDDING_API_KEY: $AZURE_EMBEDDING_API_KEY"
         echo "AZURE_PROMPT_API_KEY: $AZURE_PROMPT_API_KEY"
         echo "AZURE_PROMPT_OPENAI_ENDPOINT: $AZURE_PROMPT_OPENAI_ENDPOINT"
@@ -85,8 +85,8 @@ jobs:
           AZURE_EMBEDDING_OPENAI_ENDPOINT=${{ secrets.AZURE_EMBEDDING_OPENAI_ENDPOINT }}
           AZURE_PROMPT_API_KEY=${{ secrets.AZURE_PROMPT_API_KEY }}
           AZURE_PROMPT_OPENAI_ENDPOINT=${{ secrets.AZURE_PROMPT_OPENAI_ENDPOINT }}
-          PLATFORM_API_URL=${{ secrets.PLATFORM_API_URL }}
-          PLATFORM_API_KEY=${{ secrets.PLATFORM_API_KEY }}
+          NAVER_CLOVA_API_URL=${{ secrets.NAVER_CLOVA_API_URL }}
+          NAVER_CLOVA_API_KEY=${{ secrets.NAVER_CLOVA_API_KEY }}
           ENV
 
           docker-compose up -d --build
