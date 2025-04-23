@@ -90,11 +90,12 @@ def append_preamble_ocr(result: List[DocumentChunk], preamble: str,
 
 
 def extract_ocr(image_url: str) -> Tuple[str, List[dict]]:
-
+  logging.info(f"image_url: {image_url}")
   # URL에서 이미지를 다운로드
 
   image_response = requests.get(image_url)
   image_data = image_response.content
+  logging.info(f"image_response: {image_response}")
 
   # 이미지 열기 (바이너리로 읽은 데이터를 사용)
 
@@ -141,6 +142,9 @@ def extract_ocr(image_url: str) -> Tuple[str, List[dict]]:
   headers = {
     'X-OCR-SECRET': NAVER_CLOVA_API_KEY
   }
+  logging.info(f"headers: {headers}")
+  logging.info(f"payload: {payload}")
+  logging.info(f"files: {files}")
 
   try:
     response = requests.request("POST", NAVER_CLOVA_API_URL, headers=headers, data=payload,
