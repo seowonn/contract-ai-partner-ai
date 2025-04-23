@@ -9,8 +9,8 @@ from app.common.constants import EMBEDDING_MODEL, PROMPT_MODEL
 
 load_dotenv() # 루트로 고정
 
-openai_client = AsyncOpenAI(api_key=os.getenv("OPENAI_API_KEY"))
-sync_openai_client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+# openai_client = AsyncOpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+# sync_openai_client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
 
 @asynccontextmanager
