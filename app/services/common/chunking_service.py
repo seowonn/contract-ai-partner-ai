@@ -2,23 +2,24 @@ import re
 from typing import List
 from typing import Optional, Tuple
 
+import matplotlib.pyplot as plt
 import nltk
 import numpy as np
 import tiktoken
+from langchain_text_splitters import RecursiveCharacterTextSplitter
 from nltk import find
 from sklearn.manifold import TSNE
-import matplotlib.pyplot as plt
 
 from app.blueprints.agreement.agreement_exception import AgreementException
 from app.blueprints.standard.standard_exception import StandardException
 from app.clients.openai_clients import get_embedding_sync_client
 from app.common.constants import ARTICLE_CHUNK_PATTERN, ARTICLE_HEADER_PATTERN, \
   ARTICLE_CLAUSE_SEPARATOR, CLAUSE_HEADER_PATTERN, \
-  PROMPT_MODEL, ARTICLE_OCR_HEADER_PATTERN, NUMBER_HEADER_PATTERN
+  NUMBER_HEADER_PATTERN, ARTICLE_OCR_HEADER_PATTERN
 from app.common.exception.custom_exception import CommonException
 from app.common.exception.error_code import ErrorCode
 from app.containers.service_container import embedding_service
-from app.schemas.chunk_schema import ArticleChunk, ClauseChunk, DocumentChunk
+from app.schemas.chunk_schema import ClauseChunk, DocumentChunk
 from app.schemas.chunk_schema import Document
 
 MIN_CLAUSE_BODY_LENGTH = 20
@@ -136,7 +137,8 @@ def chunk_legal_terms(extracted_text: str) -> List[ClauseChunk]:
   return chunks
 
 
-def chunk_by_article_and_clause_with_page(documents: List[Document], pattern: str) -> List[
+def chunk_by_article_and_clause_with_page(documents: List[Document],
+    pattern: str =ARTICLE_OCR_HEADER_PATTERN) -> List[
   DocumentChunk]:
   chunks: List[DocumentChunk] = []
 
@@ -145,11 +147,11 @@ def chunk_by_article_and_clause_with_page(documents: List[Document], pattern: st
     page_text = doc.page_content
     order_index = 1
 
-    # preamble_exists = check_if_preamble_exists_except_first_page(page,
-    #                                                              page_text)
-    # if preamble_exists:
-    #   order_index, chunks = (
-    #     chunk_preamble_content(page_text, chunks, page, order_index))
+    preamble_exists = check_if_preamble_exists_except_first_page(page,
+                                                                 page_text)
+    if preamble_exists:
+      order_index, chunks = (
+        chunk_preamble_content(page_text, chunks, page, order_index))
 
     matches = re.findall(pattern, page_text, flags=re.DOTALL)
     for header, body in matches:
@@ -206,7 +208,6 @@ def chunk_by_article_and_clause_with_page(documents: List[Document], pattern: st
 def parse_article_header(header: str) -> Tuple[int, str]:
   clean_header = header.replace(" ", "")
 
-
   if not clean_header.startswith("제") or "조" not in clean_header:
     raise AgreementException(ErrorCode.NOT_SUPPORTED_FORMAT)
 
@@ -235,7 +236,7 @@ def parse_number_header(header: str) -> Tuple[int, str]:
 
 def check_if_preamble_exists_except_first_page(page: int,
     page_text: str) -> bool:
-  return page != 1 and not is_page_text_starting_with_article_heading(
+  return not is_page_text_starting_with_article_heading(
       ARTICLE_HEADER_PATTERN, page_text
   )
 
@@ -328,3 +329,27 @@ def get_clause_pattern(clause_number: str) -> Optional[str]:
   elif re.match(r'\d+\.', pattern):
     return r'(\n\s*\d+\.)'
   return None
+
+
+def chunk_by_paragraph(documents: List[Document]) -> List[DocumentChunk]:
+  chunks = []
+  text_splitter = RecursiveCharacterTextSplitter.from_tiktoken_encoder(
+      chunk_size=300,
+      chunk_overlap=50,
+      separators=["\n\n", "."]
+  )
+
+  for doc in documents:
+    divided_text = text_splitter.split_text(doc.page_content)
+
+    for idx, content in enumerate(divided_text, start=1):
+      chunks.append(
+          DocumentChunk(
+              page=doc.metadata.page,
+              clause_content=content,
+              order_index=idx,
+              clause_number=str(len(chunks) + 1)
+          )
+      )
+
+  return chunks

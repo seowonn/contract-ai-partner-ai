@@ -17,7 +17,8 @@ from app.services.agreement.ocr_service import extract_ocr, \
 from app.services.agreement.vectorize_similarity import \
   vectorize_and_calculate_similarity
 from app.services.common.chunking_service import \
-  chunk_by_article_and_clause_with_page, semantic_chunk, chunk_legal_terms
+  chunk_by_article_and_clause_with_page, semantic_chunk, chunk_legal_terms, \
+  chunk_by_paragraph
 from app.services.common.pdf_service import preprocess_pdf
 
 
@@ -27,8 +28,7 @@ def ocr_service(document_request: DocumentRequest):
   documents: List[Document] = [
     Document(page_content=full_text, metadata=DocumentMetadata(page=1))]
 
-  document_chunks = chunk_agreement_documents(documents,
-                                              ARTICLE_OCR_HEADER_PATTERN)
+  document_chunks = chunk_agreement_documents(documents)
   combined_chunks = combine_chunks_by_clause_number(document_chunks)
 
   # 입력값이 다르기에 함수가 분리되어야 함
@@ -42,7 +42,7 @@ def ocr_service(document_request: DocumentRequest):
 def pdf_agreement_service(document_request: DocumentRequest) -> Tuple[
   List[RagResult], int, int]:
   documents, fitz_document = preprocess_pdf(document_request)
-  document_chunks = chunk_agreement_documents(documents, ARTICLE_CHUNK_PATTERN)
+  document_chunks = chunk_agreement_documents(documents)
   combined_chunks = combine_chunks_by_clause_number(document_chunks)
   chunks = asyncio.run(
       vectorize_and_calculate_similarity(combined_chunks, document_request,
@@ -76,18 +76,27 @@ def chunk_standard_texts(documents: List[Document], category: str,
   return all_clauses
 
 
-def chunk_agreement_documents(documents: List[Document], split_pattern: str) -> \
-    List[DocumentChunk]:
-  chunks = chunk_by_article_and_clause_with_page(documents, split_pattern)
+def chunk_agreement_documents(documents: List[Document]) -> List[DocumentChunk]:
+  if re.findall(ARTICLE_OCR_HEADER_PATTERN, documents[0].page_content,
+                  flags=re.DOTALL):
+    chunks = chunk_by_article_and_clause_with_page(documents,
+                                                   ARTICLE_OCR_HEADER_PATTERN)
+  elif re.findall(ARTICLE_CHUNK_PATTERN, documents[0].page_content,
+                  flags=re.DOTALL):
+    chunks = chunk_by_article_and_clause_with_page(documents,
+                                                   ARTICLE_CHUNK_PATTERN)
+  elif re.findall(NUMBER_HEADER_PATTERN, documents[0].page_content,
+                  flags=re.DOTALL):
+    chunks = chunk_by_article_and_clause_with_page(documents,
+                                                   NUMBER_HEADER_PATTERN)
+  else:
+    chunks = chunk_by_paragraph(documents)
+
   # keep_text, _ = chunks[0].clause_content.split("1.", 1)
   # chunks[0].clause_content = keep_text
   # keep_text, _ = chunks[-2].clause_content.split("날짜 :", 1)
   # chunks[-2].clause_content = keep_text.strip()
   # del chunks[-1]
-
-  if not chunks:
-    chunks = chunk_by_article_and_clause_with_page(documents,
-                                                   NUMBER_HEADER_PATTERN)
 
   if not chunks:
     raise CommonException(ErrorCode.CHUNKING_FAIL)
