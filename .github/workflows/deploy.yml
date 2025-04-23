@@ -25,6 +25,11 @@ jobs:
         PLATFORM_API_KEY: ${{ secrets.PLATFORM_API_KEY }}
 
 
+    - name: Check environment variables
+      run: |
+        echo "PLATFORM_API_URL: $PLATFORM_API_URL"
+        echo "PLATFORM_API_KEY: $PLATFORM_API_KEY"
+
     - name: Check Flask health
       run: |
         echo "🔄 Waiting for Flask to become ready..."
