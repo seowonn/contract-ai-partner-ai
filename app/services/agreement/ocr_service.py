@@ -93,6 +93,9 @@ def extract_ocr(image_url: str) -> Tuple[str, List[dict]]:
   logging.info(f"image_url: {image_url}")
   # URL에서 이미지를 다운로드
 
+  logging.info(f"NAVER_CLOVA_API_URL: {NAVER_CLOVA_API_URL}")
+  logging.info(f"NAVER_CLOVA_API_KEY: {NAVER_CLOVA_API_KEY}")
+
   image_response = requests.get(image_url)
   image_data = image_response.content
   logging.info(f"image_response: {image_response}")
