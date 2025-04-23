@@ -18,6 +18,7 @@ from app.clients.openai_clients import get_embedding_async_client, \
 from app.clients.qdrant_client import get_qdrant_client
 from app.common.chunk_status import ChunkProcessStatus, ChunkProcessResult
 from app.common.constants import ARTICLE_OCR_HEADER_PATTERN
+from app.common.decorators import measure_time, async_measure_time
 from app.common.exception.error_code import ErrorCode
 from app.containers.service_container import embedding_service, prompt_service
 from app.schemas.analysis_response import RagResult
@@ -30,9 +31,6 @@ from app.services.common.chunking_service import MIN_CLAUSE_BODY_LENGTH, \
   get_clause_pattern, split_text_by_pattern
 from app.services.common.llm_retry import retry_llm_call
 from app.services.common.qdrant_utils import ensure_qdrant_collection
-
-
-# .env 파일에서 환경변수 불러오기
 
 
 def chunk_preamble_content_ocr(page_text: str, chunks: List[DocumentChunk],
@@ -179,7 +177,7 @@ def extract_ocr(image_url: str) -> Tuple[str, List[dict]]:
   return full_text, all_texts_with_bounding_boxes
 
 
-
+@async_measure_time
 async def vectorize_and_calculate_similarity_ocr(
     combined_chunks: List[RagResult], document_request: DocumentRequest,
     all_texts_with_bounding_boxes: List[dict]) -> List[RagResult]:

@@ -138,7 +138,7 @@ def chunk_legal_terms(extracted_text: str) -> List[ClauseChunk]:
 
 
 def chunk_by_article_and_clause_with_page(documents: List[Document],
-    pattern: str =ARTICLE_OCR_HEADER_PATTERN) -> List[
+    pattern: str) -> List[
   DocumentChunk]:
   chunks: List[DocumentChunk] = []
 
@@ -147,11 +147,11 @@ def chunk_by_article_and_clause_with_page(documents: List[Document],
     page_text = doc.page_content
     order_index = 1
 
-    preamble_exists = check_if_preamble_exists_except_first_page(page,
-                                                                 page_text)
-    if preamble_exists:
-      order_index, chunks = (
-        chunk_preamble_content(page_text, chunks, page, order_index))
+    # preamble_exists = check_if_preamble_exists_except_first_page(page,
+    #                                                              page_text)
+    # if preamble_exists:
+    #   order_index, chunks = (
+    #     chunk_preamble_content(page_text, chunks, page, order_index))
 
     matches = re.findall(pattern, page_text, flags=re.DOTALL)
     for header, body in matches:

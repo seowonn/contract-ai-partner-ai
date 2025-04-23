@@ -77,11 +77,7 @@ def chunk_standard_texts(documents: List[Document], category: str,
 
 
 def chunk_agreement_documents(documents: List[Document]) -> List[DocumentChunk]:
-  if re.findall(ARTICLE_OCR_HEADER_PATTERN, documents[0].page_content,
-                  flags=re.DOTALL):
-    chunks = chunk_by_article_and_clause_with_page(documents,
-                                                   ARTICLE_OCR_HEADER_PATTERN)
-  elif re.findall(ARTICLE_CHUNK_PATTERN, documents[0].page_content,
+  if re.findall(ARTICLE_CHUNK_PATTERN, documents[0].page_content,
                   flags=re.DOTALL):
     chunks = chunk_by_article_and_clause_with_page(documents,
                                                    ARTICLE_CHUNK_PATTERN)
