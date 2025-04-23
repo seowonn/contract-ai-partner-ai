@@ -144,7 +144,6 @@ def extract_ocr(image_url: str) -> Tuple[str, List[dict]]:
   }
   logging.info(f"headers: {headers}")
   logging.info(f"payload: {payload}")
-  logging.info(f"files: {files}")
 
   try:
     response = requests.request("POST", NAVER_CLOVA_API_URL, headers=headers, data=payload,
