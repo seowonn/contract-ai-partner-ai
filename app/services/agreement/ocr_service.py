@@ -16,7 +16,7 @@ from app.clients.openai_clients import get_embedding_async_client, \
   get_prompt_async_client
 from app.clients.qdrant_client import get_qdrant_client
 from app.common.chunk_status import ChunkProcessStatus, ChunkProcessResult
-from app.common.decorators import async_measure_time
+from app.common.decorators import async_measure_time, measure_time
 from app.common.exception.error_code import ErrorCode
 from app.containers.service_container import embedding_service, prompt_service
 from app.schemas.analysis_response import RagResult
@@ -28,6 +28,7 @@ from app.services.common.llm_retry import retry_llm_call
 from app.services.common.qdrant_utils import ensure_qdrant_collection
 
 
+@measure_time
 def extract_ocr(image_url: str) -> Tuple[str, List[dict]]:
   image_response = requests.get(image_url)
   image_data = image_response.content
