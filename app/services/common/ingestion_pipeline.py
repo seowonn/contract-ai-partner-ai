@@ -3,7 +3,7 @@ import re
 from typing import List, Tuple
 
 from app.common.constants import CLAUSE_TEXT_SEPARATOR, ARTICLE_CHUNK_PATTERN, \
-  ARTICLE_OCR_HEADER_PATTERN, NUMBER_HEADER_PATTERN
+  NUMBER_HEADER_PATTERN
 from app.common.exception.custom_exception import CommonException
 from app.common.exception.error_code import ErrorCode
 from app.common.file_type import FileType
@@ -78,7 +78,7 @@ def chunk_standard_texts(documents: List[Document], category: str,
 
 def chunk_agreement_documents(documents: List[Document]) -> List[DocumentChunk]:
   if re.findall(ARTICLE_CHUNK_PATTERN, documents[0].page_content,
-                  flags=re.DOTALL):
+                flags=re.DOTALL):
     chunks = chunk_by_article_and_clause_with_page(documents,
                                                    ARTICLE_CHUNK_PATTERN)
   elif re.findall(NUMBER_HEADER_PATTERN, documents[0].page_content,

@@ -1,7 +1,6 @@
 import asyncio
 import json
 import logging
-import re
 import time
 import uuid
 from typing import List, Tuple
@@ -17,70 +16,16 @@ from app.clients.openai_clients import get_embedding_async_client, \
   get_prompt_async_client
 from app.clients.qdrant_client import get_qdrant_client
 from app.common.chunk_status import ChunkProcessStatus, ChunkProcessResult
-from app.common.constants import ARTICLE_OCR_HEADER_PATTERN
-from app.common.decorators import measure_time, async_measure_time
+from app.common.decorators import async_measure_time
 from app.common.exception.error_code import ErrorCode
 from app.containers.service_container import embedding_service, prompt_service
 from app.schemas.analysis_response import RagResult
-from app.schemas.chunk_schema import DocumentChunk
 from app.schemas.document_request import DocumentRequest
 from app.services.agreement.vectorize_similarity import \
   prepare_embedding_inputs, search_qdrant, parse_incorrect_text, \
   LLM_REQUIRED_KEYS, VIOLATION_THRESHOLD
-from app.services.common.chunking_service import MIN_CLAUSE_BODY_LENGTH, \
-  get_clause_pattern, split_text_by_pattern
 from app.services.common.llm_retry import retry_llm_call
 from app.services.common.qdrant_utils import ensure_qdrant_collection
-
-
-def chunk_preamble_content_ocr(page_text: str, chunks: List[DocumentChunk],
-    order_index: int) -> Tuple[int, List[DocumentChunk]]:
-  first_article_match = (
-    re.search(ARTICLE_OCR_HEADER_PATTERN, page_text, flags=re.MULTILINE))
-
-  preamble = page_text[
-             first_article_match.start():] if first_article_match else page_text
-  return append_preamble_ocr(chunks, preamble, order_index)
-
-
-def append_preamble_ocr(result: List[DocumentChunk], preamble: str,
-    order_index: int) -> Tuple[int, List[DocumentChunk]]:
-  pattern = get_clause_pattern(result[-1].clause_number)
-
-  if not pattern:
-    result.append(DocumentChunk(
-        clause_content=preamble,
-        order_index=order_index,
-        clause_number=result[-1].clause_number
-    ))
-    return order_index + 1, result
-
-  clause_chunks = split_text_by_pattern(preamble, pattern)
-  lines = clause_chunks[0].strip().splitlines()
-  content_lines = [line for line in lines if not line.strip().startswith("페이지")]
-
-  result.append(DocumentChunk(
-      clause_content="\n".join(content_lines),
-      order_index=order_index,
-      clause_number=result[-1].clause_number
-  ))
-  order_index += 1
-
-  for j in range(1, len(clause_chunks), 2):
-    clause_number = clause_chunks[j].strip()
-    clause_content = clause_chunks[j + 1].strip() if j + 1 < len(
-        clause_chunks) else ""
-
-    if len(clause_content) >= MIN_CLAUSE_BODY_LENGTH:
-      prev_clause_prefix = result[-1].clause_number.split(" ")[0]
-      result.append(DocumentChunk(
-          clause_content=clause_content,
-          order_index=order_index,
-          clause_number=f"{prev_clause_prefix} {clause_number}항"
-      ))
-      order_index += 1
-
-  return order_index, result
 
 
 def extract_ocr(image_url: str) -> Tuple[str, List[dict]]:
@@ -95,7 +40,7 @@ def extract_ocr(image_url: str) -> Tuple[str, List[dict]]:
   height, width = image.shape[:2]
   resize_ratio = 1
   resized_image = cv2.resize(image, (
-  int(width * resize_ratio), int(height * resize_ratio)),
+    int(width * resize_ratio), int(height * resize_ratio)),
                              interpolation=cv2.INTER_LINEAR)
 
   # 2. 그레이스케일 변환
@@ -126,13 +71,13 @@ def extract_ocr(image_url: str) -> Tuple[str, List[dict]]:
   # 전송을 위한 인코딩
   files = [
     ('file', (
-    'photo1_binary_low.jpg', cv2.imencode('.jpg', binarized_img)[1].tobytes(),
-    'image/jpeg'))  # 이진화된 이미지를 바이너리로 전송
+      'photo1_binary_low.jpg', cv2.imencode('.jpg', binarized_img)[1].tobytes(),
+      'image/jpeg'))  # 이진화된 이미지를 바이너리로 전송
   ]
 
   try:
     response = requests.request("POST", api_url, headers=headers, data=payload,
-                              files=files)
+                                files=files)
   except Exception:
     raise AgreementException(ErrorCode.NAVER_OCR_REQUEST_FAIL)
 
@@ -271,12 +216,11 @@ async def find_text_positions_ocr(rag_result: RagResult, incorrect_part: str,
     incorrect_part = part_clause_content[1].strip()
 
   all_positions, part_positions = extract_bbox_positions(
-    rag_result.incorrect_text,
-    incorrect_part,
-    all_texts_with_bounding_boxes)
+      rag_result.incorrect_text,
+      incorrect_part,
+      all_texts_with_bounding_boxes)
 
   return all_positions, part_positions
-
 
 
 def extract_bbox_positions(
