@@ -75,13 +75,13 @@ jobs:
         run: |
           ssh -i bastion.pem -o StrictHostKeyChecking=no ${{ secrets.BASTION_HOST_IP }} << EOF
           sudo ssh -i /var/lib/jenkins/.ssh/rising-star-private-flask-a.pem -o StrictHostKeyChecking=no ${{ secrets.FLASK_HOST_IP }} << EOC
-          echo "Flask 서버 접속 완료"
+          echo "🚀 Flask 서버 접속 완료"
           cd /home/ec2-user/contract-ai-partner-ai
+
           git fetch origin
           git checkout ${{ github.ref_name }}
           git pull origin ${{ github.ref_name }}
 
-          # ✅ .env 파일 생성
           cat <<ENV > .env
           OPENAI_API_KEY=${{ secrets.OPENAI_API_KEY }}
           AZURE_EMBEDDING_API_KEY=${{ secrets.AZURE_EMBEDDING_API_KEY }}
@@ -92,13 +92,9 @@ jobs:
           NAVER_CLOVA_API_KEY=${{ secrets.NAVER_CLOVA_API_KEY }}
           ENV
 
-          echo "✅ .env 파일 생성 완료"
-          echo "🧼 기존 컨테이너 종료 중..."
           docker-compose down
-          
-          echo "🔁 새 컨테이너 빌드 및 재시작 중..."
           docker-compose up -d --build --force-recreate
-          
+
           echo "🔄 Flask health check 시작..."
           for i in {1..10}; do
             if curl --fail http://localhost:5000/health-check; then
@@ -108,12 +104,19 @@ jobs:
             echo "⏳ Flask not ready yet... retrying in 3s"
             sleep 3
           done
-      
+
           echo "::error ::❌ Flask health check failed after 10 attempts"
-          docker-compose logs flask-app
           exit 1
-    
-          echo "[✅ Flask 서버 배포 완료]"
+          EOC
+          EOF
+
+      - name: Show Flask logs (for debugging)
+        if: always()
+        run: |
+          ssh -i bastion.pem -o StrictHostKeyChecking=no ${{ secrets.BASTION_HOST_IP }} << EOF
+          sudo ssh -i /var/lib/jenkins/.ssh/rising-star-private-flask-a.pem -o StrictHostKeyChecking=no ${{ secrets.FLASK_HOST_IP }} << EOC
+          echo "📄 Flask logs (flask-app):"
+          docker-compose logs flask-app || true
           EOC
           EOF
 
