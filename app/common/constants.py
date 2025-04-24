@@ -5,7 +5,7 @@ ARTICLE_CHUNK_PATTERN = r'(제\s*\d+\s*조\s*(?:【[^】\n]*】?|[^】\n]*】|\(
 
 
 ARTICLE_HEADER_PARSE_PATTERN = r'제\s*(\d+)\s*조\s*(?:【([^】]+)】|\(([^)]+)\)|\[([^\]]+)\])'
-NUMBER_HEADER_PATTERN = r'(\d+\.\s*[^\n:：]+)\s*[:：]?\s*(.*?)(?=\n\d+\.\s|$)'
+NUMBER_HEADER_PATTERN = r'(\d+\.\s*[^\n:：]+)\s*[:：]?\s*(.*?)(?=\d+\.\s|$)'
 
 CLAUSE_HEADER_PATTERN = r'(①|1\.|\(1\))'
 
