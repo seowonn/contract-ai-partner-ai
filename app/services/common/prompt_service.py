@@ -26,30 +26,28 @@ def clean_incorrect_part(text: str) -> str:
   return text
 
 
-def clean_markdown_block(response_text: str) -> str | None:
+def clean_markdown_block(response_text: str) -> dict | None:
   response_text_cleaned = response_text
 
   if response_text_cleaned.startswith(
       "```json") and response_text_cleaned.endswith("```"):
-    return response_text_cleaned[7:-3].strip()
+    response_text_cleaned = response_text_cleaned[7:-3].strip()
   elif response_text_cleaned.startswith(
       "```") and response_text_cleaned.endswith("```"):
-    return response_text_cleaned[3:-3].strip()
+    response_text_cleaned = response_text_cleaned[3:-3].strip()
 
   try:
     parsed_response = json.loads(response_text_cleaned)
     if "incorrectPart" in parsed_response:
       parsed_response["incorrectPart"] = clean_incorrect_part(
-          parsed_response["incorrectPart"]
-      )
+          parsed_response["incorrectPart"])
+
+    return parsed_response
 
   except json.JSONDecodeError as e:
     logging.error(
-        f"[PromptService]: jsonDecodeError: {e} | raw response: {response_text_cleaned}")
+      f"[PromptService]: jsonDecodeError: {e} | raw response: {response_text_cleaned}")
     return None
-
-  return parsed_response
-
 
 class PromptService:
   def __init__(self, deployment_name):
@@ -204,7 +202,7 @@ class PromptService:
             - 무작위가 아닌, 문장의 위반 가능성을 기반으로 신중하게 결정해 주세요.
 
             [출력 형식]
-            각 항목은 반드시 문자열(string) 형태로 출력할 것:
+            출력은 dict 형태이며, value 값은 반드시 문자열(string) 형태로 출력할 것:
             {{
               "correctedText": "계약서의 문장을 올바르게 교정한 문장",
               "proofText": "입력 데이터를 참조해 잘못된 포인트와 그 이유",
