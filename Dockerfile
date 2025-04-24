@@ -9,7 +9,7 @@ COPY requirements.txt .
 
 # 필요한 패키지 설치
 RUN pip install --upgrade pip && \
-    pip install -r requirements.txt && \
+    pip install --no-cache-dir -r requirements.txt && \
     python -c "import nltk; nltk.download('punkt'); nltk.download('punkt_tab')"
 RUN apt-get update && apt-get install -y \
     curl \
