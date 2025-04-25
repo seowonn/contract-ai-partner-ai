@@ -129,7 +129,7 @@ def parse_incorrect_text(rag_result: RagResult) -> None:
     raise AgreementException(ErrorCode.NO_SEPARATOR_FOUND)
 
   rag_result.incorrect_text = clause_parts[-1]
-  rag_result.incorrect_text = rag_result.incorrect_text.replace("\n", "")  # 여기서
+  rag_result.incorrect_text = rag_result.incorrect_text.replace("\n", " ")
 
 
 async def search_qdrant(semaphore: Semaphore, collection_name: str,
