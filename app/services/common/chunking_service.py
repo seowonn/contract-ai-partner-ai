@@ -146,11 +146,11 @@ def chunk_by_article_and_clause_with_page(documents: List[Document],
     page_text = doc.page_content
     order_index = 1
 
-    preamble_exists = check_if_preamble_exists_except_first_page(page,
+    preamble_exists = check_if_preamble_exists_except_first_page(pattern,
                                                                  page_text)
     if preamble_exists:
       order_index, chunks = (
-        chunk_preamble_content(page_text, chunks, page, order_index))
+        chunk_preamble_content(pattern, page_text, chunks, page, order_index))
 
     matches = re.findall(pattern, page_text, flags=re.DOTALL)
     for header, body in matches:
@@ -233,11 +233,9 @@ def parse_number_header(header: str) -> Tuple[int, str]:
     raise AgreementException(ErrorCode.NOT_SUPPORTED_FORMAT)
 
 
-def check_if_preamble_exists_except_first_page(page: int,
+def check_if_preamble_exists_except_first_page(pattern: str,
     page_text: str) -> bool:
-  return not is_page_text_starting_with_article_heading(
-      ARTICLE_HEADER_PATTERN, page_text
-  )
+  return not is_page_text_starting_with_article_heading(pattern, page_text)
 
 
 def is_page_text_starting_with_article_heading(heading: str,
@@ -247,10 +245,11 @@ def is_page_text_starting_with_article_heading(heading: str,
   return bool(re.match(heading, content_lines[0])) if content_lines else False
 
 
-def chunk_preamble_content(page_text: str, chunks: List[DocumentChunk],
-    page: int, order_index: int) -> Tuple[int, List[DocumentChunk]]:
+def chunk_preamble_content(pattern: str, page_text: str,
+    chunks: List[DocumentChunk], page: int, order_index: int) -> \
+    Tuple[int, List[DocumentChunk]]:
   first_article_match = (
-    re.search(ARTICLE_HEADER_PATTERN, page_text, flags=re.MULTILINE))
+    re.search(pattern, page_text, flags=re.MULTILINE))
 
   preamble = page_text[
              :first_article_match.start()] if first_article_match else page_text
