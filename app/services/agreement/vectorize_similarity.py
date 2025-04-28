@@ -24,7 +24,8 @@ from app.services.common.llm_retry import retry_llm_call
 from app.services.common.qdrant_utils import ensure_qdrant_collection
 
 SEARCH_COUNT = 3
-VIOLATION_THRESHOLD = 0.75
+
+VIOLATION_THRESHOLD = 0.85
 LLM_REQUIRED_KEYS = {"clause_content", "correctedText", "proofText",
                      "violation_score"}
 
