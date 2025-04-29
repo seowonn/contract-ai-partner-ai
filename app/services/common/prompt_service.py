@@ -38,6 +38,9 @@ def clean_markdown_block(response_text: str) -> dict | None:
 
   try:
     parsed_response = json.loads(response_text_cleaned)
+    if isinstance(parsed_response, list):
+      parsed_response = parsed_response[0]
+
     if "incorrectPart" in parsed_response:
       parsed_response["incorrectPart"] = clean_incorrect_part(
           parsed_response["incorrectPart"])
@@ -69,6 +72,7 @@ class PromptService:
               - 원문에 명확한 위배 문장이 없어 보여도, **해석 가능성이나 맥락에 근거해 위배 소지가 있는 문장을 추정해서 생성할 것**
               - **절대 원문 그대로 반환하지 말 것**
               - **맞춤법, 어휘 표현 개선은 하지 말고, 오직 불공정성/위배 가능성에만 초점 둘 것**
+              - 예시 출력 형식 외에 다른 추가 설명은 붙이지 마
 
               예시 출력 형식:
               {{
@@ -96,7 +100,8 @@ class PromptService:
     )
 
     response_text = response.choices[0].message.content
-    return clean_markdown_block(response_text)
+    result = clean_markdown_block(response_text)
+    return result
 
 
   async def extract_keywords(self, prompt_client: AsyncAzureOpenAI,
