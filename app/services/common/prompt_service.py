@@ -99,47 +99,6 @@ class PromptService:
     return clean_markdown_block(response_text)
 
 
-  async def extract_keywords(self, prompt_client: AsyncAzureOpenAI,
-      clause_content: str) -> Any | None:
-    response = await prompt_client.chat.completions.create(
-        model=self.deployment_name,
-        messages=[
-          {
-            "role": "user",
-            "content": f"""
-              너는 법률 문서를 분석하고, **해석의 위험성과 핵심 개념을 추출**하는 전문가야.
-        
-              아래 문장을 기반으로 다음 두 가지 정보를 추출해:
-              1. **meaning_difference**: 비전문가와 전문가 사이에 해석 차이가 발생할 수 있는 예시 상황을 한 문장으로 설명해줘.  
-                 - 예시는 현실 계약에서 이 문장이 어떻게 오해될 수 있는지를 설명해야 해  
-                 - 반드시 '비전문가는 ~ / 전문가는 ~' 식으로 해석 차이를 비교해서 써줘
-        
-              2. **keyword**: 문장의 핵심 개념 또는 법률적 쟁점을 최대 3개까지 추출해줘  
-                 - 키워드는 원문에서 핵심이 되는 단어 또는 유사한 의미를 갖는 단어로 작성해줘  
-                 - 반드시 Python 리스트 형태로 제공해
-        
-              다음과 같은 JSON 형식으로만 응답해줘. 그 외의 설명은 절대 하지 마.
-        
-              예시 출력 형식:
-              {{
-                "meaning_difference": "비전문가는 '협의'를 법적 구속력이 있는 절차로 해석할 수 있지만, 전문가는 단순한 의견 교환으로 본다. 이 문장은 계약 해지 요건과 관련된 해석 차이를 유발할 수 있다.",
-                "keyword": ["협의", "계약 해지", "구속력"]
-              }}
-
-              원문:
-              \"\"\"{clause_content}\"\"\"
-              """
-
-          }
-        ],
-        temperature=0.8,
-        max_tokens=512,
-        top_p=1
-    )
-
-    response_text = response.choices[0].message.content
-    return clean_markdown_block(response_text)
-
   async def correct_contract(self, prompt_client: AsyncAzureOpenAI,
       clause_content: str, search_results: List[SearchResult]) -> Optional[
     dict[str, Any]]:
@@ -152,8 +111,7 @@ class PromptService:
       "clause_content": clause_content,
       "proof_text": [item.proof_text for item in search_results],
       "incorrect_text": [item.incorrect_text for item in search_results],
-      "corrected_text": [item.corrected_text for item in search_results],
-      "term": [x for item in search_results for x in[item.term] + item.keywords],
+      "corrected_text": [item.corrected_text for item in search_results]
     }
 
     response = await prompt_client.chat.completions.create(
@@ -192,9 +150,7 @@ class PromptService:
             - proof_text: 법률 문서의 문장 목록
             - incorrect_text: 법률 위반할 가능성이 있는 예시 문장 
             - corrected_text: 법률 위반 가능성이 있는 예시 문장을 올바르게 수정한 문장 목록
-            - term: 계약서 문장에서 등장하거나 유사한 법률 용어
-            - meaning_difference: 이 용어에 대해 비전문가와 전문가의 해석 차이가 발생할 수 있는 경우 설명
-            - definition: 해당 법률 용어의 사전적 또는 법적 정의
+    
 
             [violation_score 판단 기준 및 생성 형식]
             - 반드시 "0.000"부터 "1.000" 사이의 **소수점 셋째 자리까지의 문자열(float 형식)**로 출력하세요.
