@@ -8,6 +8,7 @@ from qdrant_client.models import PointStruct
 from app.clients.openai_clients import get_prompt_async_client, \
   get_embedding_async_client
 from app.clients.qdrant_client import get_qdrant_client
+from app.common.constants import DENSE_VECTOR_NAME
 from app.common.decorators import async_measure_time
 from app.containers.service_container import embedding_service
 from app.schemas.chunk_schema import ClauseChunk
@@ -51,9 +52,13 @@ async def vectorize_and_save(chunks: List[ClauseChunk],
                                 final_points)
 
 
-def build_point(payload, embedding: List[float]) -> PointStruct:
+def build_point(payload, dense_embedding: List[float]) -> PointStruct:
+  vectors = {
+    DENSE_VECTOR_NAME: dense_embedding
+  }
+
   return PointStruct(
       id=str(uuid.uuid4()),
-      vector=embedding,
+      vector=vectors,
       payload=payload.to_dict()
   )
