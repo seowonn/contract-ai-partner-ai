@@ -154,8 +154,6 @@ class PromptService:
       "incorrect_text": [item.incorrect_text for item in search_results],
       "corrected_text": [item.corrected_text for item in search_results],
       "term": [x for item in search_results for x in[item.term] + item.keywords],
-      "meaning_difference": [item.meaning_difference for item in search_results],
-      "definition": [item.definition for item in search_results],
     }
 
     response = await prompt_client.chat.completions.create(
