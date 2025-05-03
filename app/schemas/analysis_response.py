@@ -14,7 +14,7 @@ class SearchResult:
   proof_text: str
   incorrect_text: str
   corrected_text: str
-  term: str
+  term_explanation: str
 
 @dataclass
 class RagResult:

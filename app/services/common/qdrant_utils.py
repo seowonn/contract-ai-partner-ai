@@ -5,7 +5,6 @@ from qdrant_client.http.models import VectorParams, Distance
 from qdrant_client.models import Filter, FieldCondition, MatchValue
 
 from app.blueprints.standard.standard_exception import StandardException
-from app.common.constants import DENSE_VECTOR_NAME, SPARSE_VECTOR_NAME
 from app.common.exception.custom_exception import CommonException
 from app.common.exception.error_code import ErrorCode
 
