@@ -8,7 +8,7 @@ from qdrant_client.models import PointStruct
 from app.clients.openai_clients import get_prompt_async_client, \
   get_embedding_async_client
 from app.clients.qdrant_client import get_qdrant_client
-from app.common.constants import DENSE_VECTOR_NAME
+
 from app.common.decorators import async_measure_time
 from app.containers.service_container import embedding_service
 from app.schemas.chunk_schema import ClauseChunk
