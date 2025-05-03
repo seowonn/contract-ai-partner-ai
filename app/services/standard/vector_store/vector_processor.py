@@ -16,7 +16,7 @@ from app.services.common.qdrant_utils import ensure_qdrant_collection, \
   upload_points_to_qdrant, point_exists
 from app.services.standard.vector_delete import delete_by_standard_id
 from app.services.standard.vector_store.payload_builder import \
-  make_word_payload, make_clause_payload
+  make_clause_payload
 
 
 @async_measure_time
@@ -27,9 +27,8 @@ async def vectorize_and_save(chunks: List[ClauseChunk],
 
   semaphore = asyncio.Semaphore(5)
   async with get_prompt_async_client() as prompt_client:
-    task_fn = make_word_payload if pdf_request.categoryName == "법률용어" else make_clause_payload
     results = await asyncio.gather(*[
-      task_fn(prompt_client, article, pdf_request, semaphore)
+      make_clause_payload(prompt_client, article, pdf_request, semaphore)
       for article in chunks
     ])
 

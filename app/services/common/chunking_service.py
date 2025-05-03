@@ -24,15 +24,17 @@ from app.schemas.chunk_schema import Document
 MIN_CLAUSE_BODY_LENGTH = 20
 
 
-def semantic_chunk(extracted_text: str, similarity_threshold: float = 0.9,
-    max_tokens: int = 250, visualize: bool = False) -> List[ClauseChunk]:
+def semantic_chunk_with_overlap(extracted_text: str,
+    similarity_threshold: float = 0.88, max_tokens: int = 180,
+    overlap: int = 1, visualize: bool = False) -> List[ClauseChunk]:
   sentences = split_into_sentences(extracted_text)
   sentences = [s for s in sentences if len(s.strip()) > MIN_CLAUSE_BODY_LENGTH]
   if not sentences:
     raise StandardException(ErrorCode.CHUNKING_FAIL)
 
   with get_embedding_sync_client() as embedding_client:
-      embeddings = embedding_service.batch_sync_embed_texts(embedding_client, sentences)
+    embeddings = embedding_service.batch_sync_embed_texts(embedding_client,
+                                                          sentences)
 
   chunks = []
   current_chunk = [sentences[0]]
@@ -44,15 +46,15 @@ def semantic_chunk(extracted_text: str, similarity_threshold: float = 0.9,
     token_len = count_tokens(" ".join(tentative_chunk))
 
     if similarity < similarity_threshold or token_len > max_tokens:
-      chunk_text = " ".join(current_chunk)
-      chunks.append(ClauseChunk(clause_content=chunk_text))
-      current_chunk = [sentences[i]]
+      chunks.append(ClauseChunk(clause_content=" ".join(current_chunk)))
+      current_chunk = current_chunk[-overlap:] + [sentences[i]]
     else:
       current_chunk.append(sentences[i])
 
     prev_embedding = embeddings[i]
 
-  append_chunk_if_valid(chunks, current_chunk)
+  if current_chunk:
+    chunks.append(ClauseChunk(clause_content=" ".join(current_chunk)))
 
   if visualize:
     try:
@@ -61,7 +63,8 @@ def semantic_chunk(extracted_text: str, similarity_threshold: float = 0.9,
       print(f"[시각화 오류] {e}")
 
   if not chunks:
-    raise CommonException(ErrorCode.CHUNKING_FAIL)
+    raise StandardException(ErrorCode.CHUNKING_FAIL)
+
   return chunks
 
 
@@ -80,7 +83,8 @@ def append_chunk_if_valid(chunks: List[ClauseChunk], current_chunk: List[str]):
 def visualize_embeddings_3d(embeddings: List[List[float]], sentences: List[str],
     chunks: List[ClauseChunk]):
   for idx, chunk in enumerate(chunks):
-    print(f"[청크 {idx}] 길이: {len(chunk.clause_content)} / 토큰 수: {count_tokens(chunk.clause_content)}")
+    print(
+      f"[청크 {idx}] 길이: {len(chunk.clause_content)} / 토큰 수: {count_tokens(chunk.clause_content)}")
 
   plt.rcParams['font.family'] = 'Malgun Gothic'  # 또는 'AppleGothic'
   plt.rcParams['axes.unicode_minus'] = False
@@ -119,21 +123,6 @@ def count_tokens(text: str) -> int:
 
 def split_text_by_pattern(text: str, pattern: str) -> List[str]:
   return re.split(pattern, text)
-
-
-def chunk_legal_terms(extracted_text: str) -> List[ClauseChunk]:
-  chunks = []
-  blocks = re.split(r'○\s\n*', extracted_text)
-  for block in blocks:
-    parts = block.split('\n', 1)
-    if len(parts) == 2 and parts[1]:
-      title, body = parts[0], parts[1]
-      title = title.split('(', 1)[0]
-      clauses = semantic_chunk(body, max_tokens=150, similarity_threshold=0.3)
-      for clause in clauses:
-        clause.clause_number = title
-      chunks.extend(clauses)
-  return chunks
 
 
 def chunk_by_article_and_clause_with_page(documents: List[Document],

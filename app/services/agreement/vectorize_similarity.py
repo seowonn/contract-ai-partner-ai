@@ -137,9 +137,7 @@ async def search_qdrant(semaphore: Semaphore, collection_name: str,
     qd_client: AsyncQdrantClient) -> List[SearchResult]:
   search_results = await search_collection(qd_client, semaphore,
                                            collection_name, embedding)
-  legal_term_results = await search_collection(qd_client, semaphore,
-                                               "법률용어", embedding)
-  return gather_search_results(search_results, legal_term_results)
+  return gather_search_results(search_results)
 
 
 async def search_collection(qd_client: AsyncQdrantClient,
@@ -169,30 +167,16 @@ async def search_collection(qd_client: AsyncQdrantClient,
   return search_results
 
 
-def gather_search_results(search_results: QueryResponse,
-    legal_term_results: QueryResponse) -> List[
-  SearchResult]:
-  merged_results: List[SearchResult] = []
-
-  for i in range(SEARCH_COUNT):
-    clause_payload = search_results.points[i].payload if i < len(
-        search_results.points) else {}
-    term_payload = legal_term_results.points[i].payload if i < len(
-        legal_term_results.points) else {}
-
-    merged_results.append(
-        SearchResult(
-            proof_text=clause_payload.get("proof_text", ""),
-            incorrect_text=clause_payload.get("incorrect_text", ""),
-            corrected_text=clause_payload.get("corrected_text", ""),
-            term=term_payload.get("term", ""),
-            meaning_difference=term_payload.get("meaning_difference", ""),
-            definition=term_payload.get("definition", ""),
-            keywords=term_payload.get("keywords", "")
-        )
+def gather_search_results(search_results: QueryResponse) -> List[SearchResult]:
+  return [
+    SearchResult(
+        proof_text=point.payload.get("proof_text", ""),
+        incorrect_text=point.payload.get("incorrect_text", ""),
+        corrected_text=point.payload.get("corrected_text", ""),
+        term_explanation=point.payload.get("term_explanation", "")
     )
-
-  return merged_results
+    for point in search_results.points[:SEARCH_COUNT]
+  ]
 
 
 def is_correct_response_format(result: dict[str, str]) -> bool:
