@@ -1,7 +1,7 @@
 from httpx import ConnectTimeout
 from qdrant_client import AsyncQdrantClient
 from qdrant_client.http.exceptions import ResponseHandlingException
-from qdrant_client.http.models import VectorParams, Distance
+from qdrant_client.http.models import VectorParams, Distance, SparseVectorParams
 from qdrant_client.models import Filter, FieldCondition, MatchValue
 
 from app.blueprints.standard.standard_exception import StandardException
@@ -25,10 +25,10 @@ async def create_qdrant_collection(qd_client: AsyncQdrantClient,
   try:
     return await qd_client.create_collection(
         collection_name=collection_name,
-        vectors_config=VectorParams(size=1536, distance=Distance.COSINE)
         vectors_config={
-          DENSE_VECTOR_NAME: VectorParams(size=1536,distance=Distance.COSINE)
+          "dense": VectorParams(size=1536,distance=Distance.COSINE)
         },
+        sparse_vectors_config={"sparse": SparseVectorParams()}
     )
   except (ConnectTimeout, ResponseHandlingException):
     raise CommonException(ErrorCode.QDRANT_CONNECTION_TIMEOUT)

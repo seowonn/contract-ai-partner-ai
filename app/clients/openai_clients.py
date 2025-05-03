@@ -15,7 +15,7 @@ load_dotenv() # 루트로 고정
 
 
 @asynccontextmanager
-async def get_embedding_async_client():
+async def get_dense_embedding_async_client():
   async with AsyncAzureOpenAI(
       api_key=os.getenv("AZURE_EMBEDDING_API_KEY"),
       api_version="2023-05-15",

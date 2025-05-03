@@ -98,7 +98,7 @@ class PromptService:
           }
         ],
         temperature=0.7,
-        max_tokens=1000,
+        max_tokens=800,
         top_p=1
     )
 
@@ -118,7 +118,8 @@ class PromptService:
       "clause_content": clause_content,
       "proof_text": [item.proof_text for item in search_results],
       "incorrect_text": [item.incorrect_text for item in search_results],
-      "corrected_text": [item.corrected_text for item in search_results]
+      "corrected_text": [item.corrected_text for item in search_results],
+      "term_explanation": [item.term_explanation for item in search_results]
     }
 
     response = await prompt_client.chat.completions.create(
@@ -143,11 +144,12 @@ class PromptService:
 
             [특히 고려해야 할 사항]
             - 계약서 문장이 **법적 요건에 맞지 않거나**, **근로자에게 일방적으로 불리한 조건**을 담고 있다면 반드시 교정이 필요합니다.
-            - 계약서 문장에 등장하는 특정 단어가 법률용어(`term`)와 같거나 유사할 경우, 해당 단어의 **정의(`definition`)를 기준**으로 문장이 잘못 쓰였는지 검토해 주세요.
-            - 비전문가와 전문가 사이에 **해석 차이의 여지가 있다면 (`meaning_difference`)**, 그 위험성을 `proofText`에 반드시 설명해 주세요.
+            - 계약서 문장에서 전문가와 비전문가 사이에 해석 차이를 유발할 수 있는 용어가 등장하는 경우, 그 의미 차이와 오해의 가능성을 `proofText`에 설명해 주세요.
+            - 해당 표현이 법률적 정의와 다르게 사용되어 문장이 잘못 해석될 수 있는 위험이 있다면, 그 위험성과 의미의 차이를 `proofText`에 해설해 주세요.
             - 문법적 오류보다는 **내용의 법적 타당성**에 집중해 주세요.
             - `proofText`에는 어떤 입력 변수명도 그대로 포함시키지 마세요.
             - 계약서 문장의 위배 확률이 높아 보인다면 `violation_score`를 높게 반환해 주세요.
+            - proofText는 350자 이내로 작성해 주세요.
             
             - 2025년 시급은 10,030원 이상이여야만 합니다.
             - 근무시간이 주15시간 이상인 경우에만, 주휴수당이 별도로 지급되어야 하고 근무시간이 주 15시간 이하라면 급여에 포함이 아닌 지급되지 않아
@@ -157,7 +159,7 @@ class PromptService:
             - proof_text: 법률 문서의 문장 목록
             - incorrect_text: 법률 위반할 가능성이 있는 예시 문장 
             - corrected_text: 법률 위반 가능성이 있는 예시 문장을 올바르게 수정한 문장 목록
-    
+            - term_explanation: 핵심 용어의 전문적 의미와 비전문가가 오해할 수 있는 해석 차이를 설명한 해설
 
             [violation_score 판단 기준 및 생성 형식]
             - 반드시 "0.000"부터 "1.000" 사이의 **소수점 셋째 자리까지의 문자열(float 형식)**로 출력하세요.
