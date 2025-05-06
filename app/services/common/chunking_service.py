@@ -13,9 +13,8 @@ from sklearn.manifold import TSNE
 from app.blueprints.agreement.agreement_exception import AgreementException
 from app.blueprints.standard.standard_exception import StandardException
 from app.clients.openai_clients import get_embedding_sync_client
-from app.common.constants import ARTICLE_CHUNK_PATTERN, ARTICLE_HEADER_PATTERN, \
+from app.common.constants import ARTICLE_CHUNK_PATTERN, \
   ARTICLE_CLAUSE_SEPARATOR, CLAUSE_HEADER_PATTERN, NUMBER_HEADER_PATTERN
-from app.common.exception.custom_exception import CommonException
 from app.common.exception.error_code import ErrorCode
 from app.containers.service_container import embedding_service
 from app.schemas.chunk_schema import ClauseChunk, DocumentChunk
@@ -25,7 +24,7 @@ MIN_CLAUSE_BODY_LENGTH = 10
 
 
 def semantic_chunk_with_overlap(extracted_text: str,
-    similarity_threshold: float = 0.88, max_tokens: int = 180,
+    similarity_threshold: float = 0.88, max_tokens: int = 250,
     overlap: int = 1, visualize: bool = False) -> List[ClauseChunk]:
   sentences = split_into_sentences(extracted_text)
   sentences = [s for s in sentences if len(s.strip()) > MIN_CLAUSE_BODY_LENGTH]
