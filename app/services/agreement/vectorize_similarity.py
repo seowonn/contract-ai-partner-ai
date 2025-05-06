@@ -88,7 +88,7 @@ async def process_clause(qd_client: AsyncQdrantClient, rag_result: RagResult,
     return ChunkProcessResult(status=ChunkProcessStatus.FAILURE)
 
   try:
-    score = float(corrected_result["violation_score"])
+    score = round(float(corrected_result["violation_score"]), 3)
   except (KeyError, ValueError, TypeError):
     logging.warning(f"violation_score 추출 실패")
     return ChunkProcessResult(status=ChunkProcessStatus.FAILURE)
