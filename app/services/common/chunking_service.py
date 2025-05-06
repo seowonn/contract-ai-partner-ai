@@ -21,7 +21,7 @@ from app.containers.service_container import embedding_service
 from app.schemas.chunk_schema import ClauseChunk, DocumentChunk
 from app.schemas.chunk_schema import Document
 
-MIN_CLAUSE_BODY_LENGTH = 20
+MIN_CLAUSE_BODY_LENGTH = 10
 
 
 def semantic_chunk_with_overlap(extracted_text: str,
