@@ -37,17 +37,14 @@ def chunk_by_article_and_clause_with_page(documents: List[Document],
   chunks: List[DocumentChunk] = []
 
   for doc in documents:
-    page = doc.metadata.page
-    page_text = doc.page_content
+    page, text = doc.metadata.page, doc.page_content
     order_index = 1
 
-    preamble_exists = check_if_preamble_exists_except_first_page(pattern,
-                                                                 page_text)
-    if preamble_exists:
+    if check_if_preamble_exists_except_first_page(pattern,text):
       order_index, chunks = (
-        chunk_preamble_content(pattern, page_text, chunks, page, order_index))
+        chunk_preamble_content(pattern, text, chunks, page, order_index))
 
-    matches = re.findall(pattern, page_text, flags=re.DOTALL)
+    matches = re.findall(pattern, text, flags=re.DOTALL)
     header_parser = HEADER_PARSERS.get(pattern)
 
     for header, body in matches:
