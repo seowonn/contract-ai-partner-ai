@@ -38,12 +38,6 @@ def clean_markdown_block(response_text: str) -> dict | None:
 
   try:
     parsed_response = json.loads(response_text_cleaned)
-<<<<<<< HEAD
-    if isinstance(parsed_response, list):
-      parsed_response = parsed_response[0]
-
-=======
->>>>>>> 6f2316a (Fork 이후 첫 커밋)
     if "incorrectPart" in parsed_response:
       parsed_response["incorrectPart"] = clean_incorrect_part(
           parsed_response["incorrectPart"])
