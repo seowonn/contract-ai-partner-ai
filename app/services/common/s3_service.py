@@ -1,7 +1,6 @@
 import os
 
 import boto3
-import requests
 from botocore.response import StreamingBody
 from dotenv import load_dotenv
 
@@ -23,19 +22,6 @@ def s3_connection():
     raise CommonException(ErrorCode.S3_CLIENT_ERROR)
 
 s3 = s3_connection()
-
-
-def s3_get_object(url: str) -> bytes:
-  try:
-    response = requests.get(url, timeout=10)
-
-    if response.status_code != 200:
-      raise CommonException(ErrorCode.FILE_LOAD_FAILED)
-
-    return response.content
-
-  except Exception:
-    raise CommonException(ErrorCode.S3_CLIENT_ERROR)
 
 
 def read_s3_stream(s3_stream: StreamingBody):

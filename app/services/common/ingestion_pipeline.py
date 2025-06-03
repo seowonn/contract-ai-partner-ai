@@ -20,10 +20,10 @@ from app.services.agreement.vectorize_similarity import \
 from app.services.common.chunking_service import \
   chunk_by_article_and_clause_with_page, semantic_chunk, chunk_legal_terms, \
   chunk_by_paragraph
-from app.services.common.pdf_service import preprocess_pdf
+from app.services.common.pdf_service import load_pdf
 
 
-def ocr_service(document_request: DocumentRequest) -> DocumentAnalysisResult:
+def analyze_img_agreement(document_request: DocumentRequest) -> DocumentAnalysisResult:
   full_text, all_texts_with_bounding_boxes = extract_ocr(document_request.url)
 
   documents: List[Document] = [
@@ -42,11 +42,15 @@ def ocr_service(document_request: DocumentRequest) -> DocumentAnalysisResult:
                                 total_pages=len(documents))
 
 
-def pdf_agreement_service(
+def analyze_pdf_agreement(
     document_request: DocumentRequest) -> DocumentAnalysisResult:
-  documents, fitz_document = preprocess_pdf(document_request)
+  documents, fitz_document = load_pdf(document_request)
+
+  # chunk
   document_chunks = chunk_agreement_documents(documents)
   combined_chunks = combine_chunks_by_clause_number(document_chunks)
+
+  # embedding + search(rag)
   chunks = asyncio.run(
       vectorize_and_calculate_similarity(combined_chunks, document_request,
                                          fitz_document))
