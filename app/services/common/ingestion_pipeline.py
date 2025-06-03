@@ -1,13 +1,14 @@
 import asyncio
 import re
-from typing import List, Tuple
+from typing import List
 
 from app.common.constants import CLAUSE_TEXT_SEPARATOR, ARTICLE_CHUNK_PATTERN, \
   NUMBER_HEADER_PATTERN
 from app.common.exception.custom_exception import CommonException
 from app.common.exception.error_code import ErrorCode
 from app.common.file_type import FileType
-from app.schemas.analysis_response import RagResult, ClauseData
+from app.schemas.analysis_response import RagResult, ClauseData, \
+  DocumentAnalysisResult
 from app.schemas.chunk_schema import ClauseChunk
 from app.schemas.chunk_schema import Document
 from app.schemas.chunk_schema import DocumentChunk, DocumentMetadata
@@ -22,7 +23,7 @@ from app.services.common.chunking_service import \
 from app.services.common.pdf_service import preprocess_pdf
 
 
-def ocr_service(document_request: DocumentRequest):
+def ocr_service(document_request: DocumentRequest) -> DocumentAnalysisResult:
   full_text, all_texts_with_bounding_boxes = extract_ocr(document_request.url)
 
   documents: List[Document] = [
@@ -36,11 +37,13 @@ def ocr_service(document_request: DocumentRequest):
       vectorize_and_calculate_similarity_ocr(combined_chunks, document_request,
                                              all_texts_with_bounding_boxes))
 
-  return chunks, len(combined_chunks), len(documents)
+  return DocumentAnalysisResult(chunks=chunks,
+                                total_chunks=len(combined_chunks),
+                                total_pages=len(documents))
 
 
-def pdf_agreement_service(document_request: DocumentRequest) -> Tuple[
-  List[RagResult], int, int]:
+def pdf_agreement_service(
+    document_request: DocumentRequest) -> DocumentAnalysisResult:
   documents, fitz_document = preprocess_pdf(document_request)
   document_chunks = chunk_agreement_documents(documents)
   combined_chunks = combine_chunks_by_clause_number(document_chunks)
@@ -48,7 +51,9 @@ def pdf_agreement_service(document_request: DocumentRequest) -> Tuple[
       vectorize_and_calculate_similarity(combined_chunks, document_request,
                                          fitz_document))
 
-  return chunks, len(combined_chunks), len(documents)
+  return DocumentAnalysisResult(chunks=chunks,
+                                total_chunks=len(combined_chunks),
+                                total_pages=len(documents))
 
 
 def extract_file_type(url: str) -> FileType:
@@ -87,12 +92,6 @@ def chunk_agreement_documents(documents: List[Document]) -> List[DocumentChunk]:
                                                    NUMBER_HEADER_PATTERN)
   else:
     chunks = chunk_by_paragraph(documents)
-
-  # keep_text, _ = chunks[0].clause_content.split("1.", 1)
-  # chunks[0].clause_content = keep_text
-  # keep_text, _ = chunks[-2].clause_content.split("날짜 :", 1)
-  # chunks[-2].clause_content = keep_text.strip()
-  # del chunks[-1]
 
   if not chunks:
     raise CommonException(ErrorCode.CHUNKING_FAIL)

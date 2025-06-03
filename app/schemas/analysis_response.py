@@ -26,12 +26,17 @@ class RagResult:
 
 @dataclass
 class AnalysisResponse:
-  total_page: int = 0
   chunks: List[RagResult] = field(default_factory=list)
   total_chunks: int = 0
+  total_page: int = 0
 
 @dataclass
 class StandardResponse:
   result: str
   contents: List[str] = field(default_factory=list)
 
+@dataclass
+class DocumentAnalysisResult:
+  chunks: List[RagResult]
+  total_chunks: int
+  total_pages: int
