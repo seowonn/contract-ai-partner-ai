@@ -2,28 +2,25 @@ import asyncio
 import re
 from typing import List
 
-from app.common.constants import CLAUSE_TEXT_SEPARATOR, ARTICLE_CHUNK_PATTERN, \
-  NUMBER_HEADER_PATTERN
-from app.common.exception.custom_exception import CommonException
-from app.common.exception.error_code import ErrorCode
-from app.common.file_type import FileType
+from app.common.constants import CLAUSE_TEXT_SEPARATOR
 from app.schemas.analysis_response import RagResult, ClauseData, \
   DocumentAnalysisResult
 from app.schemas.chunk_schema import ClauseChunk
 from app.schemas.chunk_schema import Document
 from app.schemas.chunk_schema import DocumentChunk, DocumentMetadata
 from app.schemas.document_request import DocumentRequest
+from app.services.agreement.chunking import chunk_agreement_documents
 from app.services.agreement.ocr_service import extract_ocr, \
   vectorize_and_calculate_similarity_ocr
 from app.services.agreement.vectorize_similarity import \
   vectorize_and_calculate_similarity
 from app.services.common.chunking_service import \
-  chunk_by_article_and_clause_with_page, semantic_chunk, chunk_legal_terms, \
-  chunk_by_paragraph
+  semantic_chunk, chunk_legal_terms
 from app.services.common.pdf_service import load_pdf
 
 
-def analyze_img_agreement(document_request: DocumentRequest) -> DocumentAnalysisResult:
+def analyze_img_agreement(
+    document_request: DocumentRequest) -> DocumentAnalysisResult:
   full_text, all_texts_with_bounding_boxes = extract_ocr(document_request.url)
 
   documents: List[Document] = [
@@ -60,14 +57,6 @@ def analyze_pdf_agreement(
                                 total_pages=len(documents))
 
 
-def extract_file_type(url: str) -> FileType:
-  try:
-    ext = url.split(".")[-1].strip().upper()
-    return FileType(ext)
-  except Exception:
-    raise CommonException(ErrorCode.UNSUPPORTED_FILE_TYPE)
-
-
 def chunk_standard_texts(documents: List[Document], category: str,
     page_batch_size: int = 50) -> List[ClauseChunk]:
   all_clauses = []
@@ -83,23 +72,6 @@ def chunk_standard_texts(documents: List[Document], category: str,
       all_clauses.extend(article_chunks)
 
   return all_clauses
-
-
-def chunk_agreement_documents(documents: List[Document]) -> List[DocumentChunk]:
-  if re.findall(ARTICLE_CHUNK_PATTERN, documents[0].page_content,
-                flags=re.DOTALL):
-    chunks = chunk_by_article_and_clause_with_page(documents,
-                                                   ARTICLE_CHUNK_PATTERN)
-  elif re.findall(NUMBER_HEADER_PATTERN, documents[0].page_content,
-                  flags=re.DOTALL):
-    chunks = chunk_by_article_and_clause_with_page(documents,
-                                                   NUMBER_HEADER_PATTERN)
-  else:
-    chunks = chunk_by_paragraph(documents)
-
-  if not chunks:
-    raise CommonException(ErrorCode.CHUNKING_FAIL)
-  return chunks
 
 
 def combine_chunks_by_clause_number(document_chunks: List[DocumentChunk]) -> \

@@ -4,6 +4,7 @@ from flask import Blueprint
 
 from app.blueprints.agreement.agreement_exception import AgreementException
 from app.common.decorators import parse_request
+from app.common.exception.custom_exception import CommonException
 from app.common.exception.error_code import ErrorCode
 from app.common.file_type import FileType
 from app.schemas.analysis_response import AnalysisResponse, \
@@ -11,8 +12,8 @@ from app.schemas.analysis_response import AnalysisResponse, \
 from app.schemas.document_request import DocumentRequest
 from app.schemas.success_code import SuccessCode
 from app.schemas.success_response import SuccessResponse
-from app.services.common.ingestion_pipeline import extract_file_type, \
-  analyze_pdf_agreement, analyze_img_agreement
+from app.services.common.ingestion_pipeline import analyze_pdf_agreement, \
+  analyze_img_agreement
 
 agreements = Blueprint('agreements', __name__, url_prefix="/flask/agreements")
 IMAGE_FILE_TYPES = (FileType.PNG, FileType.JPG, FileType.JPEG)
@@ -34,3 +35,11 @@ def process_uploaded_agreement(document_request: DocumentRequest):
                                           total_chunks=result.total_chunks,
                                           total_page=result.total_pages)
                          ).of(), HTTPStatus.OK
+
+
+def extract_file_type(url: str) -> FileType:
+  try:
+    ext = url.split(".")[-1].strip().upper()
+    return FileType(ext)
+  except Exception:
+    raise CommonException(ErrorCode.UNSUPPORTED_FILE_TYPE)
