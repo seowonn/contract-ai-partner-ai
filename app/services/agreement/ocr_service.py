@@ -3,16 +3,18 @@ import json
 import logging
 import time
 import uuid
+from asyncio import Semaphore
 from typing import List, Tuple
 
 import cv2
 import numpy as np
 import requests
 from qdrant_client import AsyncQdrantClient
+from qdrant_client.http.models import SparseVector
 
 from app.blueprints.agreement.agreement_exception import AgreementException
 from app.clients.naver_clients import get_naver_ocr_client
-from app.clients.openai_clients import get_embedding_async_client, \
+from app.clients.openai_clients import get_dense_embedding_async_client, \
   get_prompt_async_client
 from app.clients.qdrant_client import get_qdrant_client
 from app.common.chunk_status import ChunkProcessStatus, ChunkProcessResult
@@ -24,6 +26,8 @@ from app.schemas.document_request import DocumentRequest
 from app.services.agreement.vectorize_similarity import \
   prepare_embedding_inputs, search_qdrant, parse_incorrect_text, \
   LLM_REQUIRED_KEYS, VIOLATION_THRESHOLD
+from app.services.common.keyword_searcher import \
+  get_sparse_embedding_async_client
 from app.services.common.llm_retry import retry_llm_call
 from app.services.common.qdrant_utils import ensure_qdrant_collection
 
@@ -132,15 +136,22 @@ async def vectorize_and_calculate_similarity_ocr(
 
   embedding_inputs = await prepare_embedding_inputs(combined_chunks)
 
-  async with get_embedding_async_client() as embedding_client:
-    embeddings = await embedding_service.batch_embed_texts(
-        embedding_client, embedding_inputs)
+  async with get_dense_embedding_async_client() as dense_client, \
+      get_sparse_embedding_async_client() as sparse_client:
+    dense_task = embedding_service.batch_embed_texts(dense_client,
+                                                     embedding_inputs)
+    sparse_task = embedding_service.batch_embed_texts_sparse(sparse_client,
+                                                             embedding_inputs)
+    dense_vectors, sparse_vectors = await asyncio.gather(dense_task,
+                                                         sparse_task)
 
+  semaphore = Semaphore(5)
   tasks = [
-    process_clause_ocr(qd_client, chunk, embedding,
+    process_clause_ocr(qd_client, chunk, dense_vec, sparse_vec,
                        document_request.categoryName,
-                       all_texts_with_bounding_boxes)
-    for chunk, embedding in zip(combined_chunks, embeddings)
+                       all_texts_with_bounding_boxes, semaphore)
+    for chunk, dense_vec, sparse_vec in
+    zip(combined_chunks, dense_vectors, sparse_vectors)
   ]
   results = await asyncio.gather(*tasks)
 
@@ -155,10 +166,12 @@ async def vectorize_and_calculate_similarity_ocr(
 
 
 async def process_clause_ocr(qd_client: AsyncQdrantClient,
-    rag_result: RagResult, embedding: List[float], collection_name: str,
-    all_texts_with_bounding_boxes: List[dict]) -> ChunkProcessResult:
-  semaphore = asyncio.Semaphore(5)
-  search_results = await search_qdrant(semaphore, collection_name, embedding,
+    rag_result: RagResult,
+    dense_vec: List[float], sparse_vec: SparseVector, collection_name: str,
+    all_texts_with_bounding_boxes: List[dict],
+    semaphore: Semaphore) -> ChunkProcessResult:
+  search_results = await search_qdrant(semaphore, collection_name,
+                                       dense_vec, sparse_vec,
                                        qd_client)
 
   parse_incorrect_text(rag_result)

@@ -17,7 +17,7 @@ from app.services.agreement.ocr_service import extract_ocr, \
 from app.services.agreement.vectorize_similarity import \
   vectorize_and_calculate_similarity
 from app.services.common.chunking_service import \
-  chunk_by_article_and_clause_with_page, semantic_chunk_with_overlap, \
+  chunk_by_article_and_clause_with_page, semantic_chunk, chunk_legal_terms, \
   chunk_by_paragraph
 from app.services.common.pdf_service import preprocess_pdf
 
@@ -67,8 +67,11 @@ def chunk_standard_texts(documents: List[Document], category: str,
     batch_docs = documents[start:start + page_batch_size]
     extracted_text = "\n".join(doc.page_content for doc in batch_docs)
 
-    article_chunks = semantic_chunk_with_overlap(extracted_text, similarity_threshold=0.3)
-    all_clauses.extend(article_chunks)
+    if category == "법률용어":
+      all_clauses.extend(chunk_legal_terms(extracted_text))
+    else:
+      article_chunks = semantic_chunk(extracted_text, similarity_threshold=0.3)
+      all_clauses.extend(article_chunks)
 
   return all_clauses
 

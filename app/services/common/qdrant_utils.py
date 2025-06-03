@@ -1,7 +1,7 @@
 from httpx import ConnectTimeout
 from qdrant_client import AsyncQdrantClient
 from qdrant_client.http.exceptions import ResponseHandlingException
-from qdrant_client.http.models import VectorParams, Distance
+from qdrant_client.http.models import VectorParams, Distance, SparseVectorParams
 from qdrant_client.models import Filter, FieldCondition, MatchValue
 
 from app.blueprints.standard.standard_exception import StandardException
@@ -25,7 +25,11 @@ async def create_qdrant_collection(qd_client: AsyncQdrantClient,
   try:
     return await qd_client.create_collection(
         collection_name=collection_name,
-        vectors_config=VectorParams(size=1536, distance=Distance.COSINE)
+
+        vectors_config={
+          "dense": VectorParams(size=1536, distance=Distance.COSINE)
+        },
+        sparse_vectors_config={"sparse": SparseVectorParams()}
     )
   except (ConnectTimeout, ResponseHandlingException):
     raise CommonException(ErrorCode.QDRANT_CONNECTION_TIMEOUT)
@@ -44,7 +48,6 @@ async def upload_points_to_qdrant(qd_client: AsyncQdrantClient, collection_name,
 
 async def point_exists(qd_client: AsyncQdrantClient, collection_name: str,
     standard_id: int) -> bool:
-
   filter_condition = Filter(
       must=[
         FieldCondition(key="standard_id", match=MatchValue(value=standard_id))]
@@ -52,9 +55,9 @@ async def point_exists(qd_client: AsyncQdrantClient, collection_name: str,
 
   try:
     points, _ = await qd_client.scroll(
-      collection_name=collection_name,
-      scroll_filter=filter_condition,
-      limit=1
+        collection_name=collection_name,
+        scroll_filter=filter_condition,
+        limit=1
     )
   except (ConnectTimeout, ResponseHandlingException):
     raise CommonException(ErrorCode.QDRANT_CONNECTION_TIMEOUT)

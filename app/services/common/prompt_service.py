@@ -38,9 +38,12 @@ def clean_markdown_block(response_text: str) -> dict | None:
 
   try:
     parsed_response = json.loads(response_text_cleaned)
+<<<<<<< HEAD
     if isinstance(parsed_response, list):
       parsed_response = parsed_response[0]
 
+=======
+>>>>>>> 6f2316a (Fork 이후 첫 커밋)
     if "incorrectPart" in parsed_response:
       parsed_response["incorrectPart"] = clean_incorrect_part(
           parsed_response["incorrectPart"])
@@ -74,12 +77,20 @@ class PromptService:
             "role": "user",
             "content": f"""
             입력 문장은 계약 체결자가 불리하게 해석할 여지가 있는지를 검토하는 대상이야.
+<<<<<<< HEAD
 
+=======
+            
+>>>>>>> 6f2316a (Fork 이후 첫 커밋)
             💡 작업 목표:
             1. 원문을 기반으로 **불공정하거나 불리하게 해석될 수 있는 문장 (incorrect_text)** 을 상상해서 작성
             2. 해당 문장을 보다 공정하게 고친 **교정 문장 (corrected_text)** 작성
             3. 해당 문장에서 **전문가와 비전문가 사이에 해석 차이를 유발할 수 있는 핵심 용어**를 식별하고, 그 **차이와 의미를 해설 (term_explanation)** 할 것
+<<<<<<< HEAD
 
+=======
+            
+>>>>>>> 6f2316a (Fork 이후 첫 커밋)
             📌 주의사항:
             - 원문 그대로 반환하지 말 것
             - 실제로 문서에 없더라도 **오해 가능성**이나 **맥락의 왜곡**에 근거해 위배 문장을 구성할 것
@@ -93,10 +104,17 @@ class PromptService:
               "corrected_text": "업무를 인계받지 못한 공무원도, 특별한 사유가 없는 경우에는 책임을 질 수 있다.",
               "term_explanation": "‘책임이 없다’는 표현은 맥락에 따라 무조건 면책되는 것처럼 해석될 수 있어, 인계 지연의 원인을 고려하지 않는 불공정성이 있다."
             }}
+<<<<<<< HEAD
 
             🎯 검토할 문장:
             \"\"\"{clause_content}\"\"\"
 
+=======
+      
+            🎯 검토할 문장:
+            \"\"\"{clause_content}\"\"\"
+      
+>>>>>>> 6f2316a (Fork 이후 첫 커밋)
             """
           }
         ],
@@ -152,6 +170,7 @@ class PromptService:
             - 문법적 오류보다는 **내용의 법적 타당성**에 집중해 주세요.
             - `proofText`에는 어떤 입력 변수명도 그대로 포함시키지 마세요.
             - 계약서 문장의 위배 확률이 높아 보인다면 `violation_score`를 높게 반환해 주세요.
+<<<<<<< HEAD
             
             - 일반적으로 소정근로시간은 매일 09시부터 18시까지로 한다(휴게시간 제외 총 8시간, 1주간 40시간 이내로 함)
             - 초과되는 근무시간은 최대 주 12시간으로 하며, 연장근로 포함 총 근무시간은 주 52시간을 초과할 수 없습니다.
@@ -161,6 +180,12 @@ class PromptService:
             - 하자 담보 책임기간은 IT 업계에서 일반적으로 3개월~1년으로 합니다. 최소 1개월 이상이어야 합니다.
             - 일반적인 지체배상금요율은 0.005% ~ 0.3% 입니다. 반드시 1천분의 3 이하가 되어야합니다.
 
+=======
+            - proofText는 350자 이내로 작성해 주세요.
+            
+            - 2025년 시급은 10,030원 이상이여야만 합니다.
+            - 근무시간이 주15시간 이상인 경우에만, 주휴수당이 별도로 지급되어야 하고 근무시간이 주 15시간 이하라면 급여에 포함이 아닌 지급되지 않아
+>>>>>>> 6f2316a (Fork 이후 첫 커밋)
     
             [입력 데이터 설명]
             - clause_content: 계약서 문장

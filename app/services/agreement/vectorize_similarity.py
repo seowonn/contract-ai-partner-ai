@@ -2,14 +2,16 @@ import asyncio
 import logging
 from asyncio import Semaphore
 from typing import List, Optional, Any
-import fitz
 
-from qdrant_client import models, AsyncQdrantClient
-from qdrant_client.http.models import QueryResponse
+import fitz
+from qdrant_client import AsyncQdrantClient
+from qdrant_client.http.models import Prefetch
+from qdrant_client.models import FusionQuery, Fusion
+from qdrant_client.models import QueryResponse, SparseVector
 
 from app.blueprints.agreement.agreement_exception import AgreementException
 from app.clients.openai_clients import get_prompt_async_client, \
-  get_embedding_async_client
+  get_dense_embedding_async_client
 from app.clients.qdrant_client import get_qdrant_client
 from app.common.chunk_status import ChunkProcessResult, ChunkProcessStatus
 from app.common.constants import ARTICLE_CLAUSE_SEPARATOR, \
@@ -20,11 +22,14 @@ from app.common.exception.error_code import ErrorCode
 from app.containers.service_container import embedding_service, prompt_service
 from app.schemas.analysis_response import RagResult, SearchResult
 from app.schemas.document_request import DocumentRequest
+from app.services.common.keyword_searcher import \
+  get_sparse_embedding_async_client
 from app.services.common.llm_retry import retry_llm_call
 from app.services.common.qdrant_utils import ensure_qdrant_collection
 
 SEARCH_COUNT = 3
-VIOLATION_THRESHOLD = 0.84
+VIOLATION_THRESHOLD = 0.85
+
 LLM_REQUIRED_KEYS = {"clause_content", "correctedText", "proofText",
                      "violation_score"}
 
@@ -38,19 +43,28 @@ async def vectorize_and_calculate_similarity(
 
   embedding_inputs = await prepare_embedding_inputs(combined_chunks)
 
-  async with get_embedding_async_client() as embedding_client:
-    embeddings = await embedding_service.batch_embed_texts(
-        embedding_client, embedding_inputs)
+  async with get_dense_embedding_async_client() as dense_client, \
+      get_sparse_embedding_async_client() as sparse_client:
+    dense_task = embedding_service.batch_embed_texts(dense_client,
+                                                     embedding_inputs)
+    sparse_task = embedding_service.batch_embed_texts_sparse(sparse_client,
+                                                             embedding_inputs)
+    dense_vectors, sparse_vectors = await asyncio.gather(dense_task,
+                                                         sparse_task)
 
+  # ✅ 세마포어 외부로 이동하여 task 재사용성 향상
+  semaphore = Semaphore(5)
   tasks = [
-    process_clause(qd_client, chunk, embedding,
-                   document_request.categoryName, byte_type_pdf)
-    for chunk, embedding in zip(combined_chunks, embeddings)
+    process_clause(qd_client, chunk, dense_vec, sparse_vec,
+                   document_request.categoryName, byte_type_pdf, semaphore)
+    for chunk, dense_vec, sparse_vec in
+    zip(combined_chunks, dense_vectors, sparse_vectors)
   ]
   results = await asyncio.gather(*tasks)
 
-  success_results: List[RagResult] = [r.result for r in results if
-                                      r.status == ChunkProcessStatus.SUCCESS and r.result is not None]
+  success_results = [r.result for r in results if
+                     r.status == ChunkProcessStatus.SUCCESS and r.result]
+
   failure_score = sum(r.status == ChunkProcessStatus.FAILURE for r in results)
 
   if not success_results and failure_score == len(combined_chunks):
@@ -70,10 +84,11 @@ async def prepare_embedding_inputs(chunks: List[RagResult]) -> List[str]:
 
 
 async def process_clause(qd_client: AsyncQdrantClient, rag_result: RagResult,
-    embedding: List[float], collection_name: str,
-    byte_type_pdf: fitz.Document) -> ChunkProcessResult:
-  semaphore = asyncio.Semaphore(5)
-  search_results = await search_qdrant(semaphore, collection_name, embedding,
+    dense_vec: List[float], sparse_vec: SparseVector,
+    collection_name: str, byte_type_pdf: fitz.Document,
+    semaphore: Semaphore) -> ChunkProcessResult:
+  search_results = await search_qdrant(semaphore, collection_name, dense_vec,
+                                       sparse_vec,
                                        qd_client)
   parse_incorrect_text(rag_result)
 
@@ -88,7 +103,7 @@ async def process_clause(qd_client: AsyncQdrantClient, rag_result: RagResult,
     return ChunkProcessResult(status=ChunkProcessStatus.FAILURE)
 
   try:
-    score = round(float(corrected_result["violation_score"]), 3)
+    score = float(corrected_result["violation_score"])
   except (KeyError, ValueError, TypeError):
     logging.warning(f"violation_score 추출 실패")
     return ChunkProcessResult(status=ChunkProcessStatus.FAILURE)
@@ -116,9 +131,9 @@ async def process_clause(qd_client: AsyncQdrantClient, rag_result: RagResult,
 
 async def extract_incorrect_text(rag_result: RagResult) -> str:
   clause_content_parts = rag_result.incorrect_text.split(
-    ARTICLE_CLAUSE_SEPARATOR, 1)
+      ARTICLE_CLAUSE_SEPARATOR, 1)
   return clause_content_parts[1].strip() if len(
-    clause_content_parts) > 1 else ""
+      clause_content_parts) > 1 else ""
 
 
 def parse_incorrect_text(rag_result: RagResult) -> None:
@@ -133,27 +148,32 @@ def parse_incorrect_text(rag_result: RagResult) -> None:
 
 
 async def search_qdrant(semaphore: Semaphore, collection_name: str,
-    embedding: List[float],
+    dense_vec: List[float], sparse_vec: SparseVector,
     qd_client: AsyncQdrantClient) -> List[SearchResult]:
   search_results = await search_collection(qd_client, semaphore,
-                                           collection_name, embedding)
+                                           collection_name, dense_vec,
+                                           sparse_vec)
   return gather_search_results(search_results)
 
 
 async def search_collection(qd_client: AsyncQdrantClient,
     semaphore: Semaphore, collection_name: str,
-    embedding: List[float]) -> QueryResponse:
+    dense_vec: List[float], sparse_vec: SparseVector) -> QueryResponse:
   for attempt in range(1, MAX_RETRIES + 1):
     try:
       async with semaphore:
         search_results = await qd_client.query_points(
             collection_name=collection_name,
-            query=embedding,
-            search_params=models.SearchParams(hnsw_ef=128, exact=False),
+            prefetch=[
+              Prefetch(query=sparse_vec, using="sparse", limit=10),
+              Prefetch(query=dense_vec, using="dense", limit=10),
+            ],
+            query=FusionQuery(fusion=Fusion.RRF),
             limit=SEARCH_COUNT,
             with_payload=True
         )
-      break
+        break
+
     except Exception as e:
       if attempt == MAX_RETRIES:
         raise CommonException(ErrorCode.QDRANT_SEARCH_FAILED)

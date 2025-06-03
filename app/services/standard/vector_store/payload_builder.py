@@ -8,6 +8,7 @@ from app.services.common.llm_retry import retry_llm_call
 STANDARD_LLM_REQUIRED_KEYS = {"incorrect_text", "corrected_text",
                               "term_explanation"}
 
+
 async def make_clause_payload(prompt_client, article, pdf_request,
     semaphore) -> VectorPayload | None:
   async with semaphore:
