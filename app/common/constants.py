@@ -1,11 +1,8 @@
 SUCCESS = "success"
 
 ARTICLE_HEADER_PATTERN = r'^\s*제\s*\d+\s*조'
-ARTICLE_CHUNK_PATTERN = r'(제\s*\d+\s*조\s*(?:【[^】\n]*】?|[^】\n]*】|\([^)\\n]*\)?|\[[^\]\n]*\]?))\s*(.*?)(?=(?:제\s*\d+\s*조\s*(?:【[^】\n]*】?|[^】\n]*】|\([^)\\n]*\)?|\[[^\]\n]*\]?|)|$))'
-
 
 ARTICLE_HEADER_PARSE_PATTERN = r'제\s*(\d+)\s*조\s*(?:【([^】]+)】|\(([^)]+)\)|\[([^\]]+)\])'
-NUMBER_HEADER_PATTERN = r'(?<!\d)(\d{1,2}\.)[ \t]*(.*?)(?=\s\d{1,2}\.|\Z)'
 ORIGINAL_NUMBER_HEADER_PATTERN = r'(\d+\.\s*[^\n:：]+)\s*[:：]?\s*(.*?)(?=\d+\.\s|$)'
 NUMBER_HEADER_PATTERN = r'(\d+\.\s*[^\n:：]+)\s*[:：]?\s*(.*?)(?=\d+\.\s|$)'
 

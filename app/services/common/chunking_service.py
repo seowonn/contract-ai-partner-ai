@@ -1,5 +1,5 @@
 import re
-from typing import List, Dict, Callable
+from typing import List
 from typing import Optional, Tuple
 
 import matplotlib.pyplot as plt
@@ -9,18 +9,12 @@ import tiktoken
 from nltk import find
 from sklearn.manifold import TSNE
 
-from app.blueprints.agreement.agreement_exception import AgreementException
 from app.blueprints.standard.standard_exception import StandardException
 from app.clients.openai_clients import get_embedding_sync_client
-from app.common.constants import ARTICLE_CHUNK_PATTERN, \
-  ARTICLE_CLAUSE_SEPARATOR, CLAUSE_HEADER_PATTERN, NUMBER_HEADER_PATTERN
 from app.common.exception.custom_exception import CommonException
 from app.common.exception.error_code import ErrorCode
 from app.containers.service_container import embedding_service
 from app.schemas.chunk_schema import ClauseChunk, DocumentChunk
-from app.schemas.chunk_schema import Document
-from app.services.agreement.chunking import parse_article_header, \
-  parse_number_header
 
 MIN_CLAUSE_BODY_LENGTH = 20
 

@@ -1,5 +1,5 @@
 import re
-from typing import List, Tuple
+from typing import List, Tuple, Dict, Callable
 
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 
@@ -8,7 +8,7 @@ from app.common.constants import ARTICLE_CLAUSE_SEPARATOR, CLAUSE_HEADER_PATTERN
 from app.common.exception.custom_exception import CommonException
 from app.common.exception.error_code import ErrorCode
 from app.schemas.chunk_schema import Document, DocumentChunk
-from app.services.agreement.mapping import HEADER_PARSERS, CHUNKING_STRATEGIES
+from app.services.agreement.chunk_regex import CHUNKING_REGEX
 from app.services.common.chunking_service import \
   split_by_clause_header_pattern, \
   MIN_CLAUSE_BODY_LENGTH, check_if_preamble_exists_except_first_page, \
@@ -18,9 +18,9 @@ from app.services.common.chunking_service import \
 def chunk_agreement_documents(documents: List[Document]) -> List[DocumentChunk]:
   first_page = documents[0].page_content
 
-  for pattern, chunk_fn in CHUNKING_STRATEGIES:
-    if re.findall(pattern, first_page, flags=re.DOTALL):
-      chunks = chunk_fn(documents, pattern)
+  for strategy in CHUNKING_REGEX:
+    if re.findall(strategy["regex"], first_page, flags=re.DOTALL):
+      chunks = chunk_by_article_and_clause_with_page(documents, strategy)
       break
   else:
     chunks = chunk_by_paragraph(documents)
@@ -32,8 +32,8 @@ def chunk_agreement_documents(documents: List[Document]) -> List[DocumentChunk]:
 
 
 def chunk_by_article_and_clause_with_page(documents: List[Document],
-    pattern: str) -> List[
-  DocumentChunk]:
+    strategy: dict) -> List[DocumentChunk]:
+  pattern = strategy["regex"]
   chunks: List[DocumentChunk] = []
 
   for doc in documents:
@@ -47,6 +47,7 @@ def chunk_by_article_and_clause_with_page(documents: List[Document],
     matches = re.findall(pattern, text, flags=re.DOTALL)
     header_parser = HEADER_PARSERS.get(pattern)
 
+    # 회사 계약서는 굳이 조 번호 / 제목으로 구분하지 않아도 된다고 해서 matches를 그대로 사용
     for header, body in matches:
       if not header_parser:
         continue
@@ -146,3 +147,11 @@ def chunk_by_paragraph(documents: List[Document]) -> List[DocumentChunk]:
       )
 
   return chunks
+
+ARTICLE_CHUNK_PATTERN = r'(제\s*\d+\s*조\s*(?:【[^】\n]*】?|[^】\n]*】|\([^)\\n]*\)?|\[[^\]\n]*\]?))\s*(.*?)(?=(?:제\s*\d+\s*조\s*(?:【[^】\n]*】?|[^】\n]*】|\([^)\\n]*\)?|\[[^\]\n]*\]?|)|$))'
+NUMBER_HEADER_PATTERN = r"(?<=\n|^)(\d+\.\s.*?)(?=\n\d+\.|\Z)"
+
+HEADER_PARSERS: Dict[str, Callable[[str], Tuple[int, str]]] = {
+  ARTICLE_CHUNK_PATTERN: parse_article_header,
+  NUMBER_HEADER_PATTERN: parse_number_header
+}
