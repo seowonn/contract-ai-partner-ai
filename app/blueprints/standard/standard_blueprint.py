@@ -1,4 +1,5 @@
 import asyncio
+import re
 from http import HTTPStatus
 
 from flask import Blueprint
@@ -12,7 +13,7 @@ from app.schemas.document_request import DocumentRequest
 from app.schemas.success_code import SuccessCode
 from app.schemas.success_response import SuccessResponse
 from app.services.common.ingestion_pipeline import load_pdf, \
-  chunk_standard_texts, normalize_spacing
+  chunk_standard_texts
 from app.services.standard.vector_delete import delete_by_standard_id
 from app.services.standard.vector_store.vector_processor import \
   vectorize_and_save
@@ -45,3 +46,10 @@ def delete_standard(categoryName: str, standardId: str):
   success_code = (
     asyncio.run(delete_by_standard_id(int(standardId), categoryName)))
   return SuccessResponse(success_code, SUCCESS).of(), HTTPStatus.OK
+
+
+def normalize_spacing(text: str) -> str:
+  text = text.replace('\n', '[[[NEWLINE]]]')
+  text = re.sub(r'\s{5,}', '\n', text)
+  text = text.replace('[[[NEWLINE]]]', '\n')
+  return text

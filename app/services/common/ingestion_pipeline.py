@@ -1,15 +1,12 @@
 import asyncio
-import re
 from typing import List
 
-from app.common.constants import CLAUSE_TEXT_SEPARATOR
-from app.schemas.analysis_response import RagResult, ClauseData, \
-  DocumentAnalysisResult
+from app.schemas.analysis_response import DocumentAnalysisResult
 from app.schemas.chunk_schema import ClauseChunk
 from app.schemas.chunk_schema import Document
-from app.schemas.chunk_schema import DocumentChunk, DocumentMetadata
+from app.schemas.chunk_schema import DocumentMetadata
 from app.schemas.document_request import DocumentRequest
-from app.services.agreement.chunking import chunk_agreement_documents
+from app.services.agreement.agreement_chunking import chunk_agreement_documents
 from app.services.agreement.ocr_service import extract_ocr, \
   vectorize_and_calculate_similarity_ocr
 from app.services.agreement.vectorize_similarity import \
@@ -26,8 +23,7 @@ def analyze_img_agreement(
   documents: List[Document] = [
     Document(page_content=full_text, metadata=DocumentMetadata(page=1))]
 
-  document_chunks = chunk_agreement_documents(documents)
-  combined_chunks = combine_chunks_by_clause_number(document_chunks)
+  combined_chunks = chunk_agreement_documents(documents)
 
   # 입력값이 다르기에 함수가 분리되어야 함
   chunks = asyncio.run(
@@ -46,8 +42,7 @@ def analyze_pdf_agreement(
   documents, fitz_document = load_pdf(document_request)
 
   # chunking
-  document_chunks = chunk_agreement_documents(documents)
-  combined_chunks = combine_chunks_by_clause_number(document_chunks)
+  combined_chunks = chunk_agreement_documents(documents)
 
   # embedding + search(rag)
   chunks = asyncio.run(
@@ -74,36 +69,3 @@ def chunk_standard_texts(documents: List[Document], category: str,
       all_clauses.extend(article_chunks)
 
   return all_clauses
-
-
-def combine_chunks_by_clause_number(document_chunks: List[DocumentChunk]) -> \
-    List[RagResult]:
-  combined_chunks: List[RagResult] = []
-  clause_map: dict[str, RagResult] = {}
-
-  for doc in document_chunks:
-    rag_result = clause_map.setdefault(doc.clause_number, RagResult())
-
-    if not doc.clause_content.strip():
-      continue
-
-    if rag_result.incorrect_text:
-      rag_result.incorrect_text += (
-          CLAUSE_TEXT_SEPARATOR + doc.clause_content)
-    else:
-      rag_result.incorrect_text = doc.clause_content
-      combined_chunks.append(rag_result)
-
-    rag_result.clause_data.append(ClauseData(
-        order_index=doc.order_index,
-        page=doc.page
-    ))
-
-  return combined_chunks
-
-
-def normalize_spacing(text: str) -> str:
-  text = text.replace('\n', '[[[NEWLINE]]]')
-  text = re.sub(r'\s{5,}', '\n', text)
-  text = text.replace('[[[NEWLINE]]]', '\n')
-  return text

@@ -9,7 +9,6 @@ NUMBER_HEADER_PATTERN = r'(\d+\.\s*[^\n:：]+)\s*[:：]?\s*(.*?)(?=\d+\.\s|$)'
 CLAUSE_HEADER_PATTERN = r'(①|1\.|\(1\))'
 
 CLAUSE_TEXT_SEPARATOR = "!!!"
-ARTICLE_CLAUSE_SEPARATOR = "+"
 
 MAX_RETRIES = 5
 LLM_TIMEOUT = 30.0

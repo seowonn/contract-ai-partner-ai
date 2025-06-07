@@ -14,8 +14,7 @@ from app.clients.openai_clients import get_prompt_async_client, \
   get_dense_embedding_async_client
 from app.clients.qdrant_client import get_qdrant_client
 from app.common.chunk_status import ChunkProcessResult, ChunkProcessStatus
-from app.common.constants import ARTICLE_CLAUSE_SEPARATOR, \
-  CLAUSE_TEXT_SEPARATOR, MAX_RETRIES
+from app.common.constants import CLAUSE_TEXT_SEPARATOR, MAX_RETRIES
 from app.common.decorators import async_measure_time
 from app.common.exception.custom_exception import CommonException
 from app.common.exception.error_code import ErrorCode
@@ -76,10 +75,7 @@ async def vectorize_and_calculate_similarity(
 async def prepare_embedding_inputs(chunks: List[RagResult]) -> List[str]:
   inputs = []
   for chunk in chunks:
-    parts = chunk.incorrect_text.split(ARTICLE_CLAUSE_SEPARATOR, 1)
-    title = parts[0].strip() if len(parts) == 2 else ""
-    content = parts[1].strip() if len(parts) == 2 else parts[0].strip()
-    inputs.append(f"{title} {content}")
+    inputs.append(f"{chunk.incorrect_text}")
   return inputs
 
 
@@ -129,22 +125,11 @@ async def process_clause(qd_client: AsyncQdrantClient, rag_result: RagResult,
                             result=rag_result)
 
 
-async def extract_incorrect_text(rag_result: RagResult) -> str:
-  clause_content_parts = rag_result.incorrect_text.split(
-      ARTICLE_CLAUSE_SEPARATOR, 1)
-  return clause_content_parts[1].strip() if len(
-      clause_content_parts) > 1 else ""
-
-
 def parse_incorrect_text(rag_result: RagResult) -> None:
   try:
-    clause_parts = rag_result.incorrect_text.split(
-        ARTICLE_CLAUSE_SEPARATOR, 1)
+    rag_result.incorrect_text = rag_result.incorrect_text.replace("\n", " ")
   except Exception:
     raise AgreementException(ErrorCode.NO_SEPARATOR_FOUND)
-
-  rag_result.incorrect_text = clause_parts[-1]
-  rag_result.incorrect_text = rag_result.incorrect_text.replace("\n", " ")
 
 
 async def search_qdrant(semaphore: Semaphore, collection_name: str,
@@ -211,8 +196,7 @@ def set_result_data(corrected_result: Optional[
   dict[str, Any]], rag_result: RagResult, positions: List[List],
     part_positions: List[List]):
   rag_result.incorrect_text = (
-    rag_result.incorrect_text.split(ARTICLE_CLAUSE_SEPARATOR, 1)[-1]
-    .replace(CLAUSE_TEXT_SEPARATOR, "")
+    rag_result.incorrect_text.replace(CLAUSE_TEXT_SEPARATOR, "")
     .replace("\n", "")
     .replace("", '"')
   )

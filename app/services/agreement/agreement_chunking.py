@@ -3,9 +3,10 @@ from typing import List
 
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 
-from app.common.constants import ARTICLE_CLAUSE_SEPARATOR, CLAUSE_HEADER_PATTERN
+from app.common.constants import CLAUSE_HEADER_PATTERN, CLAUSE_TEXT_SEPARATOR
 from app.common.exception.custom_exception import CommonException
 from app.common.exception.error_code import ErrorCode
+from app.schemas.analysis_response import RagResult, ClauseData
 from app.schemas.chunk_schema import Document, DocumentChunk
 from app.services.agreement.chunk_regex import CHUNKING_REGEX, ARTICLE_NUMBER
 from app.services.common.chunking_service import \
@@ -14,7 +15,7 @@ from app.services.common.chunking_service import \
   chunk_preamble_content
 
 
-def chunk_agreement_documents(documents: List[Document]) -> List[DocumentChunk]:
+def chunk_agreement_documents(documents: List[Document]) -> List[RagResult]:
   first_page = documents[0].page_content
 
   for strategy in CHUNKING_REGEX:
@@ -24,10 +25,12 @@ def chunk_agreement_documents(documents: List[Document]) -> List[DocumentChunk]:
   else:
     chunks = chunk_by_paragraph(documents)
 
-  if not chunks:
+  combined_chunks = combine_chunks_by_clause_number(chunks)
+
+  if not combined_chunks:
     raise CommonException(ErrorCode.CHUNKING_FAIL)
 
-  return chunks
+  return combined_chunks
 
 
 def chunk_by_article_and_clause_with_page(documents: List[Document],
@@ -69,7 +72,7 @@ def chunk_by_article_and_clause_with_page(documents: List[Document],
 
           if len(clause_content) >= MIN_CLAUSE_BODY_LENGTH:
             chunks.append(DocumentChunk(
-                clause_content=f"{ARTICLE_CLAUSE_SEPARATOR}\n{clause_content}",
+                clause_content=f"{clause_content}",
                 page=page,
                 order_index=order_index,
                 clause_number=f"{article_number}조"
@@ -78,7 +81,7 @@ def chunk_by_article_and_clause_with_page(documents: List[Document],
       else:
         if len(article_body) >= MIN_CLAUSE_BODY_LENGTH:
           chunks.append(DocumentChunk(
-              clause_content=f"{ARTICLE_CLAUSE_SEPARATOR}\n{article_body}",
+              clause_content=f"{article_body}",
               page=page,
               order_index=order_index,
               clause_number=f"{article_number}조"
@@ -111,3 +114,29 @@ def chunk_by_paragraph(documents: List[Document]) -> List[DocumentChunk]:
       )
 
   return chunks
+
+
+def combine_chunks_by_clause_number(document_chunks: List[DocumentChunk]) -> \
+    List[RagResult]:
+  combined_chunks: List[RagResult] = []
+  clause_map: dict[str, RagResult] = {}
+
+  for doc in document_chunks:
+    rag_result = clause_map.setdefault(doc.clause_number, RagResult())
+
+    if not doc.clause_content.strip():
+      continue
+
+    if rag_result.incorrect_text:
+      rag_result.incorrect_text += (
+          CLAUSE_TEXT_SEPARATOR + doc.clause_content)
+    else:
+      rag_result.incorrect_text = doc.clause_content
+      combined_chunks.append(rag_result)
+
+    rag_result.clause_data.append(ClauseData(
+        order_index=doc.order_index,
+        page=doc.page
+    ))
+
+  return combined_chunks
