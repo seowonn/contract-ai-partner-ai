@@ -25,12 +25,12 @@ def chunk_agreement_documents(documents: List[Document]) -> List[RagResult]:
   else:
     chunks = chunk_by_paragraph(documents)
 
-  combined_chunks = combine_chunks_by_clause_number(chunks)
+  document_chunks = combine_chunks_by_clause_number(chunks)
 
-  if not combined_chunks:
+  if not document_chunks:
     raise CommonException(ErrorCode.CHUNKING_FAIL)
 
-  return combined_chunks
+  return document_chunks
 
 
 def chunk_by_article_and_clause_with_page(documents: List[Document],
@@ -88,8 +88,13 @@ def chunk_by_article_and_clause_with_page(documents: List[Document],
           ))
           order_index += 1
 
-  chunks[-1].clause_content = chunks[-1].clause_content.split("     ")[0]
+  remove_signature_block(chunks[-1])
   return chunks
+
+
+def remove_signature_block(chunk: DocumentChunk):
+  chunk.clause_content = chunk.clause_content.split("     ")[0]
+  chunk.clause_content = chunk.clause_content.split(":", 1)[0]
 
 
 def chunk_by_paragraph(documents: List[Document]) -> List[DocumentChunk]:
@@ -128,6 +133,9 @@ def combine_chunks_by_clause_number(document_chunks: List[DocumentChunk]) -> \
       continue
 
     if rag_result.incorrect_text:
+      if len(doc.clause_content) > 500:
+        continue
+
       rag_result.incorrect_text += (
           CLAUSE_TEXT_SEPARATOR + doc.clause_content)
     else:

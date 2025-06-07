@@ -1,6 +1,6 @@
 import re
 from typing import List
-from typing import Optional, Tuple
+from typing import Tuple
 
 import matplotlib.pyplot as plt
 import nltk

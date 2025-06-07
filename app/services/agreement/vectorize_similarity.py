@@ -35,12 +35,12 @@ LLM_REQUIRED_KEYS = {"clause_content", "correctedText", "proofText",
 
 @async_measure_time
 async def vectorize_and_calculate_similarity(
-    combined_chunks: List[RagResult], document_request: DocumentRequest,
+    document_chunks: List[RagResult], document_request: DocumentRequest,
     byte_type_pdf: fitz.Document) -> List[RagResult]:
   qd_client = get_qdrant_client()
   await ensure_qdrant_collection(qd_client, document_request.categoryName)
 
-  embedding_inputs = await prepare_embedding_inputs(combined_chunks)
+  embedding_inputs = await prepare_embedding_inputs(document_chunks)
 
   async with get_dense_embedding_async_client() as dense_client, \
       get_sparse_embedding_async_client() as sparse_client:
@@ -57,7 +57,7 @@ async def vectorize_and_calculate_similarity(
     process_clause(qd_client, chunk, dense_vec, sparse_vec,
                    document_request.categoryName, byte_type_pdf, semaphore)
     for chunk, dense_vec, sparse_vec in
-    zip(combined_chunks, dense_vectors, sparse_vectors)
+    zip(document_chunks, dense_vectors, sparse_vectors)
   ]
   results = await asyncio.gather(*tasks)
 
@@ -66,7 +66,7 @@ async def vectorize_and_calculate_similarity(
 
   failure_score = sum(r.status == ChunkProcessStatus.FAILURE for r in results)
 
-  if not success_results and failure_score == len(combined_chunks):
+  if not success_results and failure_score == len(document_chunks):
     raise AgreementException(ErrorCode.CHUNK_ANALYSIS_FAILED)
 
   return success_results

@@ -42,15 +42,15 @@ def analyze_pdf_agreement(
   documents, fitz_document = load_pdf(document_request)
 
   # chunking
-  combined_chunks = chunk_agreement_documents(documents)
+  document_chunks = chunk_agreement_documents(documents)
 
   # embedding + search(rag)
   chunks = asyncio.run(
-      vectorize_and_calculate_similarity(combined_chunks, document_request,
+      vectorize_and_calculate_similarity(document_chunks, document_request,
                                          fitz_document))
 
   return DocumentAnalysisResult(chunks=chunks,
-                                total_chunks=len(combined_chunks),
+                                total_chunks=len(document_chunks),
                                 total_pages=len(documents))
 
 
