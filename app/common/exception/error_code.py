@@ -8,7 +8,7 @@ class ErrorCode(Enum):
   URL_NOT_FOUND = (HTTPStatus.BAD_REQUEST, "G002", "존재하지 않는 url 요청")
 
   # standard 관련 에러
-  UPLOAD_FAIL = (HTTPStatus.INTERNAL_SERVER_ERROR, "S001", "기준 문서 저장 과정 중 에러 발생")
+
   DELETE_FAIL = (HTTPStatus.INTERNAL_SERVER_ERROR, "S002", "삭제 과정 중 에러 발생")
   CHUNKING_FAIL = (HTTPStatus.INTERNAL_SERVER_ERROR, "S003", "청킹된 데이터 없음")
   PROMPT_MAX_TRIAL_FAILED = (HTTPStatus.INTERNAL_SERVER_ERROR, "S004", "프롬프트 응답 재요청 3회 시도 진행 결과 json 불일치")
@@ -17,11 +17,11 @@ class ErrorCode(Enum):
   BUILD_POINT_FAILED = (HTTPStatus.INTERNAL_SERVER_ERROR, "S007", "포인트 생성 과정 내 에러 발견")
 
   # common 에러
-  DATA_TYPE_NOT_MATCH = (HTTPStatus.BAD_REQUEST, "C001", "데이터의 형식이 맞지 않음")
+
   FILE_LOAD_FAILED = (HTTPStatus.BAD_REQUEST, "C002", "S3에서 파일을 가져 오지 못함")
   S3_CLIENT_ERROR = (HTTPStatus.INTERNAL_SERVER_ERROR, "C003", "S3 연결 도중 에러 발생")
   INVALID_FILE_STREAM = (HTTPStatus.INTERNAL_SERVER_ERROR, "C004", "유효하지 않은 파일 url")
-  INNER_DATA_ERROR = (HTTPStatus.INTERNAL_SERVER_ERROR, "C005", "페이지가 없거나 내부 구조가 깨져 있음")
+
   FILE_FORMAT_INVALID = (HTTPStatus.INTERNAL_SERVER_ERROR, "C006", "파일이 깨졌거나 지원 불가")
   S3_STREAM_READ_FAILED = (HTTPStatus.INTERNAL_SERVER_ERROR, "C007", "S3 스트림을 읽는 중 에러 발생")
   INVALID_JSON_FORMAT = (HTTPStatus.BAD_REQUEST, "C008", "입력 형태가 JSON 형식에 맞지 않음")
@@ -37,15 +37,15 @@ class ErrorCode(Enum):
   LLM_RESPONSE_TIMEOUT = (HTTPStatus.INTERNAL_SERVER_ERROR, "C018", "LLM 응답 시간 초과")
 
   # agreement 관련 에러
-  AGREEMENT_REVIEW_FAIL = (HTTPStatus.INTERNAL_SERVER_ERROR, "A001", "AI 검토 보고서 생성 작업 중 에러 발생")
-  INVALID_S3_PATH = (HTTPStatus.BAD_REQUEST, "A002", "openai 파싱에 적합하지 않은 s3 경로")
-  NO_SEARCH_RESULT = (HTTPStatus.INTERNAL_SERVER_ERROR, "A003", "Qdrant 내 검색된 데이터 없음")
+
+
+
   QDRANT_SEARCH_FAILED = (HTTPStatus.INTERNAL_SERVER_ERROR, "A004", "Qdrant 검색 결과 반환 실패")
   NO_POINTS_FOUND = (HTTPStatus.INTERNAL_SERVER_ERROR, "A005", "Qdrant 내 조회 가능한 포인트 없음")
   CHUNK_ANALYSIS_FAILED = (HTTPStatus.INTERNAL_SERVER_ERROR, "A006", "계약서 분석 내 누락건으로 인해 분석 실패")
   NO_SEPARATOR_FOUND = (HTTPStatus.INTERNAL_SERVER_ERROR, "A007", "원문 분리 인자 발견 못함")
   UNSUPPORTED_FILE_TYPE = (HTTPStatus.BAD_REQUEST, "A008", "지원되지 않는 타입의 파일")
-  NOT_SUPPORTED_FORMAT = (HTTPStatus.BAD_REQUEST, "A009", "지원되지 않는 문서 형식")
+
   NAVER_OCR_REQUEST_FAIL = (HTTPStatus.INTERNAL_SERVER_ERROR, "A010", "네이버 OCR 요청 실패")
   NAVER_OCR_SETTING_LOAD_FAIL = (HTTPStatus.INTERNAL_SERVER_ERROR, "A011", "API_URL 또는 API_KEY 환경변수가 설정되지 않음")
 
