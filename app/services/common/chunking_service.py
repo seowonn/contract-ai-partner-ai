@@ -161,45 +161,14 @@ def append_preamble(result: List[DocumentChunk], preamble: str, page: int,
   if not result:
     return order_index, result
 
-  pattern = get_clause_pattern(result[-1].clause_number)
-
-  if not pattern:
-    result.append(DocumentChunk(
-        clause_content=preamble,
-        page=page,
-        order_index=order_index,
-        clause_number=result[-1].clause_number
-    ))
-    return order_index + 1, result
-
-  clause_chunks = split_text_by_pattern(preamble, pattern)
-  lines = clause_chunks[0].strip().splitlines()
-  content_lines = [line for line in lines if not line.strip().startswith("페이지")]
 
   result.append(DocumentChunk(
-      clause_content="\n".join(content_lines),
+      clause_content=preamble,
       page=page,
       order_index=order_index,
       clause_number=result[-1].clause_number
   ))
-  order_index += 1
-
-  for j in range(1, len(clause_chunks), 2):
-    clause_number = clause_chunks[j].strip()
-    clause_content = clause_chunks[j + 1].strip() if j + 1 < len(
-        clause_chunks) else ""
-
-    if len(clause_content) >= MIN_CLAUSE_BODY_LENGTH:
-      prev_clause_prefix = result[-1].clause_number.split(" ")[0]
-      result.append(DocumentChunk(
-          clause_content=clause_content,
-          page=page,
-          order_index=order_index,
-          clause_number=f"{prev_clause_prefix} {clause_number}항"
-      ))
-      order_index += 1
-
-  return order_index, result
+  return order_index + 1, result
 
 
 def split_by_clause_header_pattern(clause_header: str, article_body: str) \
@@ -215,15 +184,3 @@ def split_by_clause_header_pattern(clause_header: str, article_body: str) \
 
   return split_text_by_pattern("\n" + article_body, clause_pattern)
 
-
-def get_clause_pattern(clause_number: str) -> Optional[str]:
-  parts = clause_number.split(" ")
-  if len(parts) < 1:
-    return None
-
-  pattern = parts[1].strip()
-  if re.match(r'[①-⑨]', pattern):
-    return r'([\n\s]*[①-⑨])'
-  elif re.match(r'\d+\.', pattern):
-    return r'(\n\s*\d+\.)'
-  return None

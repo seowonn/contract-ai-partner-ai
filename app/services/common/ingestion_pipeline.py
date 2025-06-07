@@ -41,9 +41,11 @@ def analyze_img_agreement(
 
 def analyze_pdf_agreement(
     document_request: DocumentRequest) -> DocumentAnalysisResult:
+
+  # PyMuPDF fitz로 document 객체 추출
   documents, fitz_document = load_pdf(document_request)
 
-  # chunk
+  # chunking
   document_chunks = chunk_agreement_documents(documents)
   combined_chunks = combine_chunks_by_clause_number(document_chunks)
 
