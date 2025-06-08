@@ -21,8 +21,7 @@ from app.common.exception.error_code import ErrorCode
 from app.containers.service_container import embedding_service, prompt_service
 from app.schemas.analysis_response import RagResult, SearchResult
 from app.schemas.document_request import DocumentRequest
-from app.services.common.keyword_searcher import \
-  get_sparse_embedding_async_client
+from app.services.common.keyword_searcher import get_sparse_embedding_client
 from app.services.common.llm_retry import retry_llm_call
 from app.services.common.qdrant_utils import ensure_qdrant_collection
 
@@ -37,13 +36,13 @@ LLM_REQUIRED_KEYS = {"clause_content", "correctedText", "proofText",
 async def vectorize_and_calculate_similarity(
     document_chunks: List[RagResult], document_request: DocumentRequest,
     byte_type_pdf: fitz.Document) -> List[RagResult]:
+  # 현재 매 요청마다 클라이언트 생성중인데 이게 맞는지 의문
   qd_client = get_qdrant_client()
   await ensure_qdrant_collection(qd_client, document_request.categoryName)
 
-  embedding_inputs = await prepare_embedding_inputs(document_chunks)
-
-  async with get_dense_embedding_async_client() as dense_client, \
-      get_sparse_embedding_async_client() as sparse_client:
+  embedding_inputs = [chunk.incorrect_text for chunk in document_chunks]
+  async with get_dense_embedding_async_client() as dense_client:
+    sparse_client = get_sparse_embedding_client()
     dense_task = embedding_service.batch_embed_texts(dense_client,
                                                      embedding_inputs)
     sparse_task = embedding_service.batch_embed_texts_sparse(sparse_client,
@@ -54,8 +53,9 @@ async def vectorize_and_calculate_similarity(
   # ✅ 세마포어 외부로 이동하여 task 재사용성 향상
   semaphore = Semaphore(5)
   tasks = [
-    process_clause(qd_client, chunk, dense_vec, sparse_vec,
-                   document_request.categoryName, byte_type_pdf, semaphore)
+    retrieve_and_analyze_clause(qd_client, chunk, dense_vec, sparse_vec,
+                                document_request.categoryName, byte_type_pdf,
+                                semaphore)
     for chunk, dense_vec, sparse_vec in
     zip(document_chunks, dense_vectors, sparse_vectors)
   ]
@@ -72,29 +72,15 @@ async def vectorize_and_calculate_similarity(
   return success_results
 
 
-async def prepare_embedding_inputs(chunks: List[RagResult]) -> List[str]:
-  inputs = []
-  for chunk in chunks:
-    inputs.append(f"{chunk.incorrect_text}")
-  return inputs
-
-
-async def process_clause(qd_client: AsyncQdrantClient, rag_result: RagResult,
-    dense_vec: List[float], sparse_vec: SparseVector,
+async def retrieve_and_analyze_clause(qd_client: AsyncQdrantClient,
+    rag_result: RagResult, dense_vec: List[float], sparse_vec: SparseVector,
     collection_name: str, byte_type_pdf: fitz.Document,
     semaphore: Semaphore) -> ChunkProcessResult:
   search_results = await search_qdrant(semaphore, collection_name, dense_vec,
-                                       sparse_vec,
-                                       qd_client)
+                                       sparse_vec, qd_client)
   parse_incorrect_text(rag_result)
 
-  async with get_prompt_async_client() as prompt_client:
-    corrected_result = await retry_llm_call(
-        prompt_service.correct_contract,
-        prompt_client, rag_result.incorrect_text.replace("\n", " "),
-        search_results,
-        required_keys=LLM_REQUIRED_KEYS
-    )
+  corrected_result = await analyze_clause_llm(semaphore, rag_result, search_results)
   if not corrected_result:
     return ChunkProcessResult(status=ChunkProcessStatus.FAILURE)
 
@@ -182,6 +168,19 @@ def gather_search_results(search_results: QueryResponse) -> List[SearchResult]:
     )
     for point in search_results.points[:SEARCH_COUNT]
   ]
+
+
+async def analyze_clause_llm(semaphore: Semaphore, rag_result: RagResult,
+  search_results: List[SearchResult]) -> Optional[dict]:
+  async with semaphore:
+    async with get_prompt_async_client() as prompt_client:
+      corrected_result = await retry_llm_call(
+          prompt_service.correct_contract,
+          prompt_client, rag_result.incorrect_text.replace("\n", " "),
+          search_results,
+          required_keys=LLM_REQUIRED_KEYS
+      )
+  return corrected_result
 
 
 def is_correct_response_format(result: dict[str, str]) -> bool:

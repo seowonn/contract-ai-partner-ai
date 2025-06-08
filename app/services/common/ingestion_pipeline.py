@@ -38,13 +38,13 @@ def analyze_img_agreement(
 def analyze_pdf_agreement(
     document_request: DocumentRequest) -> DocumentAnalysisResult:
 
-  # PyMuPDF fitz로 document 객체 추출
+  # load document: PyMuPDF fitz로 document 객체 추출
   documents, fitz_document = load_pdf(document_request)
 
   # chunking
   document_chunks = chunk_agreement_documents(documents)
 
-  # embedding + search(rag)
+  # vectorize + similarity search + LLM (async pipeline)
   chunks = asyncio.run(
       vectorize_and_calculate_similarity(document_chunks, document_request,
                                          fitz_document))

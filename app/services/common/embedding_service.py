@@ -26,6 +26,8 @@ class EmbeddingService:
       batch = inputs[i:i + MAX_BATCH_SIZE]
       try:
         embeddings = await self.embed_texts(embedding_client, batch)
+        if len(embeddings) != len(batch):
+          raise CommonException(ErrorCode.EMBEDDING_MISMATCH)
         all_embeddings.extend(embeddings)
       except Exception:
         raise CommonException(ErrorCode.EMBEDDING_FAILED)

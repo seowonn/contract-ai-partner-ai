@@ -21,7 +21,7 @@ class ErrorCode(Enum):
   FILE_LOAD_FAILED = (HTTPStatus.BAD_REQUEST, "C002", "S3에서 파일을 가져 오지 못함")
   S3_CLIENT_ERROR = (HTTPStatus.INTERNAL_SERVER_ERROR, "C003", "S3 연결 도중 에러 발생")
   INVALID_FILE_STREAM = (HTTPStatus.INTERNAL_SERVER_ERROR, "C004", "유효하지 않은 파일 url")
-
+  EMBEDDING_MISMATCH = (HTTPStatus.INTERNAL_SERVER_ERROR, "C005", "임베딩 결과 개수 불일치")
   FILE_FORMAT_INVALID = (HTTPStatus.INTERNAL_SERVER_ERROR, "C006", "파일이 깨졌거나 지원 불가")
   S3_STREAM_READ_FAILED = (HTTPStatus.INTERNAL_SERVER_ERROR, "C007", "S3 스트림을 읽는 중 에러 발생")
   INVALID_JSON_FORMAT = (HTTPStatus.BAD_REQUEST, "C008", "입력 형태가 JSON 형식에 맞지 않음")

@@ -23,11 +23,9 @@ from app.common.exception.error_code import ErrorCode
 from app.containers.service_container import embedding_service, prompt_service
 from app.schemas.analysis_response import RagResult
 from app.schemas.document_request import DocumentRequest
-from app.services.agreement.vectorize_similarity import \
-  prepare_embedding_inputs, search_qdrant, parse_incorrect_text, \
-  LLM_REQUIRED_KEYS, VIOLATION_THRESHOLD
-from app.services.common.keyword_searcher import \
-  get_sparse_embedding_async_client
+from app.services.agreement.vectorize_similarity import search_qdrant, \
+  parse_incorrect_text, LLM_REQUIRED_KEYS, VIOLATION_THRESHOLD
+from app.services.common.keyword_searcher import get_sparse_embedding_client
 from app.services.common.llm_retry import retry_llm_call
 from app.services.common.qdrant_utils import ensure_qdrant_collection
 
@@ -134,10 +132,10 @@ async def vectorize_and_calculate_similarity_ocr(
   qd_client = get_qdrant_client()
   await ensure_qdrant_collection(qd_client, document_request.categoryName)
 
-  embedding_inputs = await prepare_embedding_inputs(combined_chunks)
+  embedding_inputs = [chunk.incorrect_text for chunk in combined_chunks]
 
-  async with get_dense_embedding_async_client() as dense_client, \
-      get_sparse_embedding_async_client() as sparse_client:
+  async with get_dense_embedding_async_client() as dense_client:
+    sparse_client = get_sparse_embedding_client()
     dense_task = embedding_service.batch_embed_texts(dense_client,
                                                      embedding_inputs)
     sparse_task = embedding_service.batch_embed_texts_sparse(sparse_client,
