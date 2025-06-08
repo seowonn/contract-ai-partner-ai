@@ -78,7 +78,6 @@ async def retrieve_and_analyze_clause(qd_client: AsyncQdrantClient,
     semaphore: Semaphore) -> ChunkProcessResult:
   search_results = await search_qdrant(semaphore, collection_name, dense_vec,
                                        sparse_vec, qd_client)
-  parse_incorrect_text(rag_result)
 
   corrected_result = await analyze_clause_llm(semaphore, rag_result, search_results)
   if not corrected_result:
@@ -109,13 +108,6 @@ async def retrieve_and_analyze_clause(qd_client: AsyncQdrantClient,
 
   return ChunkProcessResult(status=ChunkProcessStatus.SUCCESS,
                             result=rag_result)
-
-
-def parse_incorrect_text(rag_result: RagResult) -> None:
-  try:
-    rag_result.incorrect_text = rag_result.incorrect_text.replace("\n", " ")
-  except Exception:
-    raise AgreementException(ErrorCode.NO_SEPARATOR_FOUND)
 
 
 async def search_qdrant(semaphore: Semaphore, collection_name: str,
@@ -181,14 +173,6 @@ async def analyze_clause_llm(semaphore: Semaphore, rag_result: RagResult,
           required_keys=LLM_REQUIRED_KEYS
       )
   return corrected_result
-
-
-def is_correct_response_format(result: dict[str, str]) -> bool:
-  return (
-      isinstance(result, dict)
-      and LLM_REQUIRED_KEYS.issubset(result.keys())
-      and all(isinstance(result[key], str) for key in LLM_REQUIRED_KEYS)
-  )
 
 
 def set_result_data(corrected_result: Optional[

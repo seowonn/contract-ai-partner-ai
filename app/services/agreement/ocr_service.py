@@ -24,7 +24,7 @@ from app.containers.service_container import embedding_service, prompt_service
 from app.schemas.analysis_response import RagResult
 from app.schemas.document_request import DocumentRequest
 from app.services.agreement.vectorize_similarity import search_qdrant, \
-  parse_incorrect_text, LLM_REQUIRED_KEYS, VIOLATION_THRESHOLD
+  LLM_REQUIRED_KEYS, VIOLATION_THRESHOLD
 from app.services.common.keyword_searcher import get_sparse_embedding_client
 from app.services.common.llm_retry import retry_llm_call
 from app.services.common.qdrant_utils import ensure_qdrant_collection
@@ -171,8 +171,6 @@ async def process_clause_ocr(qd_client: AsyncQdrantClient,
   search_results = await search_qdrant(semaphore, collection_name,
                                        dense_vec, sparse_vec,
                                        qd_client)
-
-  parse_incorrect_text(rag_result)
 
   async with get_prompt_async_client() as prompt_client:
     corrected_result = await retry_llm_call(
